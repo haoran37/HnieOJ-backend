@@ -1,0 +1,13 @@
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+
+sa-token:
+  token-name: Authorization
+  token-prefix: Bearer
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus

@@ -1,0 +1,17 @@
+spring:
+  application:
+    name: hnieoj-submission
+  profiles:
+    active: dev
+  cloud:
+    nacos:
+      server-addr: 106.54.177.244:8848
+      discovery:
+        namespace: dev
+      config:
+        namespace: dev
+        file-extension: yaml
+  config:
+    import:
+      - optional:nacos:hnieoj-secrets.yaml?group=HNIEOJ_SECRET_GROUP
+      - optional:nacos:${spring.application.name}.yaml?group=DEFAULT_GROUP

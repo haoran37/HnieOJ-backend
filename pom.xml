@@ -50,10 +50,10 @@
         <spring-cloud-alibaba.version>2023.0.1.2</spring-cloud-alibaba.version>
 
         <!-- Sa-Token 认证框架 -->
-        <sa-token.version>1.37.0</sa-token.version>
+        <sa-token.version>1.44.0</sa-token.version>
 
         <!-- 数据库相关 (MyBatis-Plus / Druid) -->
-        <mybatis-plus.version>3.5.5</mybatis-plus.version>
+        <mybatis-plus.version>3.5.7</mybatis-plus.version>
         <druid.version>1.2.20</druid.version>
 
         <!-- 工具类库 -->
@@ -93,16 +93,21 @@
             <!-- ~~~~~ 数据库 & ORM (MyBatis-Plus / Druid) ~~~~~ -->
             <dependency>
                 <groupId>com.baomidou</groupId>
-                <artifactId>mybatis-plus-boot-starter</artifactId>
+                <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
                 <version>${mybatis-plus.version}</version>
             </dependency>
             <dependency>
                 <groupId>com.alibaba</groupId>
-                <artifactId>druid-spring-boot-starter</artifactId>
+                <artifactId>druid-spring-boot-3-starter</artifactId>
                 <version>${druid.version}</version>
             </dependency>
 
             <!-- ~~~~~ Sa-Token 认证鉴权 ~~~~~ -->
+            <dependency>
+                <groupId>cn.dev33</groupId>
+                <artifactId>sa-token-reactor-spring-boot3-starter</artifactId>
+                <version>${sa-token.version}</version>
+            </dependency>
             <dependency>
                 <groupId>cn.dev33</groupId>
                 <artifactId>sa-token-spring-boot3-starter</artifactId>

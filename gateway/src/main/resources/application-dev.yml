@@ -1,2 +1,10 @@
 server:
   port: ${SERVER_PORT:8080}
+
+sa-token:
+  token-name: Authorization
+  token-prefix: Bearer
+
+hnieoj:
+  auth-cache:
+    ttl-minutes: 240

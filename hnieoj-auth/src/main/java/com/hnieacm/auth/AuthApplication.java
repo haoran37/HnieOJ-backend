@@ -9,7 +9,7 @@ import org.springframework.cloud.client.discovery.EnableDiscoveryClient;
  * @Date: 2026/02/10
  * @Description: Auth Service 启动类
  */
-@SpringBootApplication
+@SpringBootApplication(scanBasePackages = "com.hnieacm")
 @EnableDiscoveryClient
 public class AuthApplication {
     public static void main(String[] args) {

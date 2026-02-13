@@ -1,0 +1,8 @@
+{
+  "properties": [
+    {
+      "name": "hnieoj.auth-cache.ttl-minutes",
+      "type": "java.lang.String",
+      "description": "Redis TLL time."
+  }
+] }

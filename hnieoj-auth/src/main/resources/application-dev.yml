@@ -3,4 +3,7 @@ server:
 
 hnieoj:
   auth-cache:
-    ttl-minutes: 240
+    ttl:
+      roles: 24h
+      permissions: 12h
+      empty: 5m

@@ -1,5 +1,6 @@
 package com.hnieacm.gateway.config;
 
+import cn.dev33.satoken.SaManager;
 import cn.dev33.satoken.exception.NotLoginException;
 import cn.dev33.satoken.exception.NotPermissionException;
 import cn.dev33.satoken.exception.NotRoleException;
@@ -37,7 +38,14 @@ public class SaTokenConfig {
                     // 统一登录态校验（双重保险：exclude + notMatch，避免误拦截登录/注册）
                     SaRouter.match("/**")
                             .notMatch("/favicon.ico", "/actuator/**", "/auth/login", "/auth/register")
-                            .check(r -> StpUtil.checkLogin());
+                            .check(r -> {
+                                StpUtil.checkLogin();
+                                // 滑动过期：在每个经过身份验证的请求上续订令牌/会话TTL
+                                long timeoutSeconds = SaManager.getConfig().getTimeout();
+                                if (timeoutSeconds > 0) {
+                                    StpUtil.renewTimeout(timeoutSeconds);
+                                }
+                            });
 
                     // 角色校验
                     SaRouter.match("/admin/**", r -> StpUtil.checkRoleOr(RoleConstant.ADMIN, RoleConstant.ROOT));

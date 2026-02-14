@@ -2,9 +2,10 @@ package com.hnieacm.gateway.service;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.hnieacm.common.constant.AuthCacheConstant;
+import com.hnieacm.gateway.properties.AuthCacheTtlProperties;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.context.config.annotation.RefreshScope;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
@@ -29,10 +30,8 @@ public class AuthCacheService {
     private final StringRedisTemplate stringRedisTemplate;
     private final ObjectMapper objectMapper;
 
-
     // roles/permissions 缓存 TTL
-    @Value("${hnieoj.auth-cache.ttl-minutes:}")
-    private long authCacheTtlMinutes;
+    private final AuthCacheTtlProperties authCacheTtlProperties;
 
     /**
      * @MethodName getList
@@ -58,7 +57,7 @@ public class AuthCacheService {
             }
 
             if (!data.isEmpty()) {
-                stringRedisTemplate.expire(cacheKey, Duration.ofMinutes(authCacheTtlMinutes));
+                stringRedisTemplate.expire(cacheKey, resolveTtl(dataType));
             }
 
             log.debug("Auth cache hit, type: {}, uid: {}, size: {}", dataType, uid, data.size());
@@ -82,7 +81,7 @@ public class AuthCacheService {
      */
     public void setList(String cacheKey, List<String> data, String uid, String dataType) {
         List<String> safeData = data == null ? Collections.emptyList() : data;
-        Duration ttl = safeData.isEmpty() ? Duration.ofMinutes(5) : Duration.ofMinutes(authCacheTtlMinutes);
+        Duration ttl = safeData.isEmpty() ? resolveEmptyTtl() : resolveTtl(dataType);
         try {
             String json = objectMapper.writeValueAsString(safeData);
             stringRedisTemplate.opsForValue().set(cacheKey, json, ttl);
@@ -90,5 +89,28 @@ public class AuthCacheService {
         } catch (Exception e) {
             log.warn("Write auth cache failed, type: {}, uid: {}", dataType, uid, e);
         }
+    }
+
+    /**
+     * @MethodName resolveTtl
+     * @Param dataType
+     * @Description 解析 TTL
+     * @Return @return {@link Duration }
+     * @Author HaoRan_Lyu
+     * @Date 2026/02/14
+     */
+    private Duration resolveTtl(String dataType) {
+        if (AuthCacheConstant.ROLE_CACHE_TYPE.equals(dataType)) {
+            return authCacheTtlProperties.getRoles();
+        }
+        if (AuthCacheConstant.PERMISSION_CACHE_TYPE.equals(dataType)) {
+            return authCacheTtlProperties.getPermissions();
+        }
+        throw new IllegalArgumentException("Unsupported auth cache data type: " + dataType);
+    }
+
+    private Duration resolveEmptyTtl() {
+        Duration emptyTtl = authCacheTtlProperties.getEmpty();
+        return emptyTtl == null ? Duration.ofMinutes(5) : emptyTtl;
     }
 }

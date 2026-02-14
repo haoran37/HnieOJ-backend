@@ -29,13 +29,13 @@ public class StpInterfaceImpl implements StpInterface {
     public List<String> getPermissionList(Object loginId, String loginType) {
         String uid = String.valueOf(loginId);
         String cacheKey = AuthCacheConstant.PERMISSION_CACHE_PREFIX + uid;
-        List<String> cached = authCacheService.getList(cacheKey, uid, "permissions");
+        List<String> cached = authCacheService.getList(cacheKey, uid, AuthCacheConstant.PERMISSION_CACHE_TYPE);
         if (!cached.isEmpty()) {
             return cached;
         }
 
         List<String> loaded = authRemoteQueryService.queryPermissions(uid);
-        authCacheService.setList(cacheKey, loaded, uid, "permissions");
+        authCacheService.setList(cacheKey, loaded, uid, AuthCacheConstant.PERMISSION_CACHE_TYPE);
         // permissions 允许为空（学生无额外权限）
         return loaded;
     }
@@ -44,13 +44,13 @@ public class StpInterfaceImpl implements StpInterface {
     public List<String> getRoleList(Object loginId, String loginType) {
         String uid = String.valueOf(loginId);
         String cacheKey = AuthCacheConstant.ROLE_CACHE_PREFIX + uid;
-        List<String> cached = authCacheService.getList(cacheKey, uid, "roles");
+        List<String> cached = authCacheService.getList(cacheKey, uid, AuthCacheConstant.ROLE_CACHE_TYPE);
         if (!cached.isEmpty()) {
             return cached;
         }
 
         List<String> loaded = authRemoteQueryService.queryRoles(uid);
-        authCacheService.setList(cacheKey, loaded, uid, "roles");
+        authCacheService.setList(cacheKey, loaded, uid, AuthCacheConstant.ROLE_CACHE_TYPE);
 
         // role 不应为空（最少应为 student），为空视为权限数据异常
         if (loaded == null || loaded.isEmpty()) {

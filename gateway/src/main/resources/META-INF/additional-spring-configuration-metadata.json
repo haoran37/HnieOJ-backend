@@ -1,8 +1,20 @@
 {
   "properties": [
     {
-      "name": "hnieoj.auth-cache.ttl-minutes",
-      "type": "java.lang.String",
-      "description": "Redis TTL time."
-  }
-] }
+      "name": "hnieoj.auth-cache.ttl.roles",
+      "type": "java.time.Duration",
+      "description": "TTL for auth role cache (Redis key: auth:roles:{uid})."
+    },
+    {
+      "name": "hnieoj.auth-cache.ttl.permissions",
+      "type": "java.time.Duration",
+      "description": "TTL for auth permission cache (Redis key: auth:permissions:{uid})."
+    },
+    {
+      "name": "hnieoj.auth-cache.ttl.empty",
+      "type": "java.time.Duration",
+      "description": "TTL for empty auth cache (avoid long negative caching)."
+    }
+  ]
+}
+

@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.hnieacm.user.mapper.UserInfoMapper">
+
+    <!-- 查询具有指定角色权限的用户信息 -->
+    <select id="selectPermissionUsers" resultType="com.hnieacm.user.vo.PermissionUserVo">
+        SELECT
+            ui.uid,
+            ui.username,
+            IFNULL(col.name, '-') AS college,
+            IFNULL(cls.name, '-') AS majorClass,
+            ui.email,
+            ui.phone
+        FROM user_info ui
+            INNER JOIN (
+                SELECT
+                    ur.user_uid
+                FROM user_role ur
+                WHERE ur.role_id IN
+                <foreach collection="roleIds" item="rid" open="(" separator="," close=")">
+                    #{rid}
+                </foreach>
+                GROUP BY ur.user_uid
+            ) urp ON urp.user_uid = ui.uid
+            LEFT JOIN sys_college col ON col.id = ui.college_id
+            LEFT JOIN sys_class cls ON cls.id = ui.class_id
+        ORDER BY ui.gmt_create DESC
+    </select>
+
+    <!-- 根据关键词搜索用户信息 -->
+    <select id="searchUsers" resultType="com.hnieacm.user.vo.UserSearchVo">
+        SELECT
+            ui.uid,
+            ui.username,
+            IFNULL(col.name, '-') AS college,
+            IFNULL(cls.name, '-') AS majorClass
+        FROM user_info ui
+            LEFT JOIN sys_college col ON col.id = ui.college_id
+            LEFT JOIN sys_class cls ON cls.id = ui.class_id
+        WHERE
+            (ui.uid LIKE CONCAT('%', #{query}, '%')
+                OR ui.username LIKE CONCAT('%', #{query}, '%')
+                OR ui.realname LIKE CONCAT('%', #{query}, '%'))
+        ORDER BY ui.gmt_create DESC
+    </select>
+
+</mapper>

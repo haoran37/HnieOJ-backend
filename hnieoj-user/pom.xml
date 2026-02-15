@@ -73,6 +73,21 @@
             <scope>runtime</scope>
         </dependency>
 
+        <!-- ==================== Sa-Token 认证鉴权 ==================== -->
+        <dependency>
+            <groupId>cn.dev33</groupId>
+            <artifactId>sa-token-spring-boot3-starter</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>cn.dev33</groupId>
+            <artifactId>sa-token-redis-jackson</artifactId>
+        </dependency>
+
+        <!-- ==================== 工具类库 (Hutool) ==================== -->
+        <dependency>
+            <groupId>cn.hutool</groupId>
+            <artifactId>hutool-all</artifactId>
+        </dependency>
 
         <!-- ==================== Spring Boot 监控 (Actuator) ==================== -->
         <dependency>

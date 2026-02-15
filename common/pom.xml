@@ -32,6 +32,12 @@
             <artifactId>hutool-all</artifactId>
         </dependency>
 
+        <!-- ==================== Sa-Token 核心（用于公共异常处理等） ==================== -->
+        <dependency>
+            <groupId>cn.dev33</groupId>
+            <artifactId>sa-token-core</artifactId>
+        </dependency>
+
         <!-- ==================== 开发辅助 (Lombok) ==================== -->
         <dependency>
             <groupId>org.projectlombok</groupId>

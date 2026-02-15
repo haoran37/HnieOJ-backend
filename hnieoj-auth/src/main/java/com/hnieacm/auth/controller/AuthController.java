@@ -23,7 +23,7 @@ import org.springframework.web.bind.annotation.RestController;
 @Slf4j
 @Tag(name = "认证模块")
 @RestController
-@RequestMapping("/auth")
+@RequestMapping("/api/auth")
 @RequiredArgsConstructor
 public class AuthController {
 
@@ -61,4 +61,3 @@ public class AuthController {
         return Result.success("注册申请提交成功，请等待审核", null);
     }
 }
-

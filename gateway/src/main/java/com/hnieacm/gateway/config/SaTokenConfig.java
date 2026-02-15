@@ -32,12 +32,12 @@ public class SaTokenConfig {
                 .addInclude("/**")
                 .addExclude("/favicon.ico")
                 .addExclude("/actuator/**")
-                .addExclude("/auth/login")
-                .addExclude("/auth/register")
+                .addExclude("/api/auth/login")
+                .addExclude("/api/auth/register")
                 .setAuth(obj -> {
                     // 统一登录态校验（双重保险：exclude + notMatch，避免误拦截登录/注册）
                     SaRouter.match("/**")
-                            .notMatch("/favicon.ico", "/actuator/**", "/auth/login", "/auth/register")
+                            .notMatch("/favicon.ico", "/actuator/**", "/api/auth/login", "/api/auth/register")
                             .check(r -> {
                                 StpUtil.checkLogin();
                                 // 滑动过期：在每个经过身份验证的请求上续订令牌/会话TTL
@@ -48,15 +48,17 @@ public class SaTokenConfig {
                             });
 
                     // 角色校验
-                    SaRouter.match("/admin/**", r -> StpUtil.checkRoleOr(RoleConstant.ADMIN, RoleConstant.ROOT));
+                    SaRouter.match("/api/admin/**", r -> StpUtil.checkRoleOr(RoleConstant.ADMIN, RoleConstant.ROOT));
 
                     // 题目管理权限校验
-                    SaRouter.match("/problem/add", r -> StpUtil.checkPermission(PermissionConstant.PROBLEM_CREATE));
-                    SaRouter.match("/problem/edit/**", r -> StpUtil.checkPermission(PermissionConstant.PROBLEM_UPDATE));
-                    SaRouter.match("/problem/delete/**", r -> StpUtil.checkPermission(PermissionConstant.PROBLEM_DELETE));
+                    SaRouter.match("/api/problem/add", r -> StpUtil.checkPermission(PermissionConstant.PROBLEM_CREATE));
+                    SaRouter.match("/api/problem/edit/**", r -> StpUtil.checkPermission(PermissionConstant.PROBLEM_UPDATE));
+                    SaRouter.match("/api/problem/delete/**", r -> StpUtil.checkPermission(PermissionConstant.PROBLEM_DELETE));
 
                     // 用户管理权限校验
-                    SaRouter.match("/user/manage/**", r -> StpUtil.checkPermission(PermissionConstant.USER_MANAGE));
+                    SaRouter.match("/api/users/**", r -> StpUtil.checkPermission(PermissionConstant.USER_MANAGE));
+                    SaRouter.match("/api/admin/permission/**", r -> StpUtil.checkPermission(PermissionConstant.USER_MANAGE));
+                    SaRouter.match("/api/admin/users/**", r -> StpUtil.checkPermission(PermissionConstant.USER_MANAGE));
                 })
                 .setError(ex -> {
                     // 便于排查：记录异常类型与 message

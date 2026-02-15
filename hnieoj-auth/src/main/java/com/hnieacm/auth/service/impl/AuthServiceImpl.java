@@ -16,6 +16,7 @@ import com.hnieacm.auth.mapper.SysClassMapper;
 import com.hnieacm.auth.mapper.SysCollegeMapper;
 import com.hnieacm.auth.mapper.UserInfoMapper;
 import com.hnieacm.auth.mapper.UserRegisterApplyMapper;
+import com.hnieacm.auth.properties.AuthValidationProperties;
 import com.hnieacm.auth.service.AuthPermissionService;
 import com.hnieacm.auth.service.UserAuthCacheService;
 import com.hnieacm.auth.service.AuthService;
@@ -42,18 +43,13 @@ import java.util.List;
 @RequiredArgsConstructor
 public class AuthServiceImpl implements AuthService {
 
-    //TODO: 将参数移至 nacos 中
-    private static final int USERNAME_MIN_LENGTH = 2;
-    private static final int USERNAME_MAX_LENGTH = 20;
-    private static final int PASSWORD_MIN_LENGTH = 6;
-    private static final int PASSWORD_MAX_LENGTH = 32;
-
     private final UserInfoMapper userInfoMapper;
     private final UserRegisterApplyMapper userRegisterApplyMapper;
     private final SysCollegeMapper sysCollegeMapper;
     private final SysClassMapper sysClassMapper;
     private final AuthPermissionService authPermissionService;
     private final UserAuthCacheService userAuthCacheService;
+    private final AuthValidationProperties authValidationProperties;
 
     /**
      * @MethodName login
@@ -120,8 +116,10 @@ public class AuthServiceImpl implements AuthService {
         }
 
         // 校验密码长度
-        if (request.getPassword().length() < PASSWORD_MIN_LENGTH || request.getPassword().length() > PASSWORD_MAX_LENGTH) {
-            throw new BizException(ResultCode.BAD_REQUEST, "密码长度应在6-32之间");
+        int passwordMinLength = authValidationProperties.getPasswordMinLength();
+        int passwordMaxLength = authValidationProperties.getPasswordMaxLength();
+        if (request.getPassword().length() < passwordMinLength || request.getPassword().length() > passwordMaxLength) {
+            throw new BizException(ResultCode.BAD_REQUEST, "密码长度应在" + passwordMinLength + "-" + passwordMaxLength + "之间");
         }
 
         // 校验 uid 是否已存在
@@ -140,8 +138,10 @@ public class AuthServiceImpl implements AuthService {
         }
 
         // 校验用户名长度
-        if (request.getUsername().length() < USERNAME_MIN_LENGTH || request.getUsername().length() > USERNAME_MAX_LENGTH) {
-            throw new BizException(ResultCode.INVALID_USERNAME, "用户名长度应在2-20之间");
+        int usernameMinLength = authValidationProperties.getUsernameMinLength();
+        int usernameMaxLength = authValidationProperties.getUsernameMaxLength();
+        if (request.getUsername().length() < usernameMinLength || request.getUsername().length() > usernameMaxLength) {
+            throw new BizException(ResultCode.INVALID_USERNAME, "用户名长度应在" + usernameMinLength + "-" + usernameMaxLength + "之间");
         }
 
         // 校验邮箱格式
@@ -205,22 +205,4 @@ public class AuthServiceImpl implements AuthService {
         }
     }
 
-    /**
-     * @MethodName resolvePrimaryRole
-     * @Param uid
-     * @Description 从 user_role + role 表解析用户主角色。
-     * <p>
-     * 说明：当前登录接口只返回一个 role（兼容前端展示）；当用户存在多个角色时按优先级取最高：
-     * root > admin > teacher > ta > student。
-     * @Return @return {@link String }
-     * @Author HaoRan_Lyu
-     * @Date 2026/02/13
-     */
-    private String resolvePrimaryRole(String uid) {
-        List<String> roles = authPermissionService.getUserRoles(uid);
-        if (roles == null || roles.isEmpty()) {
-            return RoleConstant.STUDENT;
-        }
-        return roles.get(0);
-    }
 }

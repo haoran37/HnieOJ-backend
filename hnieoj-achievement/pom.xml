@@ -73,6 +73,16 @@
             <scope>runtime</scope>
         </dependency>
 
+        <!-- ==================== Sa-Token 璁よ瘉閴存潈 ==================== -->
+        <dependency>
+            <groupId>cn.dev33</groupId>
+            <artifactId>sa-token-spring-boot3-starter</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>cn.dev33</groupId>
+            <artifactId>sa-token-redis-jackson</artifactId>
+        </dependency>
+
 
         <!-- ==================== Spring Boot 监控 (Actuator) ==================== -->
         <dependency>

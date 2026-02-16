@@ -24,9 +24,9 @@ import org.springframework.web.bind.annotation.RestController;
 /**
  * @Author: HaoRan_Lyu
  * @Date: 2026/02/14
- * @Description: 用户管理
+ * @Description: 用户管理（管理员）
  */
-@Tag(name = "用户管理模块")
+@Tag(name = "用户管理模块(管理员)")
 @RestController
 @RequestMapping("/api/users")
 @RequiredArgsConstructor
@@ -69,11 +69,11 @@ public class UserManageController {
         return Result.success("批量禁用成功", null);
     }
 
-    @Operation(summary = "批量激活用户")
+    @Operation(summary = "批量启用用户")
     @PutMapping("/batch/enable")
     public Result<Void> batchEnable(@Valid @RequestBody BatchUidsRequest request) {
         userManageService.batchEnableUsers(request);
-        return Result.success("批量激活成功", null);
+        return Result.success("批量启用成功", null);
     }
 
     @Operation(summary = "批量删除用户")

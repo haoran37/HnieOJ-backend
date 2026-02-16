@@ -9,6 +9,8 @@ import com.hnieacm.user.dto.UpdateUserPermissionRequest;
 import com.hnieacm.user.dto.UpdateUserRequest;
 import com.hnieacm.user.vo.CreateUserVo;
 import com.hnieacm.user.vo.PermissionUserVo;
+import com.hnieacm.user.vo.UserDetailVo;
+import com.hnieacm.user.vo.UserListVo;
 import com.hnieacm.user.vo.UserSearchVo;
 
 /**
@@ -54,6 +56,16 @@ public interface UserManageService {
     void batchDeleteUsers(BatchUidsRequest request);
 
     /**
+     * 获取用户列表（支持复合筛选）
+     */
+    PageVo<UserListVo> listUsers(String keyword, Long collegeId, String grade, Long classId, int page, int pageSize);
+
+    /**
+     * 获取用户信息（公开字段，用于展示）
+     */
+    UserDetailVo getUserDetail(String uid);
+
+    /**
      * 获取权限用户列表
      */
     PageVo<PermissionUserVo> getPermissionUsers(int page, int pageSize);
@@ -83,4 +95,3 @@ public interface UserManageService {
      */
     void batchRevokePermissions(BatchUidsRequest request);
 }
-

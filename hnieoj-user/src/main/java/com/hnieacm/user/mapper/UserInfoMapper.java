@@ -3,6 +3,7 @@ package com.hnieacm.user.mapper;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.hnieacm.user.entity.UserInfo;
+import com.hnieacm.user.vo.UserListVo;
 import com.hnieacm.user.vo.PermissionUserVo;
 import com.hnieacm.user.vo.UserSearchVo;
 import org.apache.ibatis.annotations.Mapper;
@@ -27,4 +28,13 @@ public interface UserInfoMapper extends BaseMapper<UserInfo> {
      * 搜索用户
      */
     IPage<UserSearchVo> searchUsers(IPage<UserSearchVo> page, @Param("query") String query);
+
+    /**
+     * 用户列表（复合筛选）
+     */
+    IPage<UserListVo> selectUserList(IPage<UserListVo> page,
+                                    @Param("keyword") String keyword,
+                                    @Param("collegeId") Long collegeId,
+                                    @Param("grade") String grade,
+                                    @Param("classId") Long classId);
 }

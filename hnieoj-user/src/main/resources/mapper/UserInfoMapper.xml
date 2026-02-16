@@ -46,4 +46,41 @@
         ORDER BY ui.gmt_create DESC
     </select>
 
+    <!-- 用户列表（复合筛选） -->
+    <select id="selectUserList" resultType="com.hnieacm.user.vo.UserListVo">
+        SELECT
+            ui.uid,
+            ui.username,
+            ui.realname,
+            ui.avatar,
+            ui.college_id AS collegeId,
+            IFNULL(col.name, '-') AS college,
+            ui.grade,
+            ui.class_id AS classId,
+            IFNULL(cls.name, '-') AS majorClass,
+            ui.status
+        FROM user_info ui
+            LEFT JOIN sys_college col ON col.id = ui.college_id
+            LEFT JOIN sys_class cls ON cls.id = ui.class_id
+        <where>
+            <if test="keyword != null and keyword != ''">
+                AND (
+                    ui.uid LIKE CONCAT('%', #{keyword}, '%')
+                    OR ui.username LIKE CONCAT('%', #{keyword}, '%')
+                    OR ui.realname LIKE CONCAT('%', #{keyword}, '%')
+                )
+            </if>
+            <if test="collegeId != null">
+                AND ui.college_id = #{collegeId}
+            </if>
+            <if test="grade != null and grade != ''">
+                AND ui.grade = #{grade}
+            </if>
+            <if test="classId != null">
+                AND ui.class_id = #{classId}
+            </if>
+        </where>
+        ORDER BY ui.gmt_create DESC
+    </select>
+
 </mapper>

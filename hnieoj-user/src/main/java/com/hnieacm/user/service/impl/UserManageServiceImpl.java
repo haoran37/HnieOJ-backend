@@ -34,6 +34,8 @@ import com.hnieacm.user.properties.UserManageProperties;
 import com.hnieacm.user.service.UserManageService;
 import com.hnieacm.user.vo.CreateUserVo;
 import com.hnieacm.user.vo.PermissionUserVo;
+import com.hnieacm.user.vo.UserDetailVo;
+import com.hnieacm.user.vo.UserListVo;
 import com.hnieacm.user.vo.UserSearchVo;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
@@ -368,6 +370,105 @@ public class UserManageServiceImpl implements UserManageService {
         uids.forEach(this::deleteUserAuthCache);
     }
 
+
+    @Override
+    public PageVo<UserListVo> listUsers(String keyword, Long collegeId, String grade, Long classId, int page, int pageSize) {
+        if (page <= 0 || pageSize <= 0) {
+            throw new BizException(ResultCode.BAD_REQUEST, "page 和 pageSize 必须大于 0");
+        }
+
+        String normalizedKeyword = StrUtil.trimToNull(keyword);
+        String normalizedGrade = StrUtil.trimToNull(grade);
+
+        if (normalizedGrade != null && collegeId == null) {
+            throw new BizException(ResultCode.BAD_REQUEST, "填写 grade 时必须同时填写 collegeId");
+        }
+
+        if (collegeId != null) {
+            SysCollege college = sysCollegeMapper.selectById(collegeId);
+            if (college == null) {
+                throw new BizException(ResultCode.COLLEGE_NOT_FOUND, "学院不存在");
+            }
+        }
+
+        if (normalizedGrade != null) {
+            Long gradeCount = sysClassMapper.selectCount(
+                    new LambdaQueryWrapper<SysClass>()
+                            .eq(SysClass::getCollegeId, collegeId)
+                            .eq(SysClass::getGrade, normalizedGrade)
+            );
+            if (gradeCount == null || gradeCount == 0) {
+                throw new BizException(ResultCode.GRADE_NOT_FOUND, "年级不存在");
+            }
+        }
+
+        if (classId != null) {
+            if (collegeId == null || normalizedGrade == null) {
+                throw new BizException(ResultCode.BAD_REQUEST, "填写 classId 时必须同时填写 collegeId 和 grade");
+            }
+            SysClass sysClass = sysClassMapper.selectById(classId);
+            if (sysClass == null) {
+                throw new BizException(ResultCode.CLASS_NOT_FOUND, "班级不存在");
+            }
+            if (!Objects.equals(sysClass.getCollegeId(), collegeId)) {
+                throw new BizException(ResultCode.BAD_REQUEST, "班级不属于指定学院");
+            }
+            if (!Objects.equals(sysClass.getGrade(), normalizedGrade)) {
+                throw new BizException(ResultCode.BAD_REQUEST, "班级不属于指定年级");
+            }
+        }
+
+        Page<UserListVo> mpPage = new Page<>(page, pageSize);
+        Page<UserListVo> result = (Page<UserListVo>) userInfoMapper.selectUserList(
+                mpPage, normalizedKeyword, collegeId, normalizedGrade, classId
+        );
+        fillRolesForUserList(result.getRecords());
+        return new PageVo<>(result.getRecords(), result.getTotal());
+    }
+
+    @Override
+    public UserDetailVo getUserDetail(String uid) {
+        uid = StrUtil.trim(uid);
+        if (StrUtil.isBlank(uid)) {
+            throw new BizException(ResultCode.BAD_REQUEST, "uid 不能为空");
+        }
+
+        UserInfo user = userInfoMapper.selectOne(new LambdaQueryWrapper<UserInfo>().eq(UserInfo::getUid, uid));
+        if (user == null) {
+            throw new BizException(ResultCode.USER_NOT_FOUND, "用户不存在");
+        }
+
+        SysCollege college = null;
+        if (user.getCollegeId() != null) {
+            college = sysCollegeMapper.selectById(user.getCollegeId());
+        }
+        SysClass sysClass = null;
+        if (user.getClassId() != null) {
+            sysClass = sysClassMapper.selectById(user.getClassId());
+        }
+
+        List<String> roles = queryUserRolesMap(List.of(uid)).getOrDefault(uid, Collections.emptyList());
+        if (roles.isEmpty()) {
+            roles = List.of(RoleConstant.STUDENT);
+        }
+
+        UserDetailVo vo = new UserDetailVo();
+        vo.setUid(user.getUid());
+        vo.setUsername(user.getUsername());
+        vo.setRealname(user.getRealname());
+        vo.setAvatar(user.getAvatar());
+        vo.setCollegeId(user.getCollegeId());
+        vo.setCollege(college == null ? null : college.getName());
+        vo.setGrade(user.getGrade());
+        vo.setClassId(user.getClassId());
+        vo.setMajorClass(sysClass == null ? null : sysClass.getName());
+        vo.setCfUsername(user.getCfUsername());
+        vo.setGithub(user.getGithub());
+        vo.setBlog(user.getBlog());
+        vo.setRoles(roles);
+        return vo;
+    }
+
     /**
      * @MethodName getPermissionUsers
      * @Param page
@@ -382,8 +483,10 @@ public class UserManageServiceImpl implements UserManageService {
         if (userManageProperties.getManageableRoleIds() == null || userManageProperties.getManageableRoleIds().isEmpty()) {
             return new PageVo<>(Collections.emptyList(), 0);
         }
+
         Page<PermissionUserVo> mpPage = new Page<>(page, pageSize);
-        Page<PermissionUserVo> result = (Page<PermissionUserVo>) userInfoMapper.selectPermissionUsers(mpPage, userManageProperties.getManageableRoleIds());
+        Page<PermissionUserVo> result =
+                (Page<PermissionUserVo>) userInfoMapper.selectPermissionUsers(mpPage, userManageProperties.getManageableRoleIds());
         fillRolesForPermissionUsers(result.getRecords());
         return new PageVo<>(result.getRecords(), result.getTotal());
     }
@@ -986,6 +1089,19 @@ public class UserManageServiceImpl implements UserManageService {
         fillRolesForUsers(records, UserSearchVo::getUid, UserSearchVo::setRoles);
     }
 
+
+
+    /**
+     * @MethodName fillRolesForUserList
+     * @Param records
+     * @Description 为用户列表填充角色
+     * @Return
+     * @Author HaoRan_Lyu
+     * @Date 2026/02/15
+     */
+    private void fillRolesForUserList(List<UserListVo> records) {
+        fillRolesForUsers(records, UserListVo::getUid, UserListVo::setRoles);
+    }
 
     /**
      * @MethodName queryUserRolesMap

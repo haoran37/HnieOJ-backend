@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.hnieacm.achievement.mapper.AchievementApplyMapper">
+
+    <select id="selectAdminApplyPage" resultType="com.hnieacm.achievement.vo.AchievementApplyAdminVo">
+        SELECT
+        aa.id AS id,
+        aa.uid AS uid,
+        COALESCE(NULLIF(TRIM(ui.realname), ''), NULLIF(TRIM(ui.username), ''), aa.uid) AS username,
+        aa.title AS title,
+        aa.status AS status,
+        (UNIX_TIMESTAMP(aa.gmt_create) * 1000) AS submitTime
+        FROM achievement_apply aa
+        LEFT JOIN user_info ui ON ui.uid = aa.uid
+        <where>
+            <if test="status != null and status != ''">
+                AND aa.status = #{status}
+            </if>
+            <if test="collegeId != null and collegeId &gt; 0">
+                AND ui.college_id = #{collegeId}
+            </if>
+            <if test="keyword != null and keyword != ''">
+                AND (
+                aa.uid LIKE CONCAT('%', #{keyword}, '%')
+                OR aa.title LIKE CONCAT('%', #{keyword}, '%')
+                OR ui.username LIKE CONCAT('%', #{keyword}, '%')
+                OR ui.realname LIKE CONCAT('%', #{keyword}, '%')
+                )
+            </if>
+        </where>
+        ORDER BY aa.gmt_create DESC, aa.id DESC
+    </select>
+
+</mapper>

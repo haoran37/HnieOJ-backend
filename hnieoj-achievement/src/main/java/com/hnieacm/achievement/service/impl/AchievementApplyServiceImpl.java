@@ -2,6 +2,7 @@ package com.hnieacm.achievement.service.impl;
 
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.hnieacm.achievement.constant.AchievementApplyStatus;
 import com.hnieacm.achievement.constant.UserAchievementStatus;
 import com.hnieacm.achievement.entity.AchievementApply;
@@ -12,6 +13,8 @@ import com.hnieacm.achievement.mapper.UserAchievementMapper;
 import com.hnieacm.achievement.mapper.UserInfoMapper;
 import com.hnieacm.achievement.service.AchievementApplyService;
 import com.hnieacm.achievement.service.AchievementFileService;
+import com.hnieacm.achievement.vo.AchievementApplyAdminVo;
+import com.hnieacm.common.dto.PageVo;
 import com.hnieacm.common.exception.BizException;
 import com.hnieacm.common.result.ResultCode;
 import lombok.RequiredArgsConstructor;
@@ -21,6 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
+import java.util.Collections;
 
 /**
  * @Author: HaoRan_Lyu
@@ -73,6 +77,33 @@ public class AchievementApplyServiceImpl implements AchievementApplyService {
         apply.setGmtModified(LocalDateTime.now());
 
         achievementApplyMapper.insert(apply);
+    }
+
+    /**
+     * @MethodName listForAdmin
+     * @Param page
+     * @Param pageSize
+     * @Param keyword
+     * @Param status
+     * @Param collegeId
+     * @Description 管理员查询申请列表
+     * @Return @return {@link PageVo }<{@link AchievementApplyAdminVo }>
+     * @Author HaoRan_Lyu
+     * @Date 2026/02/18
+     */
+    @Override
+    public PageVo<AchievementApplyAdminVo> listForAdmin(int page, int pageSize, String keyword, String status, Long collegeId) {
+        validateAdminListParams(page, pageSize, collegeId);
+
+        String normalizedKeyword = StrUtil.trimToNull(keyword);
+        String normalizedStatus = normalizeStatus(status);
+
+        Page<AchievementApplyAdminVo> mpPage = new Page<>(page, pageSize);
+        var result = achievementApplyMapper.selectAdminApplyPage(mpPage, normalizedKeyword, normalizedStatus, collegeId);
+        if (result.getRecords().isEmpty()) {
+            return new PageVo<>(Collections.emptyList(), result.getTotal());
+        }
+        return new PageVo<>(result.getRecords(), result.getTotal());
     }
 
     /**
@@ -159,5 +190,48 @@ public class AchievementApplyServiceImpl implements AchievementApplyService {
 
         log.info("Achievement apply rejected, id: {}, uid: {}", id, apply.getUid());
     }
-}
 
+    /**
+     * @MethodName normalizeStatus
+     * @Param status
+     * @Description 标准化状态
+     * @Return @return {@link String }
+     * @Author HaoRan_Lyu
+     * @Date 2026/02/18
+     */
+    private String normalizeStatus(String status) {
+        String normalizedStatus = StrUtil.trimToNull(status);
+        if (normalizedStatus == null) {
+            return null;
+        }
+        if (AchievementApplyStatus.PENDING.equalsIgnoreCase(normalizedStatus)) {
+            return AchievementApplyStatus.PENDING;
+        }
+        if (AchievementApplyStatus.APPROVED.equalsIgnoreCase(normalizedStatus)) {
+            return AchievementApplyStatus.APPROVED;
+        }
+        if (AchievementApplyStatus.REJECTED.equalsIgnoreCase(normalizedStatus)) {
+            return AchievementApplyStatus.REJECTED;
+        }
+        throw new BizException(ResultCode.BAD_REQUEST, "status 仅支持 pending/approved/rejected");
+    }
+
+    /**
+     * @MethodName validateAdminListParams
+     * @Param page
+     * @Param pageSize
+     * @Param collegeId
+     * @Description 验证管理员查询申请列表参数
+     * @Return
+     * @Author HaoRan_Lyu
+     * @Date 2026/02/18
+     */
+    private void validateAdminListParams(int page, int pageSize, Long collegeId) {
+        if (page <= 0 || pageSize <= 0) {
+            throw new BizException(ResultCode.BAD_REQUEST, "page 和 pageSize 必须大于 0");
+        }
+        if (collegeId != null && collegeId <= 0) {
+            throw new BizException(ResultCode.BAD_REQUEST, "collegeId 不合法");
+        }
+    }
+}

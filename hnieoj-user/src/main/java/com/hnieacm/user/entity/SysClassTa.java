@@ -9,28 +9,19 @@ import java.time.LocalDateTime;
 
 /**
  * @Author: HaoRan_Lyu
- * @Date: 2026/02/14
- * @Description: 班级实体（sys_class）
+ * @Date: 2026/02/17
+ * @Description: 班级助教关联实体（sys_class_ta）
  */
 @Data
-@TableName("sys_class")
-public class SysClass {
+@TableName("sys_class_ta")
+public class SysClassTa {
 
     @TableId(type = IdType.AUTO)
     private Long id;
 
-    private Long collegeId;
+    private Long classId;
 
-    private String grade;
-
-    private String name;
-
-    /**
-     * 负责教师 UID
-     */
-    private String teacherUid;
+    private String taUid;
 
     private LocalDateTime gmtCreate;
-
-    private LocalDateTime gmtModified;
 }

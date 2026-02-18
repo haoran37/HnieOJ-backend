@@ -1,4 +1,6 @@
 mybatis-plus:
+  mapper-locations: classpath*:/mapper/**/*.xml
+  type-aliases-package: com.hnieacm.achievement.entity
   configuration:
     map-underscore-to-camel-case: true
 

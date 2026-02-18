@@ -17,5 +17,10 @@ public class UserInfo {
     private String uuid;
 
     private String uid;
-}
 
+    private String username;
+
+    private String realname;
+
+    private Long collegeId;
+}

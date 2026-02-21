@@ -1,4 +1,4 @@
-package com.hnieacm.auth.interceptor;
+package com.hnieacm.problem.interceptor;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hnieacm.common.constant.HeaderConstant;
@@ -19,7 +19,7 @@ import java.nio.charset.StandardCharsets;
 
 /**
  * @Author: HaoRan_Lyu
- * @Date: 2026/02/20
+ * @Date: 2026/02/21
  * @Description: 保护 /internal/** 接口，仅允许携带正确 X-Internal-Token 的请求访问
  */
 @Slf4j

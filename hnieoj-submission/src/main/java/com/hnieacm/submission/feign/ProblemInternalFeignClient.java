@@ -15,5 +15,5 @@ import org.springframework.web.bind.annotation.PathVariable;
 public interface ProblemInternalFeignClient {
 
     @GetMapping("/internal/problems/{problemCode}")
-    Result<ProblemBasicDto> getProblemBasic(@PathVariable String problemCode);
+    Result<ProblemBasicDto> getProblemBasic(@PathVariable("problemCode") String problemCode);
 }

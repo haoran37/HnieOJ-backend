@@ -15,6 +15,5 @@ import org.springframework.web.bind.annotation.PathVariable;
 public interface UserProfileFeignClient {
 
     @GetMapping("/api/user/users/{uid}")
-    Result<UserDetailDto> getUserDetail(@PathVariable String uid);
+    Result<UserDetailDto> getUserDetail(@PathVariable("uid") String uid);
 }
-

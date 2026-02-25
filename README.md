@@ -8,7 +8,7 @@
 HnieOJ-backend/
 ├── common/                    # 公共模块（工具、常量、异常等）
 ├── gateway/                   # API网关
-├── hnieoj-admin/              # 管理后台聚合服务
+├── hnieoj-announcement/       # 公告新闻服务
 ├── hnieoj-auth/               # 认证服务
 ├── hnieoj-user/               # 用户服务
 ├── hnieoj-problem/            # 题目服务
@@ -75,7 +75,7 @@ mvn clean install -DskipTests
 在 IntelliJ IDEA 中分别运行以下启动类：
 
 1. `gateway` → `GatewayApplication` (端口 8080)
-2. `hnieoj-admin` → `AdminApplication` (端口 8081)
+2. `hnieoj-announcement` → `AnnouncementApplication` (端口 8109)
 3. `hnieoj-user` → `UserApplication` (端口 8082)
 4. `hnieoj-problem` → `ProblemApplication` (端口 8083)
 5. `hnieoj-submission` → `SubmissionApplication` (端口 8084)

@@ -1,7 +1,8 @@
 package com.hnieacm.user.dto;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import lombok.Data;
 
 /**
@@ -18,9 +19,11 @@ public class UpdateUserRequest {
     private String email;
 
     /**
-     * 状态（兼容 normal/disabled）
+     * 状态（0：正常，1：禁用）
      */
-    private String status;
+    @Min(value = 0, message = "status 只能为0或1")
+    @Max(value = 1, message = "status 只能为0或1")
+    private Integer status;
 
     private String phone;
 
@@ -30,11 +33,5 @@ public class UpdateUserRequest {
 
     private Long classId;
 
-    private String college;
-
     private String grade;
-
-    @JsonProperty("class")
-    private String className;
 }
-

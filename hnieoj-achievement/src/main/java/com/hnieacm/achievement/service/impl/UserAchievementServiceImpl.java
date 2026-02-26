@@ -179,7 +179,6 @@ public class UserAchievementServiceImpl implements UserAchievementService {
                 record.getContent(),
                 record.getProofUrl(),
                 time,
-                time,
                 record.getStatus()
         );
     }

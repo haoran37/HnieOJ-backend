@@ -1,6 +1,5 @@
 package com.hnieacm.user.dto;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
@@ -36,11 +35,5 @@ public class CreateUserRequest {
 
     private Long classId;
 
-    private String college;
-
     private String grade;
-
-    @JsonProperty("class")
-    private String className;
 }
-

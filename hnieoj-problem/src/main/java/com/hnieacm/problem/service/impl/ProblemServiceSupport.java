@@ -11,7 +11,6 @@ import com.hnieacm.problem.entity.Tag;
 import com.hnieacm.problem.mapper.ProblemMapper;
 import com.hnieacm.problem.mapper.ProblemTagMapper;
 import com.hnieacm.problem.mapper.TagMapper;
-import org.slf4j.Logger;
 import org.springframework.dao.DuplicateKeyException;
 
 import java.util.*;
@@ -120,24 +119,6 @@ public final class ProblemServiceSupport {
         List<Long> problemIds = records.stream().map(Problem::getId).filter(Objects::nonNull).toList();
         Map<Long, List<String>> tagsMap = queryTagsMap(problemTagMapper, tagMapper, problemIds);
         return new ProblemPageResult(records, result.getTotal(), tagsMap);
-    }
-
-    /**
-     * @MethodName logUnpersistedLanguages
-     * @Param logger
-     * @Param problemCode
-     * @Param languages
-     * @Description 记录未被持久化语言
-     * @Return
-     * @Author HaoRan_Lyu
-     * @Date 2026/02/21
-     */
-    public static void logUnpersistedLanguages(Logger logger, String problemCode, List<String> languages) {
-        if (logger == null || languages == null || languages.isEmpty()) {
-            return;
-        }
-        logger.info("Problem languages received but not persisted, problemCode: {}, languages: {}",
-                problemCode, languages);
     }
 
     /**

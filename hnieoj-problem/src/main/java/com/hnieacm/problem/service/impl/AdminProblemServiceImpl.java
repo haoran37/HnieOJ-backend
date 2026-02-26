@@ -20,7 +20,6 @@ import com.hnieacm.problem.mapper.TagMapper;
 import com.hnieacm.problem.service.AdminProblemService;
 import com.hnieacm.problem.vo.AdminProblemListVo;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -34,7 +33,6 @@ import java.util.Objects;
  * @Date: 2026/02/21
  * @Description: 题目管理服务实现
  */
-@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AdminProblemServiceImpl implements AdminProblemService {
@@ -138,7 +136,7 @@ public class AdminProblemServiceImpl implements AdminProblemService {
             throw new BizException(ResultCode.BAD_REQUEST, "problemCode已存在");
         }
 
-        Problem entity = buildProblemEntityForSave(pr, request.getJudgeMode());
+        Problem entity = buildProblemEntityForSave(pr);
         entity.setProblemCode(problemCode);
 
         if (StrUtil.isBlank(entity.getAuthor())) {
@@ -148,8 +146,6 @@ public class AdminProblemServiceImpl implements AdminProblemService {
 
         problemMapper.insert(entity);
         saveProblemTags(entity.getId(), request.getTags());
-
-        ProblemServiceSupport.logUnpersistedLanguages(log, entity.getProblemCode(), request.getLanguages());
     }
 
     /**
@@ -187,15 +183,13 @@ public class AdminProblemServiceImpl implements AdminProblemService {
             }
         }
 
-        Problem entity = buildProblemEntityForSave(pr, request.getJudgeMode());
+        Problem entity = buildProblemEntityForSave(pr);
         entity.setId(pr.getId());
         entity.setProblemCode(normalizedProblemCode);
         entity.setModifiedUser(StpUtil.getLoginIdAsString());
 
         problemMapper.updateById(entity);
         saveProblemTags(entity.getId(), request.getTags());
-
-        ProblemServiceSupport.logUnpersistedLanguages(log, entity.getProblemCode(), request.getLanguages());
     }
 
     /**
@@ -258,13 +252,12 @@ public class AdminProblemServiceImpl implements AdminProblemService {
     /**
      * @MethodName buildProblemEntityForSave
      * @Param pr
-     * @Param judgeModeFromRequest
      * @Description 构建题目实体以进行保存
      * @Return @return {@link Problem }
      * @Author HaoRan_Lyu
      * @Date 2026/02/21
      */
-    private Problem buildProblemEntityForSave(ProblemRequest pr, String judgeModeFromRequest) {
+    private Problem buildProblemEntityForSave(ProblemRequest pr) {
         Problem entity = new Problem();
         entity.setProblemCode(pr.getProblemCode());
         entity.setTitle(StrUtil.trimToNull(pr.getTitle()));
@@ -272,9 +265,6 @@ public class AdminProblemServiceImpl implements AdminProblemService {
         entity.setType(pr.getType());
 
         String judgeMode = StrUtil.trimToNull(pr.getJudgeMode());
-        if (StrUtil.isNotBlank(judgeModeFromRequest)) {
-            judgeMode = StrUtil.trimToNull(judgeModeFromRequest);
-        }
         entity.setJudgeMode(judgeMode);
 
         entity.setTimeLimit(pr.getTimeLimit());

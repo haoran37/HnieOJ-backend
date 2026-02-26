@@ -1,6 +1,5 @@
 package com.hnieacm.achievement.dto;
 
-import com.fasterxml.jackson.annotation.JsonAlias;
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 
@@ -26,10 +25,5 @@ public class AddUserAchievementRequest {
      */
     private String proofUrl;
 
-    /**
-     * 成就获得时间（毫秒时间戳），兼容前端旧字段 date
-     */
-    @JsonAlias("date")
     private Long achieveTime;
 }
-

@@ -27,11 +27,5 @@ public class UserAchievementVo {
      */
     private Long achieveTime;
 
-    /**
-     * 兼容旧字段：date = achieveTime
-     */
-    private Long date;
-
     private Integer status;
 }
-

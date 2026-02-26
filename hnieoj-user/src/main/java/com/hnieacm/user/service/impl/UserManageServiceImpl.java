@@ -98,8 +98,8 @@ public class UserManageServiceImpl implements UserManageService {
 
         validateUsernameLength(request.getUsername());
 
-        Long collegeId = resolveCollegeId(request.getCollegeId(), request.getCollege());
-        SysClass sysClass = resolveClassId(request.getClassId(), request.getClassName(), collegeId);
+        Long collegeId = resolveCollegeId(request.getCollegeId());
+        SysClass sysClass = resolveClassId(request.getClassId(), collegeId);
 
         String grade = request.getGrade();
         if (StrUtil.isBlank(grade) && sysClass != null) {
@@ -203,8 +203,8 @@ public class UserManageServiceImpl implements UserManageService {
             user.setAvatar(request.getAvatar());
         }
 
-        Long collegeId = resolveCollegeId(request.getCollegeId(), request.getCollege());
-        SysClass sysClass = resolveClassId(request.getClassId(), request.getClassName(), collegeId);
+        Long collegeId = resolveCollegeId(request.getCollegeId());
+        SysClass sysClass = resolveClassId(request.getClassId(), collegeId);
 
         if (collegeId != null) {
             user.setCollegeId(collegeId);
@@ -709,7 +709,7 @@ public class UserManageServiceImpl implements UserManageService {
      * @Date 2026/02/15
      */
     @Nullable
-    private Long resolveCollegeId(Long collegeId, String collegeName) {
+    private Long resolveCollegeId(Long collegeId) {
         if (collegeId != null) {
             SysCollege college = sysCollegeMapper.selectById(collegeId);
             if (college == null) {
@@ -717,16 +717,7 @@ public class UserManageServiceImpl implements UserManageService {
             }
             return collegeId;
         }
-        if (StrUtil.isBlank(collegeName)) {
-            return null;
-        }
-        SysCollege college = sysCollegeMapper.selectOne(
-                new LambdaQueryWrapper<SysCollege>().eq(SysCollege::getName, collegeName.trim())
-        );
-        if (college == null) {
-            throw new BizException(ResultCode.COLLEGE_NOT_FOUND, "学院不存在");
-        }
-        return college.getId();
+        return null;
     }
 
     /**
@@ -740,7 +731,7 @@ public class UserManageServiceImpl implements UserManageService {
      * @Date 2026/02/15
      */
     @Nullable
-    private SysClass resolveClassId(Long classId, String className, Long collegeId) {
+    private SysClass resolveClassId(Long classId, Long collegeId) {
         if (classId != null) {
             SysClass sysClass = sysClassMapper.selectById(classId);
             if (sysClass == null) {
@@ -752,25 +743,7 @@ public class UserManageServiceImpl implements UserManageService {
 
             return sysClass;
         }
-
-        if (StrUtil.isBlank(className)) {
-            return null;
-        }
-
-        LambdaQueryWrapper<SysClass> wrapper = new LambdaQueryWrapper<SysClass>()
-                .eq(SysClass::getName, className.trim());
-        if (collegeId != null) {
-            wrapper.eq(SysClass::getCollegeId, collegeId);
-        }
-
-        List<SysClass> matches = sysClassMapper.selectList(wrapper);
-        if (matches == null || matches.isEmpty()) {
-            throw new BizException(ResultCode.CLASS_NOT_FOUND, "班级不存在");
-        }
-        if (matches.size() > 1) {
-            throw new BizException(ResultCode.BAD_REQUEST, "班级信息不唯一，请使用 classId");
-        }
-        return matches.get(0);
+        return null;
     }
 
     /**
@@ -781,19 +754,12 @@ public class UserManageServiceImpl implements UserManageService {
      * @Author HaoRan_Lyu
      * @Date 2026/02/15
      */
-    private Integer resolveStatus(String status) {
+    private Integer resolveStatus(Integer status) {
         if (status == null) {
             return null;
         }
-        String s = status.trim().toLowerCase(Locale.ROOT);
-        if (s.isBlank()) {
-            return null;
-        }
-        if ("normal".equals(s) || "0".equals(s)) {
-            return UserStatusConstant.NORMAL;
-        }
-        if ("disabled".equals(s) || "1".equals(s)) {
-            return UserStatusConstant.DISABLED;
+        if (UserStatusConstant.NORMAL == status || UserStatusConstant.DISABLED == status) {
+            return status;
         }
         throw new BizException(ResultCode.BAD_REQUEST, "status 参数不合法");
     }

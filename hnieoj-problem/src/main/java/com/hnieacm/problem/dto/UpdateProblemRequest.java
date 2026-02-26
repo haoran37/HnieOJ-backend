@@ -1,7 +1,6 @@
 package com.hnieacm.problem.dto;
 
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
@@ -18,11 +17,6 @@ public class UpdateProblemRequest {
     @Valid
     @NotNull(message = "problem不能为空")
     private ProblemRequest problem;
-
-    private String judgeMode;
-
-    @NotEmpty(message = "languages不能为空")
-    private List<String> languages;
 
     private List<String> tags;
 }

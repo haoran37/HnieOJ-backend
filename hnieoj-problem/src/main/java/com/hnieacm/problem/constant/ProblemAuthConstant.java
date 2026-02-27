@@ -21,7 +21,7 @@ public class ProblemAuthConstant {
     public static final int PRIVATE = 2;
 
     /**
-     * 仅限竞赛
+     * 仅限比赛
      */
     public static final int CONTEST_ONLY = 3;
 }

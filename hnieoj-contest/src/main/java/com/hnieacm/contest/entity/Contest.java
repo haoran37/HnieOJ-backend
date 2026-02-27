@@ -10,7 +10,7 @@ import java.time.LocalDateTime;
 /**
  * @Author: HaoRan_Lyu
  * @Date: 2026/02/22
- * @Description: 竞赛实体（contest）
+ * @Description: 比赛实体（contest）
  */
 @Data
 @TableName("contest")

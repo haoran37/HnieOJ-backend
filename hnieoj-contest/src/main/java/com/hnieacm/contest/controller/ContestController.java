@@ -20,9 +20,9 @@ import org.springframework.web.bind.annotation.RestController;
 /**
  * @Author: HaoRan_Lyu
  * @Date: 2026/02/22
- * @Description: 竞赛模块对外接口
+ * @Description: 比赛模块对外接口
  */
-@Tag(name = "竞赛模块")
+@Tag(name = "比赛模块")
 @Validated
 @SaCheckLogin
 @RestController
@@ -32,7 +32,7 @@ public class ContestController {
 
     private final ContestQueryService contestQueryService;
 
-    @Operation(summary = "获取竞赛列表")
+    @Operation(summary = "获取比赛列表")
     @GetMapping
     public Result<PageVo<ContestListVo>> list(
             @RequestParam @Min(value = 1, message = "page 必须大于等于 1") int page,
@@ -42,7 +42,7 @@ public class ContestController {
         return Result.success(contestQueryService.listContests(page, pageSize, type, auth));
     }
 
-    @Operation(summary = "获取竞赛详情")
+    @Operation(summary = "获取比赛详情")
     @GetMapping("/{id}")
     public Result<ContestDetailVo> detail(@PathVariable("id") @Min(value = 1, message = "id 必须大于等于 1") Long contestId) {
         return Result.success(contestQueryService.getContestDetail(contestId));

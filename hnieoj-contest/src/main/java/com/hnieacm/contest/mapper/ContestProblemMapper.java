@@ -6,7 +6,7 @@ import com.hnieacm.contest.entity.ContestProblem;
 /**
  * @Author: HaoRan_Lyu
  * @Date: 2026/02/22
- * @Description: 竞赛题目 Mapper
+ * @Description: 比赛题目 Mapper
  */
 public interface ContestProblemMapper extends BaseMapper<ContestProblem> {
 }

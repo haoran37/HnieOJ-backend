@@ -2,6 +2,8 @@ package com.hnieacm.problem.service;
 
 import com.hnieacm.problem.dto.ProblemBasicDto;
 
+import java.util.List;
+
 /**
  * @Author: HaoRan_Lyu
  * @Date: 2026/02/21
@@ -10,4 +12,6 @@ import com.hnieacm.problem.dto.ProblemBasicDto;
 public interface InternalProblemService {
 
     ProblemBasicDto getProblemBasicByProblemCode(String problemCode);
+
+    List<ProblemBasicDto> getProblemBasicsByIds(List<Long> problemIds);
 }

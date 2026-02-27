@@ -7,7 +7,7 @@ import com.hnieacm.contest.vo.ContestListVo;
 /**
  * @Author: HaoRan_Lyu
  * @Date: 2026/02/22
- * @Description: 竞赛查询服务
+ * @Description: 比赛查询服务
  */
 public interface ContestQueryService {
 

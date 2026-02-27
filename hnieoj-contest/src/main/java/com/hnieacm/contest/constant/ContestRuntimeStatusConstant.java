@@ -3,7 +3,7 @@ package com.hnieacm.contest.constant;
 /**
  * @Author: HaoRan_Lyu
  * @Date: 2026/02/22
- * @Description: 竞赛运行态常量
+ * @Description: 比赛运行态常量
  */
 public final class ContestRuntimeStatusConstant {
 

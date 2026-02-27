@@ -6,7 +6,7 @@ import com.hnieacm.common.result.ResultCode;
 /**
  * @Author: HaoRan_Lyu
  * @Date: 2026/02/22
- * @Description: 竞赛权限常量
+ * @Description: 比赛权限常量
  */
 public final class ContestAuthConstant {
 

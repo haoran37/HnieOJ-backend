@@ -7,27 +7,33 @@ import java.util.List;
 
 /**
  * @Author: HaoRan_Lyu
- * @Date: 2026/02/22
- * @Description: 比赛列表展示对象
+ * @Date: 2026/02/27
+ * @Description: 管理端比赛列表展示对象
  */
 @Data
-public class ContestListVo {
+public class AdminContestListVo {
 
     private Long id;
 
     private String title;
 
-    private String type;
-
-    private String auth;
-
-    private String source;
-
     private LocalDateTime startTime;
 
     private LocalDateTime endTime;
 
-    private String status;
+    private String type;
+
+    private String auth;
+
+    private String permission;
+
+    private String source;
+
+    private String author;
+
+    private Boolean status;
+
+    private String runtimeStatus;
 
     private Integer problemCount;
 

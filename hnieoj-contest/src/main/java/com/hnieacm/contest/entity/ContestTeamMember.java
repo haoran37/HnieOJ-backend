@@ -7,23 +7,19 @@ import lombok.Data;
 
 /**
  * @Author: HaoRan_Lyu
- * @Date: 2026/02/22
- * @Description: 比赛题目关联实体（contest_problem）
+ * @Date: 2026/02/27
+ * @Description: 比赛队伍成员实体（contest_team_member）
  */
 @Data
-@TableName("contest_problem")
-public class ContestProblem {
+@TableName("contest_team_member")
+public class ContestTeamMember {
 
     @TableId(type = IdType.AUTO)
     private Long id;
 
-    private Long cid;
+    private Long teamId;
 
-    private Long problemId;
+    private String uid;
 
-    private String displayId;
-
-    private String displayTitle;
-
-    private String color;
+    private Integer isCaptain;
 }

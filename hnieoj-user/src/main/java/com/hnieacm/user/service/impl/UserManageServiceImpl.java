@@ -19,6 +19,7 @@ import com.hnieacm.user.dto.GrantPermissionRequest;
 import com.hnieacm.user.dto.UpdateUserPasswordRequest;
 import com.hnieacm.user.dto.UpdateUserPermissionRequest;
 import com.hnieacm.user.dto.UpdateUserRequest;
+import com.hnieacm.user.dto.UserContextDto;
 import com.hnieacm.user.entity.Role;
 import com.hnieacm.user.entity.SysClass;
 import com.hnieacm.user.entity.SysCollege;
@@ -32,6 +33,7 @@ import com.hnieacm.user.mapper.UserInfoMapper;
 import com.hnieacm.user.mapper.UserRoleMapper;
 import com.hnieacm.user.properties.UserManageProperties;
 import com.hnieacm.user.service.UserManageService;
+import com.hnieacm.user.service.manager.UserInfoManager;
 import com.hnieacm.user.vo.CreateUserVo;
 import com.hnieacm.user.vo.PermissionUserVo;
 import com.hnieacm.user.vo.UserDetailVo;
@@ -68,6 +70,7 @@ public class UserManageServiceImpl implements UserManageService {
     private final AuthInternalFeignClient authInternalFeignClient;
     private final StringRedisTemplate stringRedisTemplate;
     private final UserManageProperties userManageProperties;
+    private final UserInfoManager userInfoManager;
 
     private final SecureRandom secureRandom = new SecureRandom();
 
@@ -174,10 +177,7 @@ public class UserManageServiceImpl implements UserManageService {
             throw new BizException(ResultCode.BAD_REQUEST, "请求参数不能为空");
         }
 
-        UserInfo user = userInfoMapper.selectOne(new LambdaQueryWrapper<UserInfo>().eq(UserInfo::getUid, uid));
-        if (user == null) {
-            throw new BizException(ResultCode.USER_NOT_FOUND, "用户不存在");
-        }
+        UserInfo user = userInfoManager.getUserByUid(uid);
 
         if (StrUtil.isNotBlank(request.getUsername())) {
             validateUsernameLength(request.getUsername());
@@ -253,10 +253,7 @@ public class UserManageServiceImpl implements UserManageService {
         }
         validatePasswordLength(request.getPassword());
 
-        UserInfo user = userInfoMapper.selectOne(new LambdaQueryWrapper<UserInfo>().eq(UserInfo::getUid, uid));
-        if (user == null) {
-            throw new BizException(ResultCode.USER_NOT_FOUND, "用户不存在");
-        }
+        UserInfo user = userInfoManager.getUserByUid(uid);
 
         user.setPassword(BCrypt.hashpw(request.getPassword()));
         userInfoMapper.updateById(user);
@@ -280,10 +277,7 @@ public class UserManageServiceImpl implements UserManageService {
             throw new BizException(ResultCode.BAD_REQUEST, "uid 不能为空");
         }
 
-        UserInfo user = userInfoMapper.selectOne(new LambdaQueryWrapper<UserInfo>().eq(UserInfo::getUid, uid));
-        if (user == null) {
-            throw new BizException(ResultCode.USER_NOT_FOUND, "用户不存在");
-        }
+        UserInfo user = userInfoManager.getUserByUid(uid);
 
         // 先下线
         kickoutUserSafely(uid);
@@ -433,19 +427,10 @@ public class UserManageServiceImpl implements UserManageService {
             throw new BizException(ResultCode.BAD_REQUEST, "uid 不能为空");
         }
 
-        UserInfo user = userInfoMapper.selectOne(new LambdaQueryWrapper<UserInfo>().eq(UserInfo::getUid, uid));
-        if (user == null) {
-            throw new BizException(ResultCode.USER_NOT_FOUND, "用户不存在");
-        }
-
-        SysCollege college = null;
-        if (user.getCollegeId() != null) {
-            college = sysCollegeMapper.selectById(user.getCollegeId());
-        }
-        SysClass sysClass = null;
-        if (user.getClassId() != null) {
-            sysClass = sysClassMapper.selectById(user.getClassId());
-        }
+        UserContextDto userContext = userInfoManager.getUserContextByUid(uid);
+        UserInfo user = userContext.user();
+        SysCollege college = userContext.college();
+        SysClass sysClass = userContext.sysClass();
 
         List<String> roles = queryUserRolesMap(List.of(uid)).getOrDefault(uid, Collections.emptyList());
         if (roles.isEmpty()) {

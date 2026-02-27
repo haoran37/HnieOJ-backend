@@ -22,7 +22,7 @@ import org.springframework.web.bind.annotation.RestController;
 /**
  * @Author: HaoRan_Lyu
  * @Date: 2026/02/14
- * @Description: User profile and user query APIs (login required).
+ * @Description: 用户配置文件和用户查询 API（需要登录）
  */
 @Tag(name = "User Profile")
 @Validated
@@ -41,7 +41,7 @@ public class UserProfileController {
         return Result.success(userProfileService.getCurrentUserProfile());
     }
 
-    @Operation(summary = "Get user list (paged)")
+    @Operation(summary = "获取用户列表（分页）")
     @SaCheckLogin
     @GetMapping("/users")
     public Result<PageVo<UserListVo>> listUsers(@RequestParam(required = false) String keyword,
@@ -53,7 +53,7 @@ public class UserProfileController {
         return Result.success(userManageService.listUsers(keyword, collegeId, grade, classId, page, pageSize));
     }
 
-    @Operation(summary = "Get user detail by uid")
+    @Operation(summary = "通过uid获取用户详细信息")
     @SaCheckLogin
     @GetMapping("/users/{uid}")
     public Result<UserDetailVo> getUserByUid(@PathVariable String uid) {

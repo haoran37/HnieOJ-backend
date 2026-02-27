@@ -55,13 +55,17 @@ public class SaTokenConfig {
                     SaRouter.match("/api/problem/edit/**", r -> StpUtil.checkPermission(PermissionConstant.PROBLEM_UPDATE));
                     SaRouter.match("/api/problem/delete/**", r -> StpUtil.checkPermission(PermissionConstant.PROBLEM_DELETE));
 
+                    // TODO: 将成就模块与用户模块合并
                     // 用户管理权限校验
                     SaRouter.match("/api/users/**")
                             // /api/users/{uid}/achievements 为用户成就模块对外接口，不走用户管理权限
                             .notMatch("/api/users/*/achievements", "/api/users/*/achievements/**")
                             .check(r -> StpUtil.checkPermission(PermissionConstant.USER_MANAGE));
                     SaRouter.match("/api/admin/permission/**", r -> StpUtil.checkPermission(PermissionConstant.USER_MANAGE));
-                    SaRouter.match("/api/admin/users/**", r -> StpUtil.checkPermission(PermissionConstant.USER_MANAGE));
+                    SaRouter.match("/api/admin/users/**")
+                            // /api/admin/users/{uid}/achievements 为成就管理接口，不走用户管理权限
+                            .notMatch("/api/admin/users/*/achievements", "/api/admin/users/*/achievements/**")
+                            .check(r -> StpUtil.checkPermission(PermissionConstant.USER_MANAGE));
                 })
                 .setError(ex -> {
                     // 便于排查：记录异常类型与 message

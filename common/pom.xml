@@ -38,6 +38,13 @@
             <artifactId>sa-token-core</artifactId>
         </dependency>
 
+        <!-- ==================== JSR-305 注解（消除 javax.annotation.meta.When 编译告警） ==================== -->
+        <dependency>
+            <groupId>com.google.code.findbugs</groupId>
+            <artifactId>jsr305</artifactId>
+            <version>3.0.2</version>
+        </dependency>
+
         <!-- ==================== 开发辅助 (Lombok) ==================== -->
         <dependency>
             <groupId>org.projectlombok</groupId>

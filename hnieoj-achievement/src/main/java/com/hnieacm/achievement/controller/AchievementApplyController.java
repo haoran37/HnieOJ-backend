@@ -1,7 +1,10 @@
 package com.hnieacm.achievement.controller;
 
+import cn.dev33.satoken.annotation.SaCheckRole;
+import cn.dev33.satoken.annotation.SaMode;
 import cn.dev33.satoken.stp.StpUtil;
 import com.hnieacm.achievement.service.AchievementApplyService;
+import com.hnieacm.common.constant.RoleConstant;
 import com.hnieacm.common.result.Result;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -27,6 +30,16 @@ public class AchievementApplyController {
 
     @Operation(summary = "提交成就认证申请")
     @PostMapping("/apply")
+    @SaCheckRole(
+            value = {
+                    RoleConstant.STUDENT,
+                    RoleConstant.TA,
+                    RoleConstant.TEACHER,
+                    RoleConstant.ADMIN,
+                    RoleConstant.ROOT
+            },
+            mode = SaMode.OR
+    )
     public Result<Void> submitApply(@RequestParam("title") String title,
                                     @RequestParam(value = "description", required = false) String description,
                                     @RequestParam("file") MultipartFile file) {
@@ -35,4 +48,3 @@ public class AchievementApplyController {
         return Result.success("申请提交成功", null);
     }
 }
-

@@ -3,19 +3,16 @@ package com.hnieacm.user.service.impl;
 import cn.dev33.satoken.stp.StpUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.hnieacm.common.constant.RoleConstant;
-import com.hnieacm.common.exception.BizException;
-import com.hnieacm.common.result.ResultCode;
+import com.hnieacm.user.dto.UserContextDto;
 import com.hnieacm.user.entity.Role;
 import com.hnieacm.user.entity.SysClass;
 import com.hnieacm.user.entity.SysCollege;
 import com.hnieacm.user.entity.UserInfo;
 import com.hnieacm.user.entity.UserRole;
 import com.hnieacm.user.mapper.RoleMapper;
-import com.hnieacm.user.mapper.SysClassMapper;
-import com.hnieacm.user.mapper.SysCollegeMapper;
-import com.hnieacm.user.mapper.UserInfoMapper;
 import com.hnieacm.user.mapper.UserRoleMapper;
 import com.hnieacm.user.service.UserProfileService;
+import com.hnieacm.user.service.manager.UserInfoManager;
 import com.hnieacm.user.vo.UserProfileVo;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -33,9 +30,7 @@ import java.util.Objects;
 @RequiredArgsConstructor
 public class UserProfileServiceImpl implements UserProfileService {
 
-    private final UserInfoMapper userInfoMapper;
-    private final SysCollegeMapper sysCollegeMapper;
-    private final SysClassMapper sysClassMapper;
+    private final UserInfoManager userInfoManager;
     private final UserRoleMapper userRoleMapper;
     private final RoleMapper roleMapper;
 
@@ -51,22 +46,10 @@ public class UserProfileServiceImpl implements UserProfileService {
     public UserProfileVo getCurrentUserProfile() {
         String uid = StpUtil.getLoginIdAsString();
 
-        UserInfo user = userInfoMapper.selectOne(
-                new LambdaQueryWrapper<UserInfo>().eq(UserInfo::getUid, uid)
-        );
-        if (user == null) {
-            throw new BizException(ResultCode.USER_NOT_FOUND, "用户不存在");
-        }
-
-        SysCollege college = null;
-        if (user.getCollegeId() != null) {
-            college = sysCollegeMapper.selectById(user.getCollegeId());
-        }
-
-        SysClass sysClass = null;
-        if (user.getClassId() != null) {
-            sysClass = sysClassMapper.selectById(user.getClassId());
-        }
+        UserContextDto userContext = userInfoManager.getUserContextByUid(uid);
+        UserInfo user = userContext.user();
+        SysCollege college = userContext.college();
+        SysClass sysClass = userContext.sysClass();
 
         List<String> roles = getUserRoles(uid);
         if (roles.isEmpty()) {

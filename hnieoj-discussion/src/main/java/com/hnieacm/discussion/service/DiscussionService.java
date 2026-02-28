@@ -1,10 +1,11 @@
 package com.hnieacm.discussion.service;
 
 import com.hnieacm.common.dto.PageVo;
+import com.hnieacm.discussion.dto.AdminUpdateDiscussionRequest;
 import com.hnieacm.discussion.dto.CreateDiscussionAnswerRequest;
 import com.hnieacm.discussion.dto.CreateDiscussionCommentRequest;
 import com.hnieacm.discussion.dto.CreateDiscussionRequest;
-import com.hnieacm.discussion.vo.DiscussionCheckProblemVo;
+import com.hnieacm.discussion.vo.AdminDiscussionListVo;
 import com.hnieacm.discussion.vo.DiscussionCreateVo;
 import com.hnieacm.discussion.vo.DiscussionDetailVo;
 import com.hnieacm.discussion.vo.DiscussionListVo;
@@ -31,7 +32,11 @@ public interface DiscussionService {
 
     DiscussionCreateVo createComment(Long answerId, CreateDiscussionCommentRequest request);
 
-    DiscussionCheckProblemVo checkProblemExists(String problemCode);
-
     List<DiscussionRelatedVo> listRelatedDiscussions(String problemCode, Integer limit);
+
+    PageVo<AdminDiscussionListVo> listAdminDiscussions(int page, int pageSize, String keyword, String category, Integer status);
+
+    void updateDiscussionByAdmin(Long discussionId, AdminUpdateDiscussionRequest request);
+
+    void deleteDiscussionByAdmin(Long discussionId);
 }

@@ -12,7 +12,9 @@ import com.hnieacm.discussion.constant.DiscussionRoleConstant;
 import com.hnieacm.discussion.constant.DiscussionSortConstant;
 import com.hnieacm.discussion.constant.DiscussionStatusConstant;
 import com.hnieacm.discussion.constant.DiscussionTargetTypeConstant;
+import com.hnieacm.discussion.constant.DiscussionTopPriorityConstant;
 import com.hnieacm.discussion.constant.DiscussionVoteDirectionConstant;
+import com.hnieacm.discussion.dto.AdminUpdateDiscussionRequest;
 import com.hnieacm.discussion.dto.CreateDiscussionAnswerRequest;
 import com.hnieacm.discussion.dto.CreateDiscussionCommentRequest;
 import com.hnieacm.discussion.dto.CreateDiscussionRequest;
@@ -26,8 +28,8 @@ import com.hnieacm.discussion.mapper.DiscussionCommentMapper;
 import com.hnieacm.discussion.mapper.DiscussionLikeMapper;
 import com.hnieacm.discussion.mapper.DiscussionMapper;
 import com.hnieacm.discussion.service.DiscussionService;
+import com.hnieacm.discussion.vo.AdminDiscussionListVo;
 import com.hnieacm.discussion.vo.DiscussionAnswerVo;
-import com.hnieacm.discussion.vo.DiscussionCheckProblemVo;
 import com.hnieacm.discussion.vo.DiscussionCommentVo;
 import com.hnieacm.discussion.vo.DiscussionCreateVo;
 import com.hnieacm.discussion.vo.DiscussionDetailVo;
@@ -50,6 +52,7 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 /**
@@ -283,7 +286,7 @@ public class DiscussionServiceImpl implements DiscussionService {
         discussion.setProblemCode(problemCode);
         discussion.setViewNum(0);
         discussion.setLikeNum(0);
-        discussion.setTopPriority(0);
+        discussion.setTopPriority(DiscussionTopPriorityConstant.NORMAL);
         discussion.setStatus(DiscussionStatusConstant.NORMAL);
         discussionMapper.insert(discussion);
         return new DiscussionCreateVo(discussion.getId());
@@ -301,9 +304,12 @@ public class DiscussionServiceImpl implements DiscussionService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public DiscussionCreateVo createAnswer(Long discussionId, CreateDiscussionAnswerRequest request) {
-        Discussion discussion = queryNormalDiscussion(discussionId);
+        Discussion discussion = queryDiscussionById(discussionId);
         if (discussion.getStatus() != null && discussion.getStatus() == DiscussionStatusConstant.CLOSED) {
             throw new BizException(ResultCode.FORBIDDEN, "该讨论已关闭，无法回复");
+        }
+        if (discussion.getStatus() != null && discussion.getStatus() != DiscussionStatusConstant.NORMAL) {
+            throw new BizException(ResultCode.NOT_FOUND, "讨论不存在");
         }
 
         String content = requireTrimmed(request.getContent(), "content 不能为空");
@@ -348,20 +354,6 @@ public class DiscussionServiceImpl implements DiscussionService {
     }
 
     /**
-     * @MethodName checkProblemExists
-     * @Param problemCode
-     * @Description 检查题目是否存在
-     * @Return @return {@link DiscussionCheckProblemVo }
-     * @Author HaoRan_Lyu
-     * @Date 2026/02/23
-     */
-    @Override
-    public DiscussionCheckProblemVo checkProblemExists(String problemCode) {
-        String normalizedCode = requireTrimmed(problemCode, "problemCode 不能为空");
-        return new DiscussionCheckProblemVo(problemExistsSafely(normalizedCode));
-    }
-
-    /**
      * @MethodName listRelatedDiscussions
      * @Param problemCode
      * @Param limit
@@ -375,7 +367,7 @@ public class DiscussionServiceImpl implements DiscussionService {
         String normalizedCode = requireTrimmed(problemCode, "problemCode 不能为空");
         int queryLimit = limit == null ? 5 : limit;
         if (queryLimit <= 0) {
-            throw new BizException(ResultCode.BAD_REQUEST, "limit 必须大于 0");
+            throw new BizException(ResultCode.BAD_REQUEST, "pageSize 必须大于 0");
         }
         if (queryLimit > 20) {
             queryLimit = 20;
@@ -402,6 +394,136 @@ public class DiscussionServiceImpl implements DiscussionService {
     }
 
     /**
+     * @MethodName listAdminDiscussions
+     * @Param page
+     * @Param pageSize
+     * @Param keyword
+     * @Param category
+     * @Param status
+     * @Description 管理端分页查询讨论列表
+     * @Return @return {@link PageVo }<{@link AdminDiscussionListVo }>
+     * @Author HaoRan_Lyu
+     * @Date 2026/02/28
+     */
+    @Override
+    public PageVo<AdminDiscussionListVo> listAdminDiscussions(int page, int pageSize, String keyword, String category, Integer status) {
+        if (page <= 0 || pageSize <= 0) {
+            throw new BizException(ResultCode.BAD_REQUEST, "page 和 pageSize 必须大于 0");
+        }
+        String normalizedKeyword = trimToNull(keyword);
+        String normalizedCategory = category == null ? null : DiscussionCategoryConstant.normalizeWithAll(category);
+        Integer normalizedStatus = status == null ? null : DiscussionStatusConstant.normalize(status);
+
+        LambdaQueryWrapper<Discussion> wrapper = new LambdaQueryWrapper<Discussion>()
+                .orderByDesc(Discussion::getTopPriority)
+                .orderByDesc(Discussion::getGmtCreate)
+                .orderByDesc(Discussion::getId);
+        if (normalizedKeyword != null) {
+            wrapper.and(w -> w.like(Discussion::getTitle, normalizedKeyword)
+                    .or()
+                    .like(Discussion::getDescription, normalizedKeyword)
+                    .or()
+                    .like(Discussion::getContent, normalizedKeyword));
+        }
+        if (normalizedCategory != null && !DiscussionCategoryConstant.ALL.equals(normalizedCategory)) {
+            wrapper.eq(Discussion::getCategory, normalizedCategory);
+        }
+        if (normalizedStatus != null) {
+            wrapper.eq(Discussion::getStatus, normalizedStatus);
+        }
+
+        Page<Discussion> pageParam = new Page<>(page, pageSize);
+        Page<Discussion> pageResult = discussionMapper.selectPage(pageParam, wrapper);
+        List<Discussion> records = pageResult.getRecords();
+        if (records == null || records.isEmpty()) {
+            return new PageVo<>(Collections.emptyList(), pageResult.getTotal());
+        }
+
+        Map<Long, Long> answerCountMap = queryAnswerCountMap(records);
+        List<AdminDiscussionListVo> list = records.stream()
+                .map(post -> toAdminDiscussionListVo(post, answerCountMap.getOrDefault(post.getId(), 0L)))
+                .toList();
+        return new PageVo<>(list, pageResult.getTotal());
+    }
+
+    /**
+     * @MethodName updateDiscussionByAdmin
+     * @Param discussionId
+     * @Param request
+     * @Description 管理端编辑讨论
+     * @Return
+     * @Author HaoRan_Lyu
+     * @Date 2026/02/28
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void updateDiscussionByAdmin(Long discussionId, @NonNull AdminUpdateDiscussionRequest request) {
+        Discussion existsDiscussion = queryDiscussionById(discussionId);
+        String title = requireTrimmed(request.getTitle(), "title 不能为空");
+        String category = DiscussionCategoryConstant.normalize(request.getCategory());
+        String content = requireTrimmed(request.getContent(), "content 不能为空");
+        int status = DiscussionStatusConstant.normalize(request.getStatus());
+        String problemCode = trimToNull(request.getProblemCode());
+        if (DiscussionCategoryConstant.PROBLEM.equals(category)) {
+            String finalProblemCode = problemCode == null ? trimToNull(existsDiscussion.getProblemCode()) : problemCode;
+            if (finalProblemCode == null) {
+                throw new BizException(ResultCode.BAD_REQUEST, "category=Problem 时 problemCode 必填");
+            }
+            ensureProblemExists(finalProblemCode);
+            problemCode = finalProblemCode;
+        } else {
+            problemCode = null;
+        }
+
+        Discussion update = new Discussion();
+        update.setId(existsDiscussion.getId());
+        update.setTitle(title);
+        update.setCategory(category);
+        update.setProblemCode(problemCode);
+        update.setContent(content);
+        update.setDescription(buildDescription(content));
+        update.setStatus(status);
+        update.setTopPriority(DiscussionTopPriorityConstant.fromBoolean(request.getIsTop()));
+        discussionMapper.updateById(update);
+    }
+
+    /**
+     * @MethodName deleteDiscussionByAdmin
+     * @Param discussionId
+     * @Description 管理端删除讨论
+     * @Return
+     * @Author HaoRan_Lyu
+     * @Date 2026/02/28
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void deleteDiscussionByAdmin(Long discussionId) {
+        Discussion discussion = queryDiscussionById(discussionId);
+
+        List<DiscussionAnswer> answerList = discussionAnswerMapper.selectList(new LambdaQueryWrapper<DiscussionAnswer>()
+                .select(DiscussionAnswer::getId)
+                .eq(DiscussionAnswer::getDid, discussion.getId()));
+        List<Long> answerIds = answerList == null
+                ? Collections.emptyList()
+                : answerList.stream().map(DiscussionAnswer::getId).filter(Objects::nonNull).toList();
+
+        if (!answerIds.isEmpty()) {
+            discussionCommentMapper.delete(new LambdaQueryWrapper<DiscussionComment>()
+                    .in(DiscussionComment::getAid, answerIds));
+            discussionLikeMapper.delete(new LambdaQueryWrapper<DiscussionLike>()
+                    .in(DiscussionLike::getTargetId, answerIds)
+                    .eq(DiscussionLike::getTargetType, DiscussionTargetTypeConstant.ANSWER));
+            discussionAnswerMapper.delete(new LambdaQueryWrapper<DiscussionAnswer>()
+                    .in(DiscussionAnswer::getId, answerIds));
+        }
+
+        discussionLikeMapper.delete(new LambdaQueryWrapper<DiscussionLike>()
+                .eq(DiscussionLike::getTargetId, discussion.getId())
+                .eq(DiscussionLike::getTargetType, DiscussionTargetTypeConstant.POST));
+        discussionMapper.deleteById(discussion.getId());
+    }
+
+    /**
      * @MethodName queryNormalDiscussion
      * @Param discussionId
      * @Description 查询正常状态讨论
@@ -412,13 +534,43 @@ public class DiscussionServiceImpl implements DiscussionService {
     @NotNull
     @Contract("null -> fail")
     private Discussion queryNormalDiscussion(Long discussionId) {
+        return queryDiscussionById(discussionId, true);
+    }
+
+    /**
+     * @MethodName queryDiscussionById
+     * @Param discussionId
+     * @Description 按 id 查询讨论
+     * @Return @return {@link Discussion }
+     * @Author HaoRan_Lyu
+     * @Date 2026/02/28
+     */
+    @NotNull
+    private Discussion queryDiscussionById(Long discussionId) {
+        return queryDiscussionById(discussionId, false);
+    }
+
+    /**
+     * @MethodName queryDiscussionById
+     * @Param discussionId
+     * @Param onlyNormal
+     * @Description 按 id 查询讨论（可限制仅正常状态）
+     * @Return @return {@link Discussion }
+     * @Author HaoRan_Lyu
+     * @Date 2026/02/28
+     */
+    @NotNull
+    private Discussion queryDiscussionById(Long discussionId, boolean onlyNormal) {
         if (discussionId == null || discussionId <= 0) {
             throw new BizException(ResultCode.BAD_REQUEST, "discussionId 不合法");
         }
-        Discussion discussion = discussionMapper.selectOne(new LambdaQueryWrapper<Discussion>()
+        LambdaQueryWrapper<Discussion> wrapper = new LambdaQueryWrapper<Discussion>()
                 .eq(Discussion::getId, discussionId)
-                .eq(Discussion::getStatus, DiscussionStatusConstant.NORMAL)
-                .last("limit 1"));
+                .last("limit 1");
+        if (onlyNormal) {
+            wrapper.eq(Discussion::getStatus, DiscussionStatusConstant.NORMAL);
+        }
+        Discussion discussion = discussionMapper.selectOne(wrapper);
         if (discussion == null) {
             throw new BizException(ResultCode.NOT_FOUND, "讨论不存在");
         }
@@ -436,13 +588,30 @@ public class DiscussionServiceImpl implements DiscussionService {
     @NotNull
     @Contract("null -> fail")
     private DiscussionAnswer queryNormalAnswer(Long answerId) {
+        return queryAnswerById(answerId, true);
+    }
+
+    /**
+     * @MethodName queryAnswerById
+     * @Param answerId
+     * @Param onlyNormal
+     * @Description 按 id 查询回答（可限制仅正常状态）
+     * @Return @return {@link DiscussionAnswer }
+     * @Author HaoRan_Lyu
+     * @Date 2026/02/28
+     */
+    @NotNull
+    private DiscussionAnswer queryAnswerById(Long answerId, boolean onlyNormal) {
         if (answerId == null || answerId <= 0) {
             throw new BizException(ResultCode.BAD_REQUEST, "answerId 不合法");
         }
-        DiscussionAnswer answer = discussionAnswerMapper.selectOne(new LambdaQueryWrapper<DiscussionAnswer>()
+        LambdaQueryWrapper<DiscussionAnswer> wrapper = new LambdaQueryWrapper<DiscussionAnswer>()
                 .eq(DiscussionAnswer::getId, answerId)
-                .eq(DiscussionAnswer::getStatus, DiscussionStatusConstant.NORMAL)
-                .last("limit 1"));
+                .last("limit 1");
+        if (onlyNormal) {
+            wrapper.eq(DiscussionAnswer::getStatus, DiscussionStatusConstant.NORMAL);
+        }
+        DiscussionAnswer answer = discussionAnswerMapper.selectOne(wrapper);
         if (answer == null) {
             throw new BizException(ResultCode.NOT_FOUND, "回答不存在");
         }
@@ -484,6 +653,34 @@ public class DiscussionServiceImpl implements DiscussionService {
         DiscussionListVo vo = new DiscussionListVo();
         BeanUtils.copyProperties(postVo, vo);
         vo.setAnswerCount(Math.toIntExact(answerCount == null ? 0L : answerCount));
+        return vo;
+    }
+
+    /**
+     * @MethodName toAdminDiscussionListVo
+     * @Param post
+     * @Param answerCount
+     * @Description 管理端讨论列表展示对象转换
+     * @Return @return {@link AdminDiscussionListVo }
+     * @Author HaoRan_Lyu
+     * @Date 2026/02/28
+     */
+    @NotNull
+    private AdminDiscussionListVo toAdminDiscussionListVo(Discussion post, Long answerCount) {
+        AdminDiscussionListVo vo = new AdminDiscussionListVo();
+        vo.setId(post.getId());
+        vo.setTitle(post.getTitle());
+        vo.setUid(post.getUid());
+        vo.setAuthor(post.getAuthor());
+        vo.setCategory(post.getCategory());
+        vo.setProblemCode(post.getProblemCode());
+        vo.setStatus(post.getStatus());
+        vo.setTopPriority(post.getTopPriority());
+        vo.setViewNum(post.getViewNum());
+        vo.setLikeNum(post.getLikeNum());
+        vo.setAnswerCount(Math.toIntExact(answerCount == null ? 0L : answerCount));
+        vo.setGmtCreate(post.getGmtCreate());
+        vo.setGmtModified(post.getGmtModified());
         return vo;
     }
 
@@ -617,24 +814,6 @@ public class DiscussionServiceImpl implements DiscussionService {
         } catch (Exception e) {
             log.error("Validate problem failed, problemCode: {}", problemCode, e);
             throw new BizException(ResultCode.INTERNAL_ERROR, "题目服务不可用，请稍后重试");
-        }
-    }
-
-    /**
-     * @MethodName problemExistsSafely
-     * @Param problemCode
-     * @Description 安全地检查题目是否存在
-     * @Return @return boolean
-     * @Author HaoRan_Lyu
-     * @Date 2026/02/23
-     */
-    private boolean problemExistsSafely(String problemCode) {
-        try {
-            Result<?> result = problemInternalFeignClient.getProblemBasic(problemCode);
-            return result != null && result.getCode() == ResultCode.SUCCESS && result.getData() != null;
-        } catch (Exception e) {
-            log.warn("Check problem exists failed, problemCode: {}", problemCode, e);
-            return false;
         }
     }
 

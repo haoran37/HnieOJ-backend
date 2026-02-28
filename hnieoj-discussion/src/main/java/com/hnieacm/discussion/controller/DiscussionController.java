@@ -8,7 +8,6 @@ import com.hnieacm.discussion.dto.CreateDiscussionCommentRequest;
 import com.hnieacm.discussion.dto.CreateDiscussionRequest;
 import com.hnieacm.discussion.dto.DiscussionVoteRequest;
 import com.hnieacm.discussion.service.DiscussionService;
-import com.hnieacm.discussion.vo.DiscussionCheckProblemVo;
 import com.hnieacm.discussion.vo.DiscussionCreateVo;
 import com.hnieacm.discussion.vo.DiscussionDetailVo;
 import com.hnieacm.discussion.vo.DiscussionListVo;
@@ -77,7 +76,7 @@ public class DiscussionController {
         return Result.success("发布成功", discussionService.createDiscussion(request));
     }
 
-    @Operation(summary = "发布回复")
+    @Operation(summary = "发布回答")
     @PostMapping("/{postId}/answers")
     public Result<DiscussionCreateVo> createAnswer(
             @PathVariable @Min(value = 1, message = "postId 必须大于等于 1") Long postId,
@@ -93,16 +92,12 @@ public class DiscussionController {
         return Result.success("发布成功", discussionService.createComment(answerId, request));
     }
 
-    @Operation(summary = "检验题目是否存在")
-    @GetMapping("/check-problem")
-    public Result<DiscussionCheckProblemVo> checkProblem(@RequestParam String problemCode) {
-        return Result.success(discussionService.checkProblemExists(problemCode));
-    }
-
     @Operation(summary = "获取相关讨论")
     @GetMapping("/related")
     public Result<List<DiscussionRelatedVo>> related(@RequestParam String problemCode,
-                                                     @RequestParam(required = false) Integer limit) {
-        return Result.success(discussionService.listRelatedDiscussions(problemCode, limit));
+                                                     @RequestParam(value = "pageSize", required = false) Integer pageSize,
+                                                     @RequestParam(value = "limit", required = false) Integer limit) {
+        Integer queryLimit = pageSize == null ? limit : pageSize;
+        return Result.success(discussionService.listRelatedDiscussions(problemCode, queryLimit));
     }
 }

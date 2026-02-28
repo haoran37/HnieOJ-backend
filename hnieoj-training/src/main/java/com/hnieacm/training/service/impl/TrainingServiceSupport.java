@@ -141,11 +141,7 @@ public final class TrainingServiceSupport {
      * @Date 2026/02/28
      */
     public static String trimToNull(String value) {
-        if (value == null) {
-            return null;
-        }
-        String trimmed = value.trim();
-        return trimmed.isEmpty() ? null : trimmed;
+        return HomeworkServiceSupport.trimToNull(value);
     }
 
     /**

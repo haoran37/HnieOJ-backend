@@ -20,7 +20,7 @@ public final class HomeworkStatusConstant {
         if (status == null) {
             throw new BizException(ResultCode.BAD_REQUEST, "status 不能为空");
         }
-        return Boolean.TRUE.equals(status) ? ENABLED : DISABLED;
+        return status ? ENABLED : DISABLED;
     }
 
     public static boolean isEnabled(Integer status) {

@@ -18,6 +18,7 @@ import com.hnieacm.problem.mapper.ProblemMapper;
 import com.hnieacm.problem.mapper.ProblemTagMapper;
 import com.hnieacm.problem.mapper.TagMapper;
 import com.hnieacm.problem.service.ProblemQueryService;
+import com.hnieacm.problem.vo.ProblemCheckVo;
 import com.hnieacm.problem.vo.ProblemDetailVo;
 import com.hnieacm.problem.vo.ProblemExampleVo;
 import com.hnieacm.problem.vo.ProblemListVo;
@@ -173,6 +174,31 @@ public class ProblemQueryServiceImpl implements ProblemQueryService {
         vo.setAcceptedCount(problem.getAcceptedCount());
         vo.setGmtCreate(problem.getGmtCreate());
         vo.setGmtModified(problem.getGmtModified());
+        return vo;
+    }
+
+    @Override
+    public ProblemCheckVo checkProblemExists(Long problemId) {
+        if (problemId == null || problemId <= 0) {
+            throw new BizException(ResultCode.BAD_REQUEST, "problemId 不合法");
+        }
+
+        Problem problem = problemMapper.selectOne(new LambdaQueryWrapper<Problem>()
+                .select(Problem::getId, Problem::getProblemCode, Problem::getTitle)
+                .eq(Problem::getId, problemId)
+                .last("limit 1"));
+
+        ProblemCheckVo vo = new ProblemCheckVo();
+        if (problem == null) {
+            vo.setExists(false);
+            vo.setProblemId(problemId);
+            return vo;
+        }
+
+        vo.setExists(true);
+        vo.setProblemId(problem.getId());
+        vo.setProblemCode(problem.getProblemCode());
+        vo.setTitle(problem.getTitle());
         return vo;
     }
 

@@ -1,6 +1,8 @@
 package com.hnieacm.training.controller;
 
-import cn.dev33.satoken.annotation.SaCheckLogin;
+import cn.dev33.satoken.annotation.SaCheckRole;
+import cn.dev33.satoken.annotation.SaMode;
+import com.hnieacm.common.constant.RoleConstant;
 import com.hnieacm.common.dto.PageVo;
 import com.hnieacm.common.result.Result;
 import com.hnieacm.training.service.TrainingQueryService;
@@ -25,10 +27,19 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @Tag(name = "题单模块")
 @Validated
-@SaCheckLogin
 @RestController
 @RequestMapping("/api/trainings")
 @RequiredArgsConstructor
+@SaCheckRole(
+        value = {
+                RoleConstant.STUDENT,
+                RoleConstant.TA,
+                RoleConstant.TEACHER,
+                RoleConstant.ADMIN,
+                RoleConstant.ROOT
+        },
+        mode = SaMode.OR
+)
 public class TrainingController {
 
     private final TrainingQueryService trainingQueryService;

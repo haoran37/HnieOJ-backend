@@ -1,6 +1,7 @@
 package com.hnieacm.problem.service;
 
 import com.hnieacm.common.dto.PageVo;
+import com.hnieacm.problem.vo.ProblemCheckVo;
 import com.hnieacm.problem.vo.ProblemDetailVo;
 import com.hnieacm.problem.vo.ProblemListVo;
 
@@ -16,4 +17,6 @@ public interface ProblemQueryService {
     PageVo<ProblemListVo> listPublicProblems(int page, int pageSize, String keyword, List<String> tags, Integer difficulty);
 
     ProblemDetailVo getProblemDetail(String problemCode);
+
+    ProblemCheckVo checkProblemExists(Long problemId);
 }

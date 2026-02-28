@@ -59,11 +59,7 @@ public class TrainingQueryServiceImpl implements TrainingQueryService {
      */
     @Override
     public PageVo<TrainingListVo> listTrainings(int page, int pageSize, String keyword, String type, String auth) {
-        if (page <= 0 || pageSize <= 0) {
-            throw new BizException(ResultCode.BAD_REQUEST, "page 和 pageSize 必须大于 0");
-        }
-
-        String normalizedKeyword = trimToNull(keyword);
+        String normalizedKeyword = TrainingServiceSupport.trimToNull(keyword);
         String normalizedType = TrainingTypeConstant.normalize(type);
         String normalizedAuth = TrainingAuthConstant.normalize(auth);
 
@@ -84,31 +80,31 @@ public class TrainingQueryServiceImpl implements TrainingQueryService {
             wrapper.eq(Training::getAuth, normalizedAuth);
         }
 
-        Page<Training> pageParam = new Page<>(page, pageSize);
-        Page<Training> pageResult = trainingMapper.selectPage(pageParam, wrapper);
-        List<Training> records = pageResult.getRecords();
-        if (records == null || records.isEmpty()) {
-            return new PageVo<>(Collections.emptyList(), pageResult.getTotal());
-        }
-
-        Map<Long, Long> problemCountMap = queryTrainingProblemCountMap(records);
-        Map<Long, List<String>> categoryMap = queryTrainingCategoryMap(records);
-
-        List<TrainingListVo> list = records.stream().map(training -> {
-            TrainingListVo vo = new TrainingListVo();
-            vo.setId(training.getId());
-            vo.setTitle(training.getTitle());
-            vo.setType(training.getType());
-            vo.setAuth(training.getAuth());
-            vo.setAuthor(training.getAuthor());
-            vo.setStatus(training.getStatus());
-            vo.setRank(training.getRank());
-            vo.setProblemCount(Math.toIntExact(problemCountMap.getOrDefault(training.getId(), 0L)));
-            vo.setCategories(categoryMap.getOrDefault(training.getId(), Collections.emptyList()));
-            vo.setGmtCreate(training.getGmtCreate());
-            return vo;
-        }).toList();
-        return new PageVo<>(list, pageResult.getTotal());
+        return TrainingServiceSupport.buildTrainingPageVo(
+                trainingMapper,
+                trainingProblemMapper,
+                wrapper,
+                page,
+                pageSize,
+                pageData -> {
+                    List<Training> records = pageData.records();
+                    Map<Long, Long> problemCountMap = pageData.problemCountMap();
+                    Map<Long, List<String>> categoryMap = queryTrainingCategoryMap(records);
+                    return records.stream().map(training -> {
+                        TrainingListVo vo = new TrainingListVo();
+                        vo.setId(training.getId());
+                        vo.setTitle(training.getTitle());
+                        vo.setType(training.getType());
+                        vo.setAuth(training.getAuth());
+                        vo.setAuthor(training.getAuthor());
+                        vo.setStatus(training.getStatus());
+                        vo.setRank(training.getRank());
+                        vo.setProblemCount(Math.toIntExact(problemCountMap.getOrDefault(training.getId(), 0L)));
+                        vo.setCategories(categoryMap.getOrDefault(training.getId(), Collections.emptyList()));
+                        vo.setGmtCreate(training.getGmtCreate());
+                        return vo;
+                    }).toList();
+                });
     }
 
     /**
@@ -122,7 +118,7 @@ public class TrainingQueryServiceImpl implements TrainingQueryService {
     @Override
     public TrainingDetailVo getTrainingDetail(Long trainingId) {
         Training training = queryEnabledTraining(trainingId);
-        Map<Long, Long> problemCountMap = queryTrainingProblemCountMap(List.of(training));
+        Map<Long, Long> problemCountMap = TrainingServiceSupport.queryTrainingProblemCountMap(trainingProblemMapper, List.of(training));
         Map<Long, List<String>> categoryMap = queryTrainingCategoryMap(List.of(training));
 
         TrainingDetailVo vo = new TrainingDetailVo();
@@ -154,9 +150,7 @@ public class TrainingQueryServiceImpl implements TrainingQueryService {
     @Override
     public PageVo<TrainingProblemVo> listTrainingProblems(Long trainingId, int page, int pageSize) {
         Training training = queryEnabledTraining(trainingId);
-        if (page <= 0 || pageSize <= 0) {
-            throw new BizException(ResultCode.BAD_REQUEST, "page 和 pageSize 必须大于 0");
-        }
+        TrainingServiceSupport.validatePageParams(page, pageSize);
 
         Page<TrainingProblem> pageParam = new Page<>(page, pageSize);
         Page<TrainingProblem> pageResult = trainingProblemMapper.selectPage(pageParam, new LambdaQueryWrapper<TrainingProblem>()
@@ -194,28 +188,6 @@ public class TrainingQueryServiceImpl implements TrainingQueryService {
             throw new BizException(ResultCode.NOT_FOUND, "题单不存在或不可访问");
         }
         return training;
-    }
-
-    /**
-     * @MethodName queryTrainingProblemCountMap
-     * @Param trainings
-      * @Description 查询题单题目数量
-     * @Return @return {@link Map }<{@link Long }, {@link Long }>
-     * @Author HaoRan_Lyu
-     * @Date 2026/02/24
-     */
-    private Map<Long, Long> queryTrainingProblemCountMap(List<Training> trainings) {
-        List<Long> trainingIds = trainings.stream().map(Training::getId).toList();
-        if (trainingIds.isEmpty()) {
-            return Collections.emptyMap();
-        }
-        List<TrainingProblem> relations = trainingProblemMapper.selectList(new LambdaQueryWrapper<TrainingProblem>()
-                .select(TrainingProblem::getTid)
-                .in(TrainingProblem::getTid, trainingIds));
-        if (relations == null || relations.isEmpty()) {
-            return Collections.emptyMap();
-        }
-        return relations.stream().collect(Collectors.groupingBy(TrainingProblem::getTid, Collectors.counting()));
     }
 
     /**
@@ -259,19 +231,4 @@ public class TrainingQueryServiceImpl implements TrainingQueryService {
         return result;
     }
 
-    /**
-     * @MethodName trimToNull
-     * @Param value
-     * @Description 去除字符串首尾空格，若结果为空则返回null
-     * @Return @return {@link String }
-     * @Author HaoRan_Lyu
-     * @Date 2026/02/24
-     */
-    private String trimToNull(String value) {
-        if (value == null) {
-            return null;
-        }
-        String trimmed = value.trim();
-        return trimmed.isEmpty() ? null : trimmed;
-    }
 }

@@ -1,9 +1,13 @@
 package com.hnieacm.problem.controller;
 
 import cn.dev33.satoken.annotation.SaCheckLogin;
+import cn.dev33.satoken.annotation.SaCheckRole;
+import cn.dev33.satoken.annotation.SaMode;
+import com.hnieacm.common.constant.RoleConstant;
 import com.hnieacm.common.dto.PageVo;
 import com.hnieacm.common.result.Result;
 import com.hnieacm.problem.service.ProblemQueryService;
+import com.hnieacm.problem.vo.ProblemCheckVo;
 import com.hnieacm.problem.vo.ProblemDetailVo;
 import com.hnieacm.problem.vo.ProblemListVo;
 import io.swagger.v3.oas.annotations.Operation;
@@ -49,5 +53,21 @@ public class ProblemController {
     @GetMapping("/{problemCode}")
     public Result<ProblemDetailVo> detail(@PathVariable String problemCode) {
         return Result.success(problemQueryService.getProblemDetail(problemCode));
+    }
+
+    @Operation(summary = "检查题目是否存在")
+    @SaCheckRole(
+            value = {
+                    RoleConstant.STUDENT,
+                    RoleConstant.TA,
+                    RoleConstant.TEACHER,
+                    RoleConstant.ADMIN,
+                    RoleConstant.ROOT
+            },
+            mode = SaMode.OR
+    )
+    @GetMapping("/check")
+    public Result<ProblemCheckVo> check(@RequestParam("problemId") @Min(value = 1, message = "problemId 必须大于 0") Long problemId) {
+        return Result.success(problemQueryService.checkProblemExists(problemId));
     }
 }

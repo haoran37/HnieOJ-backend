@@ -146,7 +146,7 @@ public class SubmissionServiceImpl implements SubmissionService {
     /**
      * @MethodName ensureProblemSubmitAllowed
      * @Param problem
-     * @Description 确保允许提交问题
+     * @Description 确保允许提交题目
      * @Return
      * @Author HaoRan_Lyu
      * @Date 2026/02/21

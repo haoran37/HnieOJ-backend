@@ -41,10 +41,10 @@ public class AnnouncementServiceImpl implements AnnouncementService {
      * @Param page
      * @Param pageSize
      * @Param keyword
-     * @Description 公开公告列表
+     * @Description 公告列表
      * @Return @return {@link PageVo }<{@link AnnouncementListVo }>
      * @Author HaoRan_Lyu
-     * @Date 2026/02/24
+     * @Date 2026/03/01
      */
     @Override
     public PageVo<AnnouncementListVo> listPublicAnnouncements(int page, int pageSize, String keyword) {
@@ -55,16 +55,16 @@ public class AnnouncementServiceImpl implements AnnouncementService {
     /**
      * @MethodName getPublicAnnouncementDetail
      * @Param id
-     * @Description 获取公开公告详情
+     * @Description 获取公告详情
      * @Return @return {@link AnnouncementDetailVo }
      * @Author HaoRan_Lyu
-     * @Date 2026/02/24
+     * @Date 2026/03/01
      */
     @Override
     public AnnouncementDetailVo getPublicAnnouncementDetail(Long id) {
         Announcement announcement = requireAnnouncement(id);
-        // 前台只允许访问已上线公告。
-        if (AnnouncementStatusConstant.isOnline(announcement.getStatus())) {
+        // 前台只允许查看已上线公告，未上线按不存在处理
+        if (!AnnouncementStatusConstant.isOnline(announcement.getStatus())) {
             throw new BizException(ResultCode.NOT_FOUND, "公告不存在");
         }
         return toDetailVo(announcement);
@@ -79,7 +79,7 @@ public class AnnouncementServiceImpl implements AnnouncementService {
      * @Description 公告列表（管理员）
      * @Return @return {@link PageVo }<{@link AnnouncementListVo }>
      * @Author HaoRan_Lyu
-     * @Date 2026/02/24
+     * @Date 2026/03/01
      */
     @Override
     public PageVo<AnnouncementListVo> listAdminAnnouncements(int page, int pageSize, String keyword, Integer status) {
@@ -91,17 +91,17 @@ public class AnnouncementServiceImpl implements AnnouncementService {
     /**
      * @MethodName createAnnouncement
      * @Param request
-     * @Description 新建公告
+     * @Description 创建公告
      * @Return
      * @Author HaoRan_Lyu
-     * @Date 2026/02/24
+     * @Date 2026/03/01
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void createAnnouncement(AnnouncementCreateRequest request) {
         Announcement announcement = new Announcement();
-        announcement.setTitle(request.getTitle().trim());
-        announcement.setContent(request.getContent().trim());
+        announcement.setTitle(request.getTitle());
+        announcement.setContent(request.getContent());
         announcement.setUid(StpUtil.getLoginIdAsString());
         announcement.setStatus(resolveStatus(request.getStatus()));
         announcementMapper.insert(announcement);
@@ -115,14 +115,14 @@ public class AnnouncementServiceImpl implements AnnouncementService {
      * @Description 更新公告
      * @Return
      * @Author HaoRan_Lyu
-     * @Date 2026/02/24
+     * @Date 2026/03/01
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void updateAnnouncement(Long id, AnnouncementUpdateRequest request) {
         Announcement announcement = requireAnnouncement(id);
-        announcement.setTitle(request.getTitle().trim());
-        announcement.setContent(request.getContent().trim());
+        announcement.setTitle(request.getTitle());
+        announcement.setContent(request.getContent());
         if (request.getStatus() != null) {
             validateStatus(request.getStatus(), false);
             announcement.setStatus(request.getStatus());
@@ -137,7 +137,7 @@ public class AnnouncementServiceImpl implements AnnouncementService {
      * @Description 删除公告
      * @Return
      * @Author HaoRan_Lyu
-     * @Date 2026/02/24
+     * @Date 2026/03/01
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -154,7 +154,7 @@ public class AnnouncementServiceImpl implements AnnouncementService {
      * @Description 更新公告状态
      * @Return
      * @Author HaoRan_Lyu
-     * @Date 2026/02/24
+     * @Date 2026/03/01
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -176,15 +176,20 @@ public class AnnouncementServiceImpl implements AnnouncementService {
      * @Param page
      * @Param pageSize
      * @Param wrapper
-     * @Description 分页查询公告列表，根据条件筛选并返回分页结果
+     * @Description 统一处理分页查询，避免列表接口重复组装分页结构
      * @Return @return {@link PageVo }<{@link AnnouncementListVo }>
      * @Author HaoRan_Lyu
-     * @Date 2026/02/24
+     * @Date 2026/03/01
      */
-    private PageVo<AnnouncementListVo> queryAnnouncementPage(int page, int pageSize, LambdaQueryWrapper<Announcement> wrapper) {
+    private PageVo<AnnouncementListVo> queryAnnouncementPage(
+            int page,
+            int pageSize,
+            LambdaQueryWrapper<Announcement> wrapper
+    ) {
         if (page <= 0 || pageSize <= 0) {
             throw new BizException(ResultCode.BAD_REQUEST, "page 和 pageSize 必须大于 0");
         }
+
         Page<Announcement> mpPage = new Page<>(page, pageSize);
         IPage<Announcement> result = announcementMapper.selectPage(mpPage, wrapper);
         List<AnnouncementListVo> list = result.getRecords().stream().map(this::toListVo).toList();
@@ -195,10 +200,10 @@ public class AnnouncementServiceImpl implements AnnouncementService {
      * @MethodName buildListQueryWrapper
      * @Param keyword
      * @Param status
-     * @Description 构建公告列表查询条件
+     * @Description 列表查询统一条件构建，避免 Controller/Service 多处拼接查询逻辑
      * @Return @return {@link LambdaQueryWrapper }<{@link Announcement }>
      * @Author HaoRan_Lyu
-     * @Date 2026/02/24
+     * @Date 2026/03/01
      */
     private LambdaQueryWrapper<Announcement> buildListQueryWrapper(String keyword, Integer status) {
         LambdaQueryWrapper<Announcement> wrapper = new LambdaQueryWrapper<>();
@@ -210,12 +215,15 @@ public class AnnouncementServiceImpl implements AnnouncementService {
                 Announcement::getGmtCreate,
                 Announcement::getGmtModified
         );
+
         if (status != null) {
             wrapper.eq(Announcement::getStatus, status);
         }
+
         if (StringUtils.hasText(keyword)) {
             wrapper.like(Announcement::getTitle, keyword.trim());
         }
+
         wrapper.orderByDesc(Announcement::getGmtCreate, Announcement::getId);
         return wrapper;
     }
@@ -223,10 +231,10 @@ public class AnnouncementServiceImpl implements AnnouncementService {
     /**
      * @MethodName requireAnnouncement
      * @Param id
-     * @Description 根据ID获取公告，若公告不存在则抛出异常
+     * @Description 获取公告
      * @Return @return {@link Announcement }
      * @Author HaoRan_Lyu
-     * @Date 2026/02/24
+     * @Date 2026/03/01
      */
     private Announcement requireAnnouncement(Long id) {
         Announcement announcement = announcementMapper.selectById(id);
@@ -239,10 +247,10 @@ public class AnnouncementServiceImpl implements AnnouncementService {
     /**
      * @MethodName resolveStatus
      * @Param status
-      * @Description 解析状态
+     * @Description 解析状态
      * @Return @return {@link Integer }
      * @Author HaoRan_Lyu
-     * @Date 2026/02/24
+     * @Date 2026/03/01
      */
     private Integer resolveStatus(Integer status) {
         if (status == null) {
@@ -259,7 +267,7 @@ public class AnnouncementServiceImpl implements AnnouncementService {
      * @Description 验证状态
      * @Return
      * @Author HaoRan_Lyu
-     * @Date 2026/02/24
+     * @Date 2026/03/01
      */
     private void validateStatus(Integer status, boolean allowNull) {
         if (status == null) {
@@ -268,7 +276,8 @@ public class AnnouncementServiceImpl implements AnnouncementService {
             }
             throw new BizException(ResultCode.BAD_REQUEST, "status 不能为空");
         }
-        if (AnnouncementStatusConstant.isOnline(status) && !AnnouncementStatusConstant.isOffline(status)) {
+
+        if (!AnnouncementStatusConstant.isValid(status)) {
             throw new BizException(ResultCode.BAD_REQUEST, "status 只能为 0 或 1");
         }
     }
@@ -276,10 +285,10 @@ public class AnnouncementServiceImpl implements AnnouncementService {
     /**
      * @MethodName toListVo
      * @Param announcement
-     * @Description 将公告实体转换为列表展示用的 VO 对象，仅包含基础信息
+     * @Description 列表vo
      * @Return @return {@link AnnouncementListVo }
      * @Author HaoRan_Lyu
-     * @Date 2026/02/24
+     * @Date 2026/03/01
      */
     private AnnouncementListVo toListVo(Announcement announcement) {
         AnnouncementListVo vo = new AnnouncementListVo();
@@ -295,10 +304,10 @@ public class AnnouncementServiceImpl implements AnnouncementService {
     /**
      * @MethodName toDetailVo
      * @Param announcement
-     * @Description 将公告实体转换为详情展示用的 VO 对象，包含所有信息
+     * @Description 详情vo
      * @Return @return {@link AnnouncementDetailVo }
      * @Author HaoRan_Lyu
-     * @Date 2026/02/24
+     * @Date 2026/03/01
      */
     private AnnouncementDetailVo toDetailVo(Announcement announcement) {
         AnnouncementDetailVo vo = new AnnouncementDetailVo();

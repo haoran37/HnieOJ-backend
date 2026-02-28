@@ -14,10 +14,14 @@ public final class AnnouncementStatusConstant {
     public static final int ONLINE = 1;
 
     public static boolean isOnline(Integer status) {
-        return status == null || status != ONLINE;
+        return status != null && status == ONLINE;
     }
 
     public static boolean isOffline(Integer status) {
         return status != null && status == OFFLINE;
+    }
+
+    public static boolean isValid(Integer status) {
+        return isOnline(status) || isOffline(status);
     }
 }

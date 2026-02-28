@@ -595,7 +595,7 @@ public class DiscussionServiceImpl implements DiscussionService {
      * @MethodName queryAnswerById
      * @Param answerId
      * @Param onlyNormal
-     * @Description 按 id 查询回答（可限制仅正常状态）
+     * @Description 按 id 查询回答（可限制状态）
      * @Return @return {@link DiscussionAnswer }
      * @Author HaoRan_Lyu
      * @Date 2026/02/28

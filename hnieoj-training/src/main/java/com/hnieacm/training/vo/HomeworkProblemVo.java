@@ -14,5 +14,5 @@ public class HomeworkProblemVo {
 
     private Long problemId;
 
-    private Integer displayId;
+    private String displayId;
 }

@@ -11,11 +11,13 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.util.Collections;
+import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -112,5 +114,36 @@ public class TrainingProblemManager {
             }
         }
         return idSet.stream().toList();
+    }
+
+    /**
+     * @MethodName normalizeProblemRequests
+     * @Param problems
+     * @Param problemIdGetter
+     * @Description 标准化题目请求列表并校验 problemId 唯一性
+     * @Return @return {@link List }<{@link T }>
+     * @Author HaoRan_Lyu
+     * @Date 2026/02/28
+     */
+    public <T> List<T> normalizeProblemRequests(List<T> problems, Function<T, Long> problemIdGetter) {
+        if (problems == null || problems.isEmpty()) {
+            return Collections.emptyList();
+        }
+        List<T> result = new ArrayList<>();
+        Set<Long> problemIdSet = new LinkedHashSet<>();
+        for (T problem : problems) {
+            if (problem == null) {
+                continue;
+            }
+            Long problemId = problemIdGetter.apply(problem);
+            if (problemId == null || problemId <= 0) {
+                throw new BizException(ResultCode.BAD_REQUEST, "problemId 不能为空且必须大于 0");
+            }
+            if (!problemIdSet.add(problemId)) {
+                throw new BizException(ResultCode.BAD_REQUEST, "problemId 不能重复: " + problemId);
+            }
+            result.add(problem);
+        }
+        return result;
     }
 }

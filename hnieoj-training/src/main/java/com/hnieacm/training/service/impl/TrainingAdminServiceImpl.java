@@ -24,8 +24,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -292,31 +290,13 @@ public class TrainingAdminServiceImpl implements TrainingAdminService {
     /**
      * @MethodName normalizeProblems
      * @Param problems
-     * @Description 标准化题目
+     * @Description 标准化题目参数
      * @Return @return {@link List }<{@link AdminTrainingProblemRequest }>
      * @Author HaoRan_Lyu
      * @Date 2026/02/28
      */
     private List<AdminTrainingProblemRequest> normalizeProblems(List<AdminTrainingProblemRequest> problems) {
-        if (problems == null || problems.isEmpty()) {
-            return Collections.emptyList();
-        }
-        List<AdminTrainingProblemRequest> result = new ArrayList<>();
-        Set<Long> problemIdSet = new LinkedHashSet<>();
-        for (AdminTrainingProblemRequest problem : problems) {
-            if (problem == null) {
-                continue;
-            }
-            Long problemId = problem.getProblemId();
-            if (problemId == null || problemId <= 0) {
-                throw new BizException(ResultCode.BAD_REQUEST, "problemId 不能为空且必须大于 0");
-            }
-            if (!problemIdSet.add(problemId)) {
-                throw new BizException(ResultCode.BAD_REQUEST, "problemId 不能重复: " + problemId);
-            }
-            result.add(problem);
-        }
-        return result;
+        return trainingProblemManager.normalizeProblemRequests(problems, AdminTrainingProblemRequest::getProblemId);
     }
 
     /**

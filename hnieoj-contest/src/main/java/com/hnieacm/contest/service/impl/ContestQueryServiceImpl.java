@@ -12,6 +12,7 @@ import com.hnieacm.contest.entity.ContestProblem;
 import com.hnieacm.contest.mapper.ContestMapper;
 import com.hnieacm.contest.mapper.ContestProblemMapper;
 import com.hnieacm.contest.service.ContestQueryService;
+import com.hnieacm.contest.vo.ContestCheckVo;
 import com.hnieacm.contest.vo.ContestDetailVo;
 import com.hnieacm.contest.vo.ContestListVo;
 import lombok.RequiredArgsConstructor;
@@ -140,6 +141,24 @@ public class ContestQueryServiceImpl implements ContestQueryService {
         vo.setProblems(problems.stream().map(ContestServiceSupport::toProblemVo).toList());
         vo.setGmtCreate(contest.getGmtCreate());
         vo.setGmtModified(contest.getGmtModified());
+        return vo;
+    }
+
+    @Override
+    public ContestCheckVo checkContestExists(Long contestId) {
+        if (contestId == null || contestId <= 0) {
+            throw new BizException(ResultCode.BAD_REQUEST, "contestId 不合法");
+        }
+
+        Contest contest = contestMapper.selectOne(new LambdaQueryWrapper<Contest>()
+                .eq(Contest::getId, contestId)
+                .eq(Contest::getIsVisible, VISIBLE)
+                .last("limit 1"));
+
+        ContestCheckVo vo = new ContestCheckVo();
+        vo.setContestId(contestId);
+        vo.setValid(contest != null);
+        vo.setTitle(contest == null ? null : contest.getTitle());
         return vo;
     }
 }

@@ -14,6 +14,6 @@ import org.springframework.web.bind.annotation.PathVariable;
 public interface AuthInternalFeignClient {
 
     @PostMapping("/internal/auth/cache/refresh/{uid}")
-    Result<Void> refreshUserAuthCache(@PathVariable("uid") String uid);
+    Result<Void> refreshUserAuthCache(@PathVariable String uid);
 }
 

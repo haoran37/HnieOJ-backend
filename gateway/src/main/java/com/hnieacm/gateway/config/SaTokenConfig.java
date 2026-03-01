@@ -34,10 +34,19 @@ public class SaTokenConfig {
                 .addExclude("/actuator/**")
                 .addExclude("/api/auth/login")
                 .addExclude("/api/auth/register")
+                .addExclude("/api/system/public-config")
+                .addExclude("/api/system/time")
                 .setAuth(obj -> {
                     // 统一登录态校验（双重保险：exclude + notMatch，避免误拦截登录/注册）
                     SaRouter.match("/**")
-                            .notMatch("/favicon.ico", "/actuator/**", "/api/auth/login", "/api/auth/register")
+                            .notMatch(
+                                    "/favicon.ico",
+                                    "/actuator/**",
+                                    "/api/auth/login",
+                                    "/api/auth/register",
+                                    "/api/system/public-config",
+                                    "/api/system/time"
+                            )
                             .check(r -> {
                                 StpUtil.checkLogin();
                                 // 滑动过期：在每个经过身份验证的请求上续订令牌/会话TTL

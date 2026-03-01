@@ -1,4 +1,4 @@
-package com.hnieacm.submission.feign;
+package com.hnieacm.judge.feign;
 
 import com.hnieacm.common.result.Result;
 import org.springframework.cloud.openfeign.FeignClient;
@@ -7,8 +7,8 @@ import org.springframework.web.bind.annotation.PostMapping;
 
 /**
  * @Author: HaoRan_Lyu
- * @Date: 2026/02/21
- * @Description: 认证服务内部 API
+ * @Date: 2026/03/01
+ * @Description: Auth 服务内部接口
  */
 @FeignClient(name = "hnieoj-auth")
 public interface AuthInternalFeignClient {

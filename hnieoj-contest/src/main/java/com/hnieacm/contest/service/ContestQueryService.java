@@ -1,6 +1,7 @@
 package com.hnieacm.contest.service;
 
 import com.hnieacm.common.dto.PageVo;
+import com.hnieacm.contest.vo.ContestCheckVo;
 import com.hnieacm.contest.vo.ContestDetailVo;
 import com.hnieacm.contest.vo.ContestListVo;
 
@@ -14,4 +15,6 @@ public interface ContestQueryService {
     PageVo<ContestListVo> listContests(int page, int pageSize, String type, String auth);
 
     ContestDetailVo getContestDetail(Long contestId);
+
+    ContestCheckVo checkContestExists(Long contestId);
 }

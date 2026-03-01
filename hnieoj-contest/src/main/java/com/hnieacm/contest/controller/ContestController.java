@@ -4,6 +4,7 @@ import cn.dev33.satoken.annotation.SaCheckLogin;
 import com.hnieacm.common.dto.PageVo;
 import com.hnieacm.common.result.Result;
 import com.hnieacm.contest.service.ContestQueryService;
+import com.hnieacm.contest.vo.ContestCheckVo;
 import com.hnieacm.contest.vo.ContestDetailVo;
 import com.hnieacm.contest.vo.ContestListVo;
 import io.swagger.v3.oas.annotations.Operation;
@@ -46,5 +47,11 @@ public class ContestController {
     @GetMapping("/{id}")
     public Result<ContestDetailVo> detail(@PathVariable("id") @Min(value = 1, message = "id 必须大于等于 1") Long contestId) {
         return Result.success(contestQueryService.getContestDetail(contestId));
+    }
+
+    @Operation(summary = "检查比赛 ID 有效性")
+    @GetMapping("/check")
+    public Result<ContestCheckVo> check(@RequestParam("cid") @Min(value = 1, message = "cid 必须大于 0") Long contestId) {
+        return Result.success(contestQueryService.checkContestExists(contestId));
     }
 }

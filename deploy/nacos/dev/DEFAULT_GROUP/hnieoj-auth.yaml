@@ -1,0 +1,41 @@
+﻿spring:
+  datasource:
+    type: com.alibaba.druid.pool.DruidDataSource
+    druid:
+      driver-class-name: com.mysql.cj.jdbc.Driver
+      url: jdbc:mysql://${hnieoj.mysql.host}:${hnieoj.mysql.port}/hnieoj_user_db?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai
+      username: ${hnieoj.mysql.username}
+      password: ${hnieoj.mysql.password}
+  data:
+    redis:
+      host: ${hnieoj.redis.host}
+      port: ${hnieoj.redis.port}
+      password: ${hnieoj.redis.password}
+
+mybatis-plus:
+  mapper-locations: classpath*:/mapper/**/*.xml
+  type-aliases-package: com.hnieacm.auth.entity
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+
+sa-token:
+  token-name: Authorization
+  token-prefix: Bearer
+  timeout: 7200
+  is-concurrent: true
+  is-share: true
+  is-print: false
+
+hnieoj:
+  auth-cache:
+    ttl:
+      roles: 24h
+      permissions: 12h
+      empty: 5m
+  auth:
+    validation:
+      username-min-length: 2
+      username-max-length: 20
+      password-min-length: 6
+      password-max-length: 32

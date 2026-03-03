@@ -1,0 +1,3 @@
+﻿# Never commit real secret config
+**/HNIEOJ_SECRET_GROUP/hnieoj-secrets.yaml
+**/HNIEOJ_SECRET_GROUP/*.local.yaml

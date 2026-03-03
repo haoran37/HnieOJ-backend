@@ -1,0 +1,93 @@
+spring:
+  data:
+    redis:
+      host: ${hnieoj.redis.host}
+      port: ${hnieoj.redis.port}
+      password: ${hnieoj.redis.password}
+      database: 0
+      lettuce:
+        pool:
+          max-active: 200
+          max-wait: -1ms
+          max-idle: 10
+          min-idle: 0
+  cloud:
+    gateway:
+      routes:
+        - id: hnieoj-auth
+          uri: lb://hnieoj-auth
+          predicates:
+            # 认证服务路由
+            - Path=/api/auth/**,/api/registrations/**
+        - id: hnieoj-achievement-public
+          uri: lb://hnieoj-achievement
+          predicates:
+            # 用户成就接口路由
+            - Path=/api/users/*/achievements,/api/users/*/achievements/**
+        - id: hnieoj-achievement
+          uri: lb://hnieoj-achievement
+          predicates:
+            # 成就管理路由
+            - Path=/api/achievements/**,/api/admin/achievements/**,/api/admin/users/*/achievements,/api/admin/users/*/achievements/**
+        - id: hnieoj-user
+          uri: lb://hnieoj-user
+          predicates:
+            # 用户服务路由 + 学院班级路由
+            - Path=/api/user/**,/api/users/**,/api/colleges/**,/api/classes/**,/api/admin/permission/**,/api/admin/users/**
+        - id: hnieoj-problem
+          uri: lb://hnieoj-problem
+          predicates:
+            # 题目服务路由
+            - Path=/api/problems/**,/api/admin/problem/**
+        - id: hnieoj-submission
+          uri: lb://hnieoj-submission
+          predicates:
+            # 提交记录路由
+            - Path=/api/submissions/**
+        - id: hnieoj-contest
+          uri: lb://hnieoj-contest
+          predicates:
+            # 竞赛服务路由
+            - Path=/api/contests/**,/api/admin/contest,/api/admin/contest/**
+        - id: hnieoj-judge
+          uri: lb://hnieoj-judge
+          predicates:
+            # 系统配置与判题管理路由
+            - Path=/api/system/**,/api/admin/config,/api/admin/config/**,/api/admin/judge/**
+        - id: hnieoj-training
+          uri: lb://hnieoj-training
+          predicates:
+            # 训练/作业路由
+            - Path=/api/trainings/**,/api/homeworks/**,/api/admin/training,/api/admin/training/**,/api/admin/homework,/api/admin/homework/**
+        - id: hnieoj-discussion
+          uri: lb://hnieoj-discussion
+          predicates:
+            # 讨论区路由
+            - Path=/api/discussions/**,/api/admin/discussions/**
+        - id: hnieoj-announcement
+          uri: lb://hnieoj-announcement
+          predicates:
+            # 公告路由
+            - Path=/api/announcements/**,/api/admin/announcements/**
+
+sa-token:
+  # 配置 Authorization Header 中的 Token
+  token-name: Authorization
+  token-prefix: Bearer
+  timeout: 7200
+  is-concurrent: true
+  is-share: true
+  is-print: false
+
+hnieoj:
+  gateway:
+    web-client:
+      connect-timeout-ms: 3000
+      read-timeout-seconds: 10
+      write-timeout-seconds: 10
+      response-timeout-seconds: 10
+  auth-cache:
+    ttl:
+      roles: 24h
+      permissions: 12h
+      empty: 5m

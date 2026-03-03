@@ -1,0 +1,41 @@
+spring:
+  datasource:
+    type: com.alibaba.druid.pool.DruidDataSource
+    druid:
+      driver-class-name: com.mysql.cj.jdbc.Driver
+      url: jdbc:mysql://${hnieoj.mysql.host}:${hnieoj.mysql.port}/hnieoj_user_db?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai
+      username: ${hnieoj.mysql.username}
+      password: ${hnieoj.mysql.password}
+  data:
+    redis:
+      host: ${hnieoj.redis.host}
+      port: ${hnieoj.redis.port}
+      password: ${hnieoj.redis.password}
+
+mybatis-plus:
+  mapper-locations: classpath*:/mapper/**/*.xml
+  type-aliases-package: com.hnieacm.user.entity
+  configuration:
+    map-underscore-to-camel-case: true
+
+sa-token:
+  token-name: Authorization
+  token-prefix: Bearer
+  timeout: 7200
+  is-concurrent: true
+  is-share: true
+  is-print: false
+
+hnieoj:
+  user:
+    manage:
+      username-min-length: 2
+      username-max-length: 20
+      password-min-length: 6
+      password-max-length: 32
+      generated-password-length: 12
+      manageable-role-ids:
+        - 1001
+        - 1002
+        - 1003
+      password-chars: "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%^&*"

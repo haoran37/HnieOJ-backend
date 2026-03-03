@@ -1,176 +1,142 @@
-# HnieOJ 后端项目
+﻿# HnieOJ-backend
 
-基于 Spring Cloud Alibaba 的微服务架构在线判题系统。
+> ⚠️ **项目状态：开发暂停中 / WIP**
+> 当前仓库已完成大部分业务接口，但“判题链路（异步判题 + 多判题机）”尚未完工。由于个人安排，项目长期内可能无法持续维护。
 
-## 项目结构
+[API文档](https://s.apifox.cn/91edc2c6-6918-4179-9852-9ec3742377c8)、[前端仓库](https://github.com/haoran37/HnieOJ)
 
-```
+## 项目状态
+
+HnieOJ-backend 是一个基于 **Spring Cloud Alibaba** 的在线判题系统后端，采用微服务架构。  
+当前阶段目标：在公开仓库前，把现状、已完成内容和后续计划透明化，便于后续维护者接手。
+
+### 已完成
+
+- 基础微服务骨架与网关转发
+- 认证鉴权（Sa-Token）与内部服务调用约束（`/internal/**`）
+- 用户、题目、提交、比赛、训练、讨论、公告、成就等模块的大部分接口
+- Nacos 配置中心接入、MyBatis-Plus 持久层、统一返回结构（`Result/ResultCode`）
+
+### 未完成
+
+- `hnieoj-judge` 判题主流程（当前仅有部分系统/管理接口）
+- `hnieoj-submission` -> RabbitMQ -> `hnieoj-judge` 异步判题完整闭环
+- go-judge 编译执行接入（含状态映射、失败重试、结果回写）
+- 多判题机负载均衡与心跳/健康检查
+- MinIO（测试数据、图片与其他对象存储）完整接入
+- 等等
+
+## 模块概览
+
+```text
 HnieOJ-backend/
-├── common/                    # 公共模块（工具、常量、异常等）
-├── gateway/                   # API网关
-├── hnieoj-announcement/       # 公告新闻服务
-├── hnieoj-auth/               # 认证服务
-├── hnieoj-user/               # 用户服务
-├── hnieoj-problem/            # 题目服务
-├── hnieoj-submission/         # 提交服务
-├── hnieoj-judge/              # 判题服务
-├── hnieoj-contest/            # 比赛服务
-├── hnieoj-training/           # 训练服务
-├── hnieoj-discussion/         # 讨论服务
-├── hnieoj-achievement/        # 成就服务
-├── docker-compose.yml         # 本地开发容器编排
-└── Dockerfile                 # 通用Dockerfile
+├── common                  # 公共模块（工具、常量、异常、通用配置）
+├── gateway                 # API 网关
+├── hnieoj-auth             # 认证服务
+├── hnieoj-user             # 用户服务
+├── hnieoj-problem          # 题目服务
+├── hnieoj-submission       # 提交服务
+├── hnieoj-judge            # 判题服务（WIP）
+├── hnieoj-contest          # 比赛服务
+├── hnieoj-training         # 训练服务
+├── hnieoj-discussion       # 讨论服务
+├── hnieoj-announcement     # 公告/新闻服务
+└── hnieoj-achievement      # 成就服务
 ```
 
 ## 技术栈
 
-- **JDK**: 17
-- **Spring Boot**: 3.2.12
-- **Spring Cloud**: 2023.0.2
-- **Spring Cloud Alibaba**: 2023.0.1.2
-- **Nacos**: 2.3.2（注册中心 & 配置中心）
-- **Redis**: 7.0（缓存 & 登录态）
-- **MySQL**: 8.0（数据存储）
-- **RocketMQ**: 5.1.0（消息队列）
-- **Sa-Token**: 1.37.0（认证授权）
-- **MyBatis-Plus**: 3.5.5（ORM框架）
-- **Knife4j**: 3.0.3（API文档）
+- JDK 17
+- Spring Boot 3.2.12
+- Spring Cloud 2023.0.2
+- Spring Cloud Alibaba 2023.0.1.2
+- MySQL 8.0
+- Nacos 2.3.2（注册中心 / 配置中心）
+- Sa-Token（鉴权）
+- Spring Cloud LoadBalancer
+- RabbitMQ（判题异步链路，规划中）
+- MyBatis / MyBatis-Plus / Druid
+- Redis
+- Hutool
+- Knife4j
+- Maven
 
-## 本地开发环境搭建
+## 启动方式（开发环境）
 
-### 前置要求
+### 前置依赖
 
-- Docker & Docker Compose
-- Maven 3.6+
-- JDK 17+
+请先自行准备并启动：
 
-### 启动步骤
+- MySQL 8.0
+- Redis
+- Nacos 2.3.2
+- RabbitMQ（判题链路开发时需要）
+- MinIO（对象存储开发时需要）
 
-#### 1. 启动基础服务（Nacos、MySQL、Redis、RocketMQ）
+### 配置Nacos
 
-```bash
-docker-compose up -d
-```
+详细步骤见 [Nacos Configs](.deploy/nacos/README.md)
 
-等待所有容器启动完成（约30秒）。
+### 配置数据库
 
-#### 2. 初始化数据库
+在 `deploy/mysql/hnieoj_多数据库.sql` 提供了 mysql 的初始化 sql 脚本，可直接构建表结构
 
-```bash
-# 数据库初始化脚本已通过 docker-compose 自动执行
-# 如需手动执行，可运行：
-mysql -h 127.0.0.1 -u root -p'YOUR_PASSWORD' < .idea/hnieoj_多数据库.sql
-```
+在 `deploy/mysql/添加测试数据.sql` 提供了添加测试的 sql 脚本，可用于开发测试
 
-#### 3. 编译项目
+### 编译
 
 ```bash
 mvn clean install -DskipTests
 ```
 
-#### 4. 启动微服务（按顺序）
-
-**方式一：IDE 启动（推荐开发时使用）**
-
-在 IntelliJ IDEA 中分别运行以下启动类：
-
-1. `gateway` → `GatewayApplication` (端口 8080)
-2. `hnieoj-announcement` → `AnnouncementApplication` (端口 8109)
-3. `hnieoj-user` → `UserApplication` (端口 8082)
-4. `hnieoj-problem` → `ProblemApplication` (端口 8083)
-5. `hnieoj-submission` → `SubmissionApplication` (端口 8084)
-6. `hnieoj-judge` → `JudgeApplication` (端口 8085)
-7. `hnieoj-contest` → `ContestApplication` (端口 8086)
-8. `hnieoj-training` → `TrainingApplication` (端口 8087)
-9. `hnieoj-discussion` → `DiscussionApplication` (端口 8088)
-10. `hnieoj-achievement` → `AchievementApplication` (端口 8089)
-11. `hnieoj-auth` → `AuthApplication` (端口 8090)
-
-**方式二：命令行启动**
+### 启动单个服务
 
 ```bash
-# 启动 gateway
 mvn -pl gateway spring-boot:run
-
-# 在新终端启动其他服务
+mvn -pl hnieoj-auth spring-boot:run
 mvn -pl hnieoj-user spring-boot:run
-mvn -pl hnieoj-problem spring-boot:run
-# ... 其他服务
 ```
 
-### 本地开发配置
-
-#### 最小启动集合（推荐）
-
-如果资源有限，可只启动以下服务：
-
-1. **gateway** - API网关（必需）
-2. **hnieoj-user** - 用户服务（必需）
-3. **hnieoj-problem** - 题目服务（必需）
-4. **hnieoj-judge** - 判题服务（可选）
-
-#### 访问地址
-
-- **API 网关**: http://localhost:8080
-- **Nacos 控制台**: http://localhost:8848/nacos
-- **API 文档**: http://localhost:8080/doc.html
-
-## 配置说明
-
-### Nacos 配置
-
-所有微服务的配置都可以在 Nacos 中心化管理。本地开发时，应用会优先读取本地 `application.yml` 配置。
-
-### 数据库配置
-
-- **用户数据库**: `hnieoj_user_db`
-- **题目数据库**: `hnieoj_problem_db`
-- **判题数据库**: `hnieoj_judge_db`
-- **比赛数据库**: `hnieoj_contest_db`
-- **训练数据库**: `hnieoj_training_db`
-- **讨论数据库**: `hnieoj_discussion_db`
-- **系统数据库**: `hnieoj_system_db`
-
-## 常见问题
-
-### 1. 启动时连接超时
-
-检查 Nacos、MySQL、Redis 是否正常运行：
+### 常用命令
 
 ```bash
-docker-compose ps
+# 全量测试
+mvn test
+
+# 指定模块测试
+mvn -pl hnieoj-user test
+
+# 使用项目内 Maven settings（如需要）
+mvn -s .idea/maven-settings.xml clean install -DskipTests
 ```
 
-### 2. 数据库连接失败
+## 配置管理（Nacos）
 
-确保 MySQL 容器已启动并初始化完成：
+当前项目配置依赖 Nacos，建议区分为：
 
-```bash
-docker-compose logs mysql
-```
+- `DEFAULT_GROUP`：可公开的业务配置（端口、开关、路由、非敏感参数）
+- `HNIEOJ_SECRET_GROUP`：敏感配置（数据库密码、Redis 密码、内部 token、MQ 凭证等）
 
-### 3. 端口被占用
+仓库中的 Nacos 配置快照目录：`deploy/nacos`（详见 `deploy/nacos/README.md`）。
 
-修改 `application.yml` 中的 `server.port` 配置。
+> 注意：实际使用中敏感配置应当使用环境变量注入，当前使用 Nacos 配置仅便于开发环境
 
-## 代码规范
+## 里程碑计划
 
-遵循 **阿里巴巴 Java 开发手册**：
+- [ ] 完成 submission -> RabbitMQ -> judge 的异步判题链路
+- [ ] 完成 go-judge 请求封装与状态映射
+- [ ] 接入 MinIO 存储测试数据与图片等对象数据
+- [ ] 支持多判题机负载均衡（节点管理、健康检查、故障摘除）
+- [ ] 补齐判题链路集成测试与回归测试
 
-- 命名语义清晰，禁止拼音命名
-- 严禁魔法值，统一使用常量或枚举
-- Controller 不允许写业务逻辑
-- Service 层方法职责单一
-- 禁止在 Controller 中直接操作数据库
+## 贡献说明
 
-## 命名规范
+欢迎提交 Issue / PR。  
+但请注意：当前处于 WIP 且维护不稳定阶段，合并与反馈可能不及时。
 
-| 对象 | 命名规范 | 示例 |
-|------|--------|------|
-| 请求参数 | XxRequest | UserLoginRequest |
-| 展示对象 | XxVo | UserVo |
-| 数据传输 | XxDto | UserDto |
-| 数据库实体 | 跟表名相同 | UserInfo |
-| Service 接口 | XxService | UserService |
-| Service 实现 | XxServiceImpl | UserServiceImpl |
-| Mapper | XxMapper | UserMapper |
+## 许可证
+
+本项目使用 [MIT License](./LICENSE) 开源。
+
+
+

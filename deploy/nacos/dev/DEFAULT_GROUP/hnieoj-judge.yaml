@@ -1,0 +1,20 @@
+spring:
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://${hnieoj.mysql.host}:${hnieoj.mysql.port}/hnieoj_judge_db?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai
+    username: ${hnieoj.mysql.username}
+    password: ${hnieoj.mysql.password}
+  data:
+    redis:
+      host: ${hnieoj.redis.host}
+      port: ${hnieoj.redis.port}
+      password: ${hnieoj.redis.password}
+  rabbitmq:
+    host: ${hnieoj.rabbitmq.host}
+    port: ${hnieoj.rabbitmq.port}
+    username: ${hnieoj.rabbitmq.username}
+    password: ${hnieoj.rabbitmq.password}
+    virtual-host: ${hnieoj.rabbitmq.virtual-host}
+
+sa-token:
+  is-print: false

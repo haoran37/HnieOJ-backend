@@ -1,0 +1,31 @@
+spring:
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://${hnieoj.mysql.host}:${hnieoj.mysql.port}/hnieoj_user_db?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai
+    username: ${hnieoj.mysql.username}
+    password: ${hnieoj.mysql.password}
+  data:
+    redis:
+      host: ${hnieoj.redis.host}
+      port: ${hnieoj.redis.port}
+      password: ${hnieoj.redis.password}
+
+mybatis-plus:
+  mapper-locations: classpath*:/mapper/**/*.xml
+  type-aliases-package: com.hnieacm.achievement.entity
+  configuration:
+    map-underscore-to-camel-case: true
+
+sa-token:
+  token-name: Authorization
+  token-prefix: Bearer
+  timeout: 7200
+  is-concurrent: true
+  is-share: true
+  is-print: false
+
+hnieoj:
+  achievement:
+    file:
+      upload-dir: ${ACHIEVEMENT_UPLOAD_DIR:}
+      public-url-prefix: ${ACHIEVEMENT_PUBLIC_URL_PREFIX:}

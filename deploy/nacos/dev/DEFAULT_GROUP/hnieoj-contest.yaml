@@ -1,0 +1,41 @@
+﻿server:
+  port: 8105
+
+spring:
+  application:
+    name: hnieoj-contest
+  config:
+    import:
+      - optional:nacos:${spring.application.name}.yaml?group=DEFAULT_GROUP
+  cloud:
+    nacos:
+      discovery:
+        server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:8848}
+      config:
+        server-addr: ${NACOS_SERVER_ADDR:127.0.0.1:8848}
+        file-extension: yaml
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://${hnieoj.mysql.host}:${hnieoj.mysql.port}/hnieoj_contest_db?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai
+    username: ${hnieoj.mysql.username}
+    password: ${hnieoj.mysql.password}
+  data:
+    redis:
+      host: ${hnieoj.redis.host}
+      port: ${hnieoj.redis.port}
+      password: ${hnieoj.redis.password}
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+
+sa-token:
+  token-name: Authorization
+  token-prefix: Bearer
+  is-print: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus

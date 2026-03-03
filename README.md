@@ -75,7 +75,7 @@ HnieOJ-backend/
 
 ### 配置Nacos
 
-详细步骤见 [Nacos Configs](.deploy/nacos/README.md)
+详细步骤见 [Nacos Configs](deploy/nacos/README.md)
 
 ### 配置数据库
 

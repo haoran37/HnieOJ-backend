@@ -12,3 +12,13 @@ spring:
 
 sa-token:
   is-print: false
+
+# 本地调试
+hnieoj:
+  submission:
+    websocket:
+      allowed-origins:
+        - "http://localhost:3000"
+        - "http://localhost:5173"
+        - "http://127.0.0.1:3000"
+        - "http://127.0.0.1:5173"

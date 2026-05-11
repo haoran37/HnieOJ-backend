@@ -44,6 +44,11 @@ spring:
           predicates:
             # 提交记录路由
             - Path=/api/submissions/**
+        - id: hnieoj-submission-ws
+          uri: lb:ws://hnieoj-submission
+          predicates:
+            # 提交判题进度 WebSocket 路由
+            - Path=/ws/submissions/**
         - id: hnieoj-contest
           uri: lb://hnieoj-contest
           predicates:

@@ -323,6 +323,9 @@ CREATE TABLE `judge` (
   `memory` int(11) DEFAULT NULL COMMENT '运行内存 kb',
   `score` int(11) DEFAULT NULL COMMENT 'OI得分',
   `cid` bigint(20) DEFAULT '0' COMMENT '比赛ID',
+  `total_case` int(11) DEFAULT '0' COMMENT '测试点总数',
+  `judged_case` int(11) DEFAULT '0' COMMENT '已完成测试点数量',
+  `current_case` int(11) DEFAULT '0' COMMENT '当前判题测试点序号',
   `cpid` bigint(20) DEFAULT '0' COMMENT '比赛内题目显示ID',
   `tid` bigint(20) DEFAULT '0' COMMENT '训练单ID',
   `hid` bigint(20) DEFAULT '0' COMMENT '作业ID',
@@ -334,7 +337,9 @@ CREATE TABLE `judge` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_submit_id` (`submit_id`),
   KEY `idx_uid_problem_id` (`uid`, `problem_id`),
-  KEY `idx_cid` (`cid`)
+  KEY `idx_cid` (`cid`),
+  KEY `idx_status` (`status`),
+  KEY `idx_gmt_create` (`gmt_create`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='代码提交记录';
 
 -- 评测样例详情
@@ -350,8 +355,11 @@ CREATE TABLE `judge_case` (
   `input_data` varchar(255) DEFAULT NULL,
   `output_data` varchar(255) DEFAULT NULL,
   `user_output` text,
+  `gmt_create` datetime DEFAULT CURRENT_TIMESTAMP,
+  `gmt_modified` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
-  KEY `idx_submit_id` (`submit_id`)
+  KEY `idx_submit_id` (`submit_id`),
+  KEY `idx_submit_case` (`submit_id`, `case_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- 重判任务表

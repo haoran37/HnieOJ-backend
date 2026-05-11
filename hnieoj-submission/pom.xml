@@ -87,6 +87,12 @@
         </dependency>
 
         <!-- ==================== 消息队列 (RabbitMQ) ==================== -->
+
+        <!-- ==================== WebSocket (STOMP 判题进度订阅) ==================== -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-websocket</artifactId>
+        </dependency>
         
         <!-- ==================== Spring Boot 监控 (Actuator) ==================== -->
         <dependency>

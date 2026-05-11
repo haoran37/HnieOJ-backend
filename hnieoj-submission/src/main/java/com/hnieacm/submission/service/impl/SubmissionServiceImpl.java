@@ -2,7 +2,11 @@ package com.hnieacm.submission.service.impl;
 
 import cn.dev33.satoken.stp.StpUtil;
 import cn.hutool.core.util.StrUtil;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.hnieacm.common.constant.PermissionConstant;
+import com.hnieacm.common.constant.RoleConstant;
+import com.hnieacm.common.dto.PageVo;
 import com.hnieacm.common.exception.BizException;
 import com.hnieacm.common.result.Result;
 import com.hnieacm.common.result.ResultCode;
@@ -10,13 +14,19 @@ import com.hnieacm.submission.constant.ProblemAuthConstant;
 import com.hnieacm.submission.constant.SubmissionConstant;
 import com.hnieacm.submission.constant.SubmissionStatusConstant;
 import com.hnieacm.submission.dto.ProblemBasicDto;
+import com.hnieacm.submission.dto.SubmissionListQueryRequest;
 import com.hnieacm.submission.dto.SubmitCodeRequest;
 import com.hnieacm.submission.dto.UserDetailDto;
 import com.hnieacm.submission.entity.Judge;
+import com.hnieacm.submission.entity.JudgeCase;
 import com.hnieacm.submission.feign.ProblemInternalFeignClient;
 import com.hnieacm.submission.feign.UserProfileFeignClient;
+import com.hnieacm.submission.mapper.JudgeCaseMapper;
 import com.hnieacm.submission.mapper.JudgeMapper;
 import com.hnieacm.submission.service.SubmissionService;
+import com.hnieacm.submission.vo.SubmissionCaseVo;
+import com.hnieacm.submission.vo.SubmissionDetailVo;
+import com.hnieacm.submission.vo.SubmissionListItemVo;
 import com.hnieacm.submission.vo.SubmitCodeVo;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -27,6 +37,9 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.nio.charset.StandardCharsets;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -39,7 +52,12 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class SubmissionServiceImpl implements SubmissionService {
 
+    private static final int DEFAULT_PAGE = 1;
+    private static final int DEFAULT_PAGE_SIZE = 20;
+    private static final int MAX_PAGE_SIZE = 100;
+
     private final JudgeMapper judgeMapper;
+    private final JudgeCaseMapper judgeCaseMapper;
     private final ProblemInternalFeignClient problemInternalFeignClient;
     private final UserProfileFeignClient userProfileFeignClient;
 
@@ -106,6 +124,9 @@ public class SubmissionServiceImpl implements SubmissionService {
         judge.setCode(code);
         judge.setStatus(SubmissionStatusConstant.PENDING);
         judge.setCid(cid);
+        judge.setTotalCase(0);
+        judge.setJudgedCase(0);
+        judge.setCurrentCase(0);
         judge.setCpid(SubmissionConstant.DEFAULT_CPID);
         judge.setTid(SubmissionConstant.DEFAULT_TID);
         judge.setHid(SubmissionConstant.DEFAULT_HID);
@@ -118,6 +139,81 @@ public class SubmissionServiceImpl implements SubmissionService {
         log.info("Submission created, submitId={}, problemCode={}, uid={}, language={}", submitId, problemCode, uid, language);
 
         return new SubmitCodeVo(submitId);
+    }
+
+    @Override
+    public PageVo<SubmissionListItemVo> listSubmissions(SubmissionListQueryRequest request) {
+        int page = normalizePage(request == null ? null : request.getPage());
+        int pageSize = normalizePageSize(request == null ? null : request.getPageSize());
+        boolean admin = isAdmin();
+        String currentUid = StpUtil.getLoginIdAsString();
+
+        LambdaQueryWrapper<Judge> wrapper = new LambdaQueryWrapper<Judge>()
+                .orderByDesc(Judge::getGmtCreate)
+                .orderByDesc(Judge::getId);
+
+        if (admin) {
+            String queryUid = trimToNull(request == null ? null : request.getUid());
+            if (queryUid != null) {
+                wrapper.eq(Judge::getUid, queryUid);
+            }
+        } else {
+            wrapper.eq(Judge::getUid, currentUid);
+        }
+
+        String problemCode = trimToNull(request == null ? null : request.getProblemCode());
+        if (problemCode != null) {
+            wrapper.eq(Judge::getProblemCode, problemCode);
+        }
+
+        String language = trimToNull(request == null ? null : request.getLanguage());
+        if (language != null) {
+            wrapper.eq(Judge::getLanguage, language);
+        }
+
+        Integer status = request == null ? null : request.getStatus();
+        if (status != null) {
+            wrapper.eq(Judge::getStatus, status);
+        }
+
+        Long contestId = request == null ? null : request.getContestId();
+        if (contestId != null) {
+            if (contestId < 0) {
+                throw new BizException(ResultCode.BAD_REQUEST, "contestId 不能小于 0");
+            }
+            wrapper.eq(Judge::getCid, contestId);
+        }
+
+        Page<Judge> pageResult = judgeMapper.selectPage(new Page<>(page, pageSize), wrapper);
+        List<Judge> records = pageResult.getRecords();
+        if (records == null || records.isEmpty()) {
+            return new PageVo<>(Collections.emptyList(), pageResult.getTotal());
+        }
+        return new PageVo<>(records.stream().map(this::toListItemVo).toList(), pageResult.getTotal());
+    }
+
+    @Override
+    public SubmissionDetailVo getSubmissionDetail(String submissionId) {
+        Judge judge = queryAccessibleJudge(submissionId);
+        return toDetailVo(judge);
+    }
+
+    @Override
+    public List<SubmissionCaseVo> listSubmissionCases(String submissionId) {
+        Judge judge = queryAccessibleJudge(submissionId);
+        boolean admin = isAdmin();
+
+        List<JudgeCase> cases = judgeCaseMapper.selectList(new LambdaQueryWrapper<JudgeCase>()
+                .eq(JudgeCase::getSubmitId, judge.getId())
+                .orderByAsc(JudgeCase::getId));
+        if (cases == null || cases.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        return cases.stream()
+                .sorted(Comparator.comparingInt(this::caseOrder).thenComparing(JudgeCase::getId))
+                .map(item -> toCaseVo(item, admin))
+                .toList();
     }
 
     /**
@@ -141,6 +237,88 @@ public class SubmissionServiceImpl implements SubmissionService {
             throw new BizException(ResultCode.PROBLEM_NOT_FOUND, "题目不存在");
         }
         return result.getData();
+    }
+
+    private Judge queryAccessibleJudge(String submissionId) {
+        String normalizedSubmissionId = trimToNull(submissionId);
+        if (normalizedSubmissionId == null) {
+            throw new BizException(ResultCode.BAD_REQUEST, "submissionId 不能为空");
+        }
+
+        Judge judge = judgeMapper.selectOne(new LambdaQueryWrapper<Judge>()
+                .eq(Judge::getSubmitId, normalizedSubmissionId)
+                .last("limit 1"));
+        if (judge == null) {
+            throw new BizException(ResultCode.SUBMISSION_NOT_FOUND, "提交记录不存在");
+        }
+
+        String currentUid = StpUtil.getLoginIdAsString();
+        if (!currentUid.equals(judge.getUid()) && !isAdmin()) {
+            throw new BizException(ResultCode.FORBIDDEN, "无权访问该提交记录");
+        }
+        return judge;
+    }
+
+    private SubmissionListItemVo toListItemVo(Judge judge) {
+        SubmissionListItemVo vo = new SubmissionListItemVo();
+        vo.setSubmissionId(judge.getSubmitId());
+        vo.setProblemCode(judge.getProblemCode());
+        vo.setUid(judge.getUid());
+        vo.setUsername(judge.getUsername());
+        vo.setLanguage(judge.getLanguage());
+        vo.setStatus(judge.getStatus());
+        vo.setStatusText(SubmissionStatusConstant.toText(judge.getStatus()));
+        vo.setTime(judge.getTime());
+        vo.setMemory(judge.getMemory());
+        vo.setScore(judge.getScore());
+        vo.setContestId(judge.getCid());
+        vo.setTotalCase(defaultZero(judge.getTotalCase()));
+        vo.setJudgedCase(defaultZero(judge.getJudgedCase()));
+        vo.setCurrentCase(defaultZero(judge.getCurrentCase()));
+        vo.setGmtCreate(judge.getGmtCreate());
+        return vo;
+    }
+
+    private SubmissionDetailVo toDetailVo(Judge judge) {
+        SubmissionDetailVo vo = new SubmissionDetailVo();
+        vo.setSubmissionId(judge.getSubmitId());
+        vo.setProblemCode(judge.getProblemCode());
+        vo.setUid(judge.getUid());
+        vo.setUsername(judge.getUsername());
+        vo.setLanguage(judge.getLanguage());
+        vo.setStatus(judge.getStatus());
+        vo.setStatusText(SubmissionStatusConstant.toText(judge.getStatus()));
+        vo.setTime(judge.getTime());
+        vo.setMemory(judge.getMemory());
+        vo.setScore(judge.getScore());
+        vo.setContestId(judge.getCid());
+        vo.setTotalCase(defaultZero(judge.getTotalCase()));
+        vo.setJudgedCase(defaultZero(judge.getJudgedCase()));
+        vo.setCurrentCase(defaultZero(judge.getCurrentCase()));
+        vo.setErrorMessage(judge.getErrorMessage());
+        vo.setJudger(judge.getJudger());
+        vo.setCode(judge.getCode());
+        vo.setGmtCreate(judge.getGmtCreate());
+        vo.setGmtModified(judge.getGmtModified());
+        return vo;
+    }
+
+    private SubmissionCaseVo toCaseVo(JudgeCase judgeCase, boolean includeSensitiveData) {
+        SubmissionCaseVo vo = new SubmissionCaseVo();
+        vo.setCaseId(judgeCase.getCaseId());
+        vo.setStatus(judgeCase.getStatus());
+        vo.setStatusText(SubmissionStatusConstant.toText(judgeCase.getStatus()));
+        vo.setTime(judgeCase.getTime());
+        vo.setMemory(judgeCase.getMemory());
+        vo.setScore(judgeCase.getScore());
+        if (includeSensitiveData) {
+            vo.setInputData(judgeCase.getInputData());
+            vo.setOutputData(judgeCase.getOutputData());
+            vo.setUserOutput(judgeCase.getUserOutput());
+        }
+        vo.setGmtCreate(judgeCase.getGmtCreate());
+        vo.setGmtModified(judgeCase.getGmtModified());
+        return vo;
     }
 
     /**
@@ -187,6 +365,53 @@ public class SubmissionServiceImpl implements SubmissionService {
         }
         // 降级返回 uid，避免因远程调用失败影响提交流程。
         return uid;
+    }
+
+    private boolean isAdmin() {
+        return StpUtil.hasRole(RoleConstant.ADMIN) || StpUtil.hasRole(RoleConstant.ROOT);
+    }
+
+    private int normalizePage(Integer page) {
+        if (page == null) {
+            return DEFAULT_PAGE;
+        }
+        if (page <= 0) {
+            throw new BizException(ResultCode.BAD_REQUEST, "page 必须大于 0");
+        }
+        return page;
+    }
+
+    private int normalizePageSize(Integer pageSize) {
+        if (pageSize == null) {
+            return DEFAULT_PAGE_SIZE;
+        }
+        if (pageSize <= 0) {
+            throw new BizException(ResultCode.BAD_REQUEST, "pageSize 必须大于 0");
+        }
+        if (pageSize > MAX_PAGE_SIZE) {
+            throw new BizException(ResultCode.BAD_REQUEST, "pageSize 不能大于 " + MAX_PAGE_SIZE);
+        }
+        return pageSize;
+    }
+
+    private String trimToNull(String value) {
+        return StrUtil.trimToNull(value);
+    }
+
+    private Integer defaultZero(Integer value) {
+        return value == null ? 0 : value;
+    }
+
+    private int caseOrder(JudgeCase judgeCase) {
+        String caseId = trimToNull(judgeCase.getCaseId());
+        if (caseId == null) {
+            return Integer.MAX_VALUE;
+        }
+        try {
+            return Integer.parseInt(caseId);
+        } catch (NumberFormatException e) {
+            return Integer.MAX_VALUE;
+        }
     }
 
     /**

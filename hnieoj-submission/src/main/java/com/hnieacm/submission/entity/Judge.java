@@ -48,6 +48,12 @@ public class Judge {
 
     private Long cid;
 
+    private Integer totalCase;
+
+    private Integer judgedCase;
+
+    private Integer currentCase;
+
     private Long cpid;
 
     private Long tid;

@@ -42,7 +42,7 @@ mvn -pl gateway spring-boot:run
 如本地 Maven 源有特殊要求，可使用：
 
 ```bash
-mvn -s .idea/maven-settings.xml clean install -DskipTests
+mvn -s deploy/maven/settings.xml clean install -DskipTests
 ```
 
 ## 5. 配置与安全

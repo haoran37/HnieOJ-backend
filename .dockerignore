@@ -1,0 +1,17 @@
+.git
+.github
+.idea
+.m2
+.m2repo
+node_modules
+
+**/src/test
+**/target/*
+!**/target/*.jar
+
+*.iml
+*.iws
+*.ipr
+AGENTS.md
+package.json
+package-lock.json

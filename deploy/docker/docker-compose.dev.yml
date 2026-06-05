@@ -1,0 +1,196 @@
+name: hnieoj-dev
+
+x-common-environment: &common-environment
+  TZ: ${TZ:-Asia/Shanghai}
+  SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
+  NACOS_SERVER_ADDR: ${NACOS_SERVER_ADDR:-106.54.177.244:8848}
+  NACOS_NAMESPACE: ${NACOS_NAMESPACE:-dev}
+  MYSQL_HOST: ${MYSQL_HOST:?MYSQL_HOST is required}
+  MYSQL_PORT: ${MYSQL_PORT:-3306}
+  MYSQL_USERNAME: ${MYSQL_USERNAME:?MYSQL_USERNAME is required}
+  MYSQL_PASSWORD: ${MYSQL_PASSWORD:?MYSQL_PASSWORD is required}
+  REDIS_HOST: ${REDIS_HOST:?REDIS_HOST is required}
+  REDIS_PORT: ${REDIS_PORT:-6379}
+  REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+  HNIEOJ_INTERNAL_TOKEN: ${HNIEOJ_INTERNAL_TOKEN:?HNIEOJ_INTERNAL_TOKEN is required}
+  RABBITMQ_HOST: ${RABBITMQ_HOST:-}
+  RABBITMQ_PORT: ${RABBITMQ_PORT:-5672}
+  RABBITMQ_USERNAME: ${RABBITMQ_USERNAME:-guest}
+  RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-}
+  RABBITMQ_VHOST: ${RABBITMQ_VHOST:-/}
+  HNIEOJ_JUDGE_JWT_SECRET: ${HNIEOJ_JUDGE_JWT_SECRET:-}
+  HNIEOJ_JUDGE_FORMAL_TOKEN_ENCRYPTED: ${HNIEOJ_JUDGE_FORMAL_TOKEN_ENCRYPTED:-}
+  HNIEOJ_JUDGE_FORMAL_TOKEN_PRIVATE_KEY: ${HNIEOJ_JUDGE_FORMAL_TOKEN_PRIVATE_KEY:-}
+  HNIEOJ_JUDGE_FORMAL_TOKEN_PRIVATE_KEY_PATH: ${HNIEOJ_JUDGE_FORMAL_TOKEN_PRIVATE_KEY_PATH:-/etc/hnieoj/judge-security/judge_formal_private.pem}
+  HNIEOJ_PROBLEM_STORAGE_ROOT: ${HNIEOJ_PROBLEM_STORAGE_ROOT:-/data/oj/problems}
+  HNIEOJ_PROBLEM_IMAGE_URL_PREFIX: ${HNIEOJ_PROBLEM_IMAGE_URL_PREFIX:-/oj/images}
+
+x-service-base: &service-base
+  restart: unless-stopped
+  build:
+    context: ../..
+    dockerfile: deploy/docker/Dockerfile
+  networks:
+    - hnieoj-backend
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
+  healthcheck:
+    test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:$${SERVER_PORT}/actuator/health >/dev/null || exit 1"]
+    interval: 30s
+    timeout: 5s
+    retries: 5
+    start_period: 60s
+
+services:
+  gateway:
+    <<: *service-base
+    image: hnieoj/gateway:dev
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile
+      args:
+        SERVICE_NAME: gateway
+    environment:
+      <<: *common-environment
+      SERVER_PORT: ${GATEWAY_SERVER_PORT:-8800}
+      JAVA_OPTS: ${JAVA_OPTS:--Xms256m -Xmx512m}
+    ports:
+      - "${GATEWAY_PUBLIC_PORT:-8800}:${GATEWAY_SERVER_PORT:-8800}"
+
+  hnieoj-auth:
+    <<: *service-base
+    image: hnieoj/hnieoj-auth:dev
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile
+      args:
+        SERVICE_NAME: hnieoj-auth
+    environment:
+      <<: *common-environment
+      SERVER_PORT: ${AUTH_SERVER_PORT:-8100}
+      JAVA_OPTS: ${JAVA_OPTS:--Xms256m -Xmx512m}
+
+  hnieoj-user:
+    <<: *service-base
+    image: hnieoj/hnieoj-user:dev
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile
+      args:
+        SERVICE_NAME: hnieoj-user
+    environment:
+      <<: *common-environment
+      SERVER_PORT: ${USER_SERVER_PORT:-8101}
+      JAVA_OPTS: ${JAVA_OPTS:--Xms256m -Xmx512m}
+
+  hnieoj-problem:
+    <<: *service-base
+    image: hnieoj/hnieoj-problem:dev
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile
+      args:
+        SERVICE_NAME: hnieoj-problem
+    environment:
+      <<: *common-environment
+      SERVER_PORT: ${PROBLEM_SERVER_PORT:-8102}
+      JAVA_OPTS: ${JAVA_OPTS:--Xms256m -Xmx512m}
+    volumes:
+      - ${HNIEOJ_PROBLEM_STORAGE_HOST_PATH:-/data/oj/problems}:${HNIEOJ_PROBLEM_STORAGE_ROOT:-/data/oj/problems}
+
+  hnieoj-submission:
+    <<: *service-base
+    image: hnieoj/hnieoj-submission:dev
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile
+      args:
+        SERVICE_NAME: hnieoj-submission
+    environment:
+      <<: *common-environment
+      SERVER_PORT: ${SUBMISSION_SERVER_PORT:-8103}
+      JAVA_OPTS: ${JAVA_OPTS:--Xms256m -Xmx512m}
+
+  hnieoj-judge:
+    <<: *service-base
+    image: hnieoj/hnieoj-judge:dev
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile
+      args:
+        SERVICE_NAME: hnieoj-judge
+    environment:
+      <<: *common-environment
+      SERVER_PORT: ${JUDGE_SERVER_PORT:-8104}
+      JAVA_OPTS: ${JAVA_OPTS:--Xms256m -Xmx512m}
+    volumes:
+      - ${HNIEOJ_JUDGE_SECURITY_HOST_DIR:-/etc/hnieoj/judge-security}:/etc/hnieoj/judge-security:ro
+
+  hnieoj-contest:
+    <<: *service-base
+    image: hnieoj/hnieoj-contest:dev
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile
+      args:
+        SERVICE_NAME: hnieoj-contest
+    environment:
+      <<: *common-environment
+      SERVER_PORT: ${CONTEST_SERVER_PORT:-8105}
+      JAVA_OPTS: ${JAVA_OPTS:--Xms256m -Xmx512m}
+
+  hnieoj-training:
+    <<: *service-base
+    image: hnieoj/hnieoj-training:dev
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile
+      args:
+        SERVICE_NAME: hnieoj-training
+    environment:
+      <<: *common-environment
+      SERVER_PORT: ${TRAINING_SERVER_PORT:-8106}
+      JAVA_OPTS: ${JAVA_OPTS:--Xms256m -Xmx512m}
+
+  hnieoj-discussion:
+    <<: *service-base
+    image: hnieoj/hnieoj-discussion:dev
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile
+      args:
+        SERVICE_NAME: hnieoj-discussion
+    environment:
+      <<: *common-environment
+      SERVER_PORT: ${DISCUSSION_SERVER_PORT:-8107}
+      JAVA_OPTS: ${JAVA_OPTS:--Xms256m -Xmx512m}
+
+  hnieoj-achievement:
+    <<: *service-base
+    image: hnieoj/hnieoj-achievement:dev
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile
+      args:
+        SERVICE_NAME: hnieoj-achievement
+    environment:
+      <<: *common-environment
+      SERVER_PORT: ${ACHIEVEMENT_SERVER_PORT:-8108}
+      JAVA_OPTS: ${JAVA_OPTS:--Xms256m -Xmx512m}
+
+  hnieoj-announcement:
+    <<: *service-base
+    image: hnieoj/hnieoj-announcement:dev
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile
+      args:
+        SERVICE_NAME: hnieoj-announcement
+    environment:
+      <<: *common-environment
+      SERVER_PORT: ${ANNOUNCEMENT_SERVER_PORT:-8109}
+      JAVA_OPTS: ${JAVA_OPTS:--Xms256m -Xmx512m}
+
+networks:
+  hnieoj-backend:
+    driver: bridge

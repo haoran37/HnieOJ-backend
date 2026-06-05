@@ -2,14 +2,14 @@ spring:
   application:
     name: hnieoj-judge
   profiles:
-    active: dev
+    active: ${SPRING_PROFILES_ACTIVE:dev}
   cloud:
     nacos:
-      server-addr: 106.54.177.244:8848
+      server-addr: ${NACOS_SERVER_ADDR:106.54.177.244:8848}
       discovery:
-        namespace: dev
+        namespace: ${NACOS_NAMESPACE:dev}
       config:
-        namespace: dev
+        namespace: ${NACOS_NAMESPACE:dev}
         file-extension: yaml
   config:
     import:

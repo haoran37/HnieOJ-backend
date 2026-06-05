@@ -1,0 +1,75 @@
+name: 部署开发环境
+
+on:
+  push:
+    branches:
+      - dev
+  workflow_dispatch:
+
+concurrency:
+  group: hnieoj-dev-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: 构建并部署
+    runs-on: self-hosted
+    env:
+      DEPLOY_DIR: /opt/hnieoj/backend
+      SOURCE_DIR: /opt/hnieoj/backend/source
+      COMPOSE_PROJECT_NAME: hnieoj-dev
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 配置 JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+
+      - name: 检查部署环境
+        shell: bash
+        run: |
+          set -euo pipefail
+          command -v docker >/dev/null
+          command -v rsync >/dev/null
+          docker compose version >/dev/null
+          test -f "${DEPLOY_DIR}/.env"
+          mkdir -p "${SOURCE_DIR}"
+          test -d /data/oj/problems
+          test -d /etc/hnieoj/judge-security
+
+      - name: Maven 打包
+        shell: bash
+        run: mvn -s deploy/maven/settings.xml clean package -DskipTests
+
+      - name: 同步部署目录
+        shell: bash
+        run: |
+          set -euo pipefail
+          rsync -a --delete \
+            --exclude '.git' \
+            --exclude '.github' \
+            --exclude '.idea' \
+            --exclude '.m2' \
+            --exclude 'node_modules' \
+            ./ "${SOURCE_DIR}/"
+
+      - name: Docker Compose 部署
+        shell: bash
+        working-directory: /opt/hnieoj/backend/source
+        run: |
+          set -euo pipefail
+          docker compose \
+            -p "${COMPOSE_PROJECT_NAME}" \
+            --env-file "${DEPLOY_DIR}/.env" \
+            -f deploy/docker/docker-compose.dev.yml \
+            up -d --build --remove-orphans
+
+      - name: 查看容器状态
+        shell: bash
+        working-directory: /opt/hnieoj/backend/source
+        run: docker compose -p "${COMPOSE_PROJECT_NAME}" -f deploy/docker/docker-compose.dev.yml ps

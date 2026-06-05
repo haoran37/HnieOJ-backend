@@ -44,8 +44,6 @@ public class SysConfig {
 
     private String smtpNickname;
 
-    private String judgeToken;
-
     private Integer submissionInterval;
 
     private LocalDateTime gmtModified;

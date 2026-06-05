@@ -33,8 +33,6 @@ public class SystemConfigVo {
 
     private String smtpNickname;
 
-    private String judgeToken;
-
     private Integer submissionInterval;
 
     private LocalDateTime gmtModified;

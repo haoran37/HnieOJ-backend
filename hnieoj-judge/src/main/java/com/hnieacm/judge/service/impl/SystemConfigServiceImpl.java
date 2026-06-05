@@ -11,7 +11,6 @@ import com.hnieacm.judge.dto.SystemConfigSaveRequest;
 import com.hnieacm.judge.entity.SysConfig;
 import com.hnieacm.judge.mapper.SysConfigMapper;
 import com.hnieacm.judge.service.SystemConfigService;
-import com.hnieacm.judge.vo.JudgeTokenResetVo;
 import com.hnieacm.judge.vo.SystemConfigVo;
 import com.hnieacm.judge.vo.SystemPublicConfigVo;
 import com.hnieacm.judge.vo.SystemTimeVo;
@@ -24,7 +23,6 @@ import java.time.format.DateTimeFormatter;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
-import java.util.UUID;
 
 /**
  * @Author: HaoRan_Lyu
@@ -39,19 +37,9 @@ public class SystemConfigServiceImpl implements SystemConfigService {
     private static final TypeReference<List<String>> LIST_STRING_TYPE = new TypeReference<>() {
     };
 
-    private static final int TOKEN_MASK_PREFIX_LENGTH = 4;
-
     private final SysConfigMapper sysConfigMapper;
     private final ObjectMapper objectMapper;
 
-    /**
-     * @MethodName getPublicConfig
-     * <p>
-     * @Description 获取公共配置
-     * @Return @return {@link SystemPublicConfigVo }
-     * @Author HaoRan_Lyu
-     * @Date 2026/03/01
-     */
     @Override
     public SystemPublicConfigVo getPublicConfig() {
         SysConfig config = getOrInitConfig();
@@ -67,14 +55,6 @@ public class SystemConfigServiceImpl implements SystemConfigService {
         return vo;
     }
 
-    /**
-     * @MethodName getSystemTime
-     * <p>
-     * @Description 获取系统时间
-     * @Return @return {@link SystemTimeVo }
-     * @Author HaoRan_Lyu
-     * @Date 2026/03/01
-     */
     @Override
     public SystemTimeVo getSystemTime() {
         ZonedDateTime now = ZonedDateTime.now();
@@ -85,14 +65,6 @@ public class SystemConfigServiceImpl implements SystemConfigService {
         return vo;
     }
 
-    /**
-     * @MethodName getSystemConfig
-     * <p>
-     * @Description 获取系统配置
-     * @Return @return {@link SystemConfigVo }
-     * @Author HaoRan_Lyu
-     * @Date 2026/03/01
-     */
     @Override
     public SystemConfigVo getSystemConfig() {
         SysConfig config = getOrInitConfig();
@@ -108,20 +80,11 @@ public class SystemConfigServiceImpl implements SystemConfigService {
         vo.setSmtpPort(config.getSmtpPort());
         vo.setSmtpEmail(config.getSmtpEmail());
         vo.setSmtpNickname(config.getSmtpNickname());
-        vo.setJudgeToken(maskJudgeToken(config.getJudgeToken()));
         vo.setSubmissionInterval(config.getSubmissionInterval());
         vo.setGmtModified(config.getGmtModified());
         return vo;
     }
 
-    /**
-     * @MethodName saveSystemConfig
-     * @Param request
-     * @Description 保存系统配置
-     * @Return
-     * @Author HaoRan_Lyu
-     * @Date 2026/03/01
-     */
     @Override
     public void saveSystemConfig(SystemConfigSaveRequest request) {
         if (request == null) {
@@ -171,41 +134,6 @@ public class SystemConfigServiceImpl implements SystemConfigService {
         }
     }
 
-    /**
-     * @MethodName resetJudgeToken
-     *
-     * @Description 重置判题令牌
-     * @Return @return {@link JudgeTokenResetVo }
-     * @Author HaoRan_Lyu
-     * @Date 2026/03/01
-     */
-    @Override
-    public JudgeTokenResetVo resetJudgeToken() {
-        getOrInitConfig();
-
-        String newToken = UUID.randomUUID().toString().replace("-", "");
-        LambdaUpdateWrapper<SysConfig> updateWrapper = new LambdaUpdateWrapper<SysConfig>()
-                .eq(SysConfig::getId, SystemConfigConstant.DEFAULT_CONFIG_ID)
-                .set(SysConfig::getJudgeToken, newToken);
-
-        int updated = sysConfigMapper.update(null, updateWrapper);
-        if (updated <= 0) {
-            throw new BizException(ResultCode.INTERNAL_ERROR, "重置 Judger Token 失败");
-        }
-
-        JudgeTokenResetVo vo = new JudgeTokenResetVo();
-        vo.setToken(newToken);
-        return vo;
-    }
-
-    /**
-     * @MethodName getOrInitConfig
-     *
-     * @Description 统一兜底初始化 id=1 配置，保证后续逻辑可直接读取
-     * @Return @return {@link SysConfig }
-     * @Author HaoRan_Lyu
-     * @Date 2026/03/01
-     */
     private SysConfig getOrInitConfig() {
         SysConfig config = sysConfigMapper.selectById(SystemConfigConstant.DEFAULT_CONFIG_ID);
         if (config != null) {
@@ -227,14 +155,6 @@ public class SystemConfigServiceImpl implements SystemConfigService {
         return config;
     }
 
-    /**
-     * @MethodName validateRegisterMode
-     * @Param registerMode
-     * @Description 验证注册模式
-     * @Return
-     * @Author HaoRan_Lyu
-     * @Date 2026/03/01
-     */
     private void validateRegisterMode(String registerMode) {
         if (!SystemConfigConstant.REGISTER_MODE_SET.contains(registerMode)) {
             throw new BizException(
@@ -244,14 +164,6 @@ public class SystemConfigServiceImpl implements SystemConfigService {
         }
     }
 
-    /**
-     * @MethodName parseAllowedEmailSuffixes
-     * @Param rawJson
-     * @Description 解析允许电子邮件后缀
-     * @Return @return {@link List }<{@link String }>
-     * @Author HaoRan_Lyu
-     * @Date 2026/03/01
-     */
     private List<String> parseAllowedEmailSuffixes(String rawJson) {
         if (StrUtil.isBlank(rawJson)) {
             return Collections.emptyList();
@@ -272,14 +184,6 @@ public class SystemConfigServiceImpl implements SystemConfigService {
         }
     }
 
-    /**
-     * @MethodName toAllowedEmailSuffixesJson
-     * @Param suffixes
-     * @Description 允许使用json电子邮件后缀
-     * @Return @return {@link String }
-     * @Author HaoRan_Lyu
-     * @Date 2026/03/01
-     */
     private String toAllowedEmailSuffixesJson(List<String> suffixes) {
         List<String> normalized = suffixes == null ? Collections.emptyList() : suffixes.stream()
                 .map(this::trimToNull)
@@ -293,15 +197,6 @@ public class SystemConfigServiceImpl implements SystemConfigService {
         }
     }
 
-    /**
-     * @MethodName resolveSmtpPassword
-     * @Param currentPassword
-     * @Param requestPassword
-     * @Description 解析smtp密码
-     * @Return @return {@link String }
-     * @Author HaoRan_Lyu
-     * @Date 2026/03/01
-     */
     private String resolveSmtpPassword(String currentPassword, String requestPassword) {
         if (requestPassword == null) {
             return currentPassword;
@@ -309,32 +204,6 @@ public class SystemConfigServiceImpl implements SystemConfigService {
         return trimToNull(requestPassword);
     }
 
-    /**
-     * @MethodName maskJudgeToken
-     * @Param token
-     * @Description mask裁判令牌
-     * @Return @return {@link String }
-     * @Author HaoRan_Lyu
-     * @Date 2026/03/01
-     */
-    private String maskJudgeToken(String token) {
-        if (StrUtil.isBlank(token)) {
-            return null;
-        }
-        if (token.length() <= TOKEN_MASK_PREFIX_LENGTH) {
-            return "****";
-        }
-        return token.substring(0, TOKEN_MASK_PREFIX_LENGTH) + "****";
-    }
-
-    /**
-     * @MethodName trimToNull
-     * @Param value
-     * @Description 去除字符串首尾空格，若结果为空则返回null
-     * @Return @return {@link String }
-     * @Author HaoRan_Lyu
-     * @Date 2026/03/01
-     */
     private String trimToNull(String value) {
         if (value == null) {
             return null;

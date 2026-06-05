@@ -2,15 +2,12 @@ package com.hnieacm.judge.controller;
 
 import com.hnieacm.common.result.Result;
 import com.hnieacm.judge.service.RemoteJudgeAccountService;
-import com.hnieacm.judge.service.SystemConfigService;
-import com.hnieacm.judge.vo.JudgeTokenResetVo;
 import com.hnieacm.judge.vo.RemoteJudgeAccountVo;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -30,7 +27,6 @@ import java.util.List;
 public class AdminJudgeController {
 
     private final RemoteJudgeAccountService remoteJudgeAccountService;
-    private final SystemConfigService systemConfigService;
 
     @Operation(summary = "获取远程评测账号列表")
     @GetMapping("/account")
@@ -38,11 +34,5 @@ public class AdminJudgeController {
             @RequestParam(required = false) String oj,
             @RequestParam(required = false) Integer status) {
         return Result.success(remoteJudgeAccountService.listRemoteJudgeAccounts(oj, status));
-    }
-
-    @Operation(summary = "重置 Judger Token")
-    @PostMapping("/token/reset")
-    public Result<JudgeTokenResetVo> resetJudgeToken() {
-        return Result.success(systemConfigService.resetJudgeToken());
     }
 }

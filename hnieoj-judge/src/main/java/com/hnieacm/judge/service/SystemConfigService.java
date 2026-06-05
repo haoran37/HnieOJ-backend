@@ -1,7 +1,6 @@
 package com.hnieacm.judge.service;
 
 import com.hnieacm.judge.dto.SystemConfigSaveRequest;
-import com.hnieacm.judge.vo.JudgeTokenResetVo;
 import com.hnieacm.judge.vo.SystemConfigVo;
 import com.hnieacm.judge.vo.SystemPublicConfigVo;
 import com.hnieacm.judge.vo.SystemTimeVo;
@@ -20,6 +19,4 @@ public interface SystemConfigService {
     SystemConfigVo getSystemConfig();
 
     void saveSystemConfig(SystemConfigSaveRequest request);
-
-    JudgeTokenResetVo resetJudgeToken();
 }

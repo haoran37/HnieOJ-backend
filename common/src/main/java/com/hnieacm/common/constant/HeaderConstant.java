@@ -12,5 +12,5 @@ public class HeaderConstant {
 
     public static final String AUTHORIZATION = "Authorization";
     public static final String INTERNAL_TOKEN = "X-Internal-Token";
+    public static final String JUDGE_TOKEN = "X-Judge-Token";
 }
-

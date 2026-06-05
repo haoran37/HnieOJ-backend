@@ -81,6 +81,8 @@ public class Problem {
 
     private Integer acceptedCount;
 
+    private Integer dataVersion;
+
     private String modifiedUser;
 
     private LocalDateTime gmtCreate;

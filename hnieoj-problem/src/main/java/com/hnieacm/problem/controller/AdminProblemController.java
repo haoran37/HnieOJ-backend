@@ -9,14 +9,17 @@ import com.hnieacm.problem.dto.DeleteProblemRequest;
 import com.hnieacm.problem.dto.UpdateProblemAuthRequest;
 import com.hnieacm.problem.dto.UpdateProblemRequest;
 import com.hnieacm.problem.service.AdminProblemService;
+import com.hnieacm.problem.service.ProblemResourceService;
 import com.hnieacm.problem.vo.AdminProblemListVo;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 /**
  * @Author: HaoRan_Lyu
@@ -31,6 +34,7 @@ import org.springframework.web.bind.annotation.*;
 public class AdminProblemController {
 
     private final AdminProblemService adminProblemService;
+    private final ProblemResourceService problemResourceService;
 
     @Operation(summary = "获取题目列表")
     @SaCheckPermission(PermissionConstant.PROBLEM_UPDATE)
@@ -72,5 +76,40 @@ public class AdminProblemController {
     public Result<Void> updateAuth(@Valid @RequestBody UpdateProblemAuthRequest request) {
         adminProblemService.updateProblemAuth(request);
         return Result.success("修改成功", null);
+    }
+
+    @Operation(summary = "更新题面 Markdown")
+    @SaCheckPermission(PermissionConstant.PROBLEM_UPDATE)
+    @PutMapping("/{id}/statement")
+    public Result<Void> updateStatement(@PathVariable @Min(value = 1, message = "id 必须大于 0") Long id,
+                                        @RequestBody(required = false) String markdown) {
+        problemResourceService.updateStatement(id, markdown);
+        return Result.success("保存成功", null);
+    }
+
+    @Operation(summary = "上传或更新测试数据")
+    @SaCheckPermission(PermissionConstant.PROBLEM_UPDATE)
+    @PostMapping(value = "/{id}/testdata", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public Result<Void> uploadTestdata(@PathVariable @Min(value = 1, message = "id 必须大于 0") Long id,
+                                       @RequestPart("file") MultipartFile file) {
+        problemResourceService.replaceTestdata(id, file);
+        return Result.success("上传成功", null);
+    }
+
+    @Operation(summary = "上传题面图片")
+    @SaCheckPermission(PermissionConstant.PROBLEM_UPDATE)
+    @PostMapping(value = "/{id}/images", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public Result<String> uploadImage(@PathVariable @Min(value = 1, message = "id 必须大于 0") Long id,
+                                      @RequestPart("file") MultipartFile file) {
+        return Result.success(problemResourceService.uploadImage(id, file));
+    }
+
+    @Operation(summary = "删除题面图片")
+    @SaCheckPermission(PermissionConstant.PROBLEM_UPDATE)
+    @DeleteMapping("/{id}/images/{filename:.+}")
+    public Result<Void> deleteImage(@PathVariable @Min(value = 1, message = "id 必须大于 0") Long id,
+                                    @PathVariable String filename) {
+        problemResourceService.deleteImage(id, filename);
+        return Result.success("删除成功", null);
     }
 }

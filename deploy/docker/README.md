@@ -14,9 +14,17 @@
 sudo mkdir -p /opt/hnieoj/backend/source /data/oj/problems /etc/hnieoj/judge-security
 sudo cp deploy/docker/.env.example /opt/hnieoj/backend/.env
 sudo chmod 600 /opt/hnieoj/backend/.env
+sudo chown -R vipuser:vipuser /opt/hnieoj/backend /data/oj/problems
 ```
 
 修改 `/opt/hnieoj/backend/.env` 中的数据库、Redis、RabbitMQ、内部 Token、判题 JWT Secret 和正式节点 Token 密文。
+
+自托管 runner 用户需要能访问 Docker daemon。若 runner 用户为 `vipuser`，通常需要执行：
+
+```bash
+sudo usermod -aG docker vipuser
+sudo systemctl restart actions.runner.*
+```
 
 ## 手动部署命令
 

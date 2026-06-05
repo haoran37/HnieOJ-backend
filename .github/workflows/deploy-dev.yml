@@ -34,13 +34,36 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          command -v docker >/dev/null
-          command -v rsync >/dev/null
-          docker compose version >/dev/null
-          test -f "${DEPLOY_DIR}/.env"
-          mkdir -p "${SOURCE_DIR}"
-          test -d /data/oj/problems
-          test -d /etc/hnieoj/judge-security
+
+          fail() {
+            echo "::error::$1"
+            exit 1
+          }
+
+          require_command() {
+            command -v "$1" >/dev/null || fail "缺少命令：$1，请先在 self-hosted runner 机器安装。"
+            echo "命令检查通过：$1"
+          }
+
+          require_file() {
+            test -f "$1" || fail "缺少文件：$1，请按 deploy/docker/.env.example 创建并填写真实部署配置。"
+            echo "文件检查通过：$1"
+          }
+
+          require_dir() {
+            test -d "$1" || fail "缺少目录：$1，请先在 runner 机器创建并配置权限。"
+            echo "目录检查通过：$1"
+          }
+
+          echo "Runner 用户：$(id)"
+          require_command docker
+          require_command rsync
+          docker compose version || fail "Docker Compose v2 不可用，请安装 docker compose 插件。"
+          docker info >/dev/null || fail "当前 runner 用户不能访问 Docker daemon，请检查 docker 服务和用户组权限。"
+          require_file "${DEPLOY_DIR}/.env"
+          mkdir -p "${SOURCE_DIR}" || fail "无法创建代码同步目录：${SOURCE_DIR}"
+          require_dir /data/oj/problems
+          require_dir /etc/hnieoj/judge-security
 
       - name: Maven 打包
         shell: bash

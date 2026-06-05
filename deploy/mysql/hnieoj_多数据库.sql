@@ -241,7 +241,7 @@ CREATE TABLE `problem` (
   `score_percentage` decimal(5, 2) DEFAULT '0.00' COMMENT '题目评分',
   `submission_count` int(11) DEFAULT '0' COMMENT '总提交次数',
   `accepted_count` int(11) DEFAULT '0' COMMENT '总通过次数',
-  
+  `data_version` int(11) DEFAULT '1' COMMENT '测试数据版本，每次测试数据变更后自增',
   `modified_user` varchar(100) DEFAULT NULL COMMENT '最后一次修改题目的管理员',
   `gmt_create` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '题目创建时间',
   `gmt_modified` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '题目最近一次修改时间',
@@ -305,6 +305,47 @@ CREATE TABLE `judge_server` (
   `gmt_create` datetime DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 临时判题节点授权码
+DROP TABLE IF EXISTS `judge_node_auth_code`;
+CREATE TABLE `judge_node_auth_code` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `code_hash` varchar(128) NOT NULL COMMENT '授权码 SHA-256 摘要',
+  `node_name` varchar(100) DEFAULT NULL COMMENT '预期节点名称',
+  `created_by` varchar(50) DEFAULT NULL COMMENT '创建管理员',
+  `remark` varchar(255) DEFAULT NULL COMMENT '备注',
+  `max_exchange_count` int(11) DEFAULT '1' COMMENT '最大兑换次数',
+  `used_count` int(11) DEFAULT '0' COMMENT '已兑换次数',
+  `status` varchar(20) DEFAULT 'enabled' COMMENT 'enabled, revoked, expired',
+  `expire_time` datetime NOT NULL COMMENT '授权码过期时间',
+  `gmt_create` datetime DEFAULT CURRENT_TIMESTAMP,
+  `gmt_modified` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_code_hash` (`code_hash`),
+  KEY `idx_status_expire` (`status`, `expire_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='临时判题节点授权码';
+
+-- 判题节点短期 Token 审计记录
+DROP TABLE IF EXISTS `judge_node_token`;
+CREATE TABLE `judge_node_token` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `token_id` varchar(64) NOT NULL COMMENT 'JWT jti/tokenId',
+  `node_id` varchar(64) NOT NULL COMMENT '判题节点 ID',
+  `node_name` varchar(100) DEFAULT NULL COMMENT '节点名称',
+  `node_type` varchar(20) NOT NULL COMMENT 'formal, temp',
+  `status` varchar(20) DEFAULT 'active' COMMENT 'active, revoked, expired',
+  `auth_code_id` bigint(20) DEFAULT NULL COMMENT '来源授权码 ID',
+  `expire_time` datetime NOT NULL COMMENT 'Token 过期时间',
+  `last_used_time` datetime DEFAULT NULL COMMENT '最近使用时间',
+  `revoked_time` datetime DEFAULT NULL COMMENT '吊销时间',
+  `revoked_by` varchar(50) DEFAULT NULL COMMENT '吊销管理员',
+  `gmt_create` datetime DEFAULT CURRENT_TIMESTAMP,
+  `gmt_modified` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_token_id` (`token_id`),
+  KEY `idx_node_id` (`node_id`),
+  KEY `idx_status_expire` (`status`, `expire_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='判题节点短期 Token 审计记录';
 
 -- 提交记录 (Status)
 DROP TABLE IF EXISTS `judge`;
@@ -665,7 +706,6 @@ CREATE TABLE `sys_config` (
   `smtp_email` varchar(100) DEFAULT NULL,
   `smtp_password` varchar(255) DEFAULT NULL,
   `smtp_nickname` varchar(100) DEFAULT 'HnieOJ Admin',
-  `judge_token` varchar(255) DEFAULT NULL,
   `submission_interval` int(11) DEFAULT '10',
   `gmt_modified` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`)

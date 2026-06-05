@@ -9,6 +9,19 @@ spring:
       host: ${hnieoj.redis.host}
       port: ${hnieoj.redis.port}
       password: ${hnieoj.redis.password}
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 50MB
 
 sa-token:
   is-print: false
+
+hnieoj:
+  problem:
+    storage:
+      root-path: ${HNIEOJ_PROBLEM_STORAGE_ROOT:/data/oj/problems}
+      image-url-prefix: ${HNIEOJ_PROBLEM_IMAGE_URL_PREFIX:/oj/images}
+      max-testdata-zip-size: 50MB
+      max-testdata-uncompressed-size: 200MB
+      max-testdata-file-count: 2000

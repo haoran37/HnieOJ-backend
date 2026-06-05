@@ -36,6 +36,8 @@ public class SaTokenConfig {
                 .addExclude("/api/auth/register")
                 .addExclude("/api/system/public-config")
                 .addExclude("/api/system/time")
+                .addExclude("/api/judge/temp-token")
+                .addExclude("/judge/problems/**")
                 .addExclude("/ws/submissions/**")
                 .setAuth(obj -> {
                     // 统一登录态校验（双重保险：exclude + notMatch，避免误拦截登录/注册）
@@ -47,6 +49,8 @@ public class SaTokenConfig {
                                     "/api/auth/register",
                                     "/api/system/public-config",
                                     "/api/system/time",
+                                    "/api/judge/temp-token",
+                                    "/judge/problems/**",
                                     "/ws/submissions/**"
                             )
                             .check(r -> {

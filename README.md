@@ -23,7 +23,7 @@ HnieOJ-backend 是一个基于 **Spring Cloud Alibaba** 的在线判题系统后
 - `hnieoj-submission` -> RabbitMQ -> `hnieoj-judge` 异步判题完整闭环
 - go-judge 编译执行接入（含状态映射、失败重试、结果回写）
 - 多判题机负载均衡与心跳/健康检查
-- MinIO（测试数据、图片与其他对象存储）完整接入
+- 本地题目资源存储的完整运维闭环（已改用 `/data/oj/problems`，仍需线上联调）
 - 等等
 
 ## 模块概览
@@ -71,7 +71,7 @@ HnieOJ-backend/
 - Redis
 - Nacos 2.3.2
 - RabbitMQ（判题链路开发时需要）
-- MinIO（对象存储开发时需要）
+- 本地文件系统目录 `/data/oj/problems`（题面、图片、测试数据）
 
 ### 配置Nacos
 
@@ -125,7 +125,7 @@ mvn -s .idea/maven-settings.xml clean install -DskipTests
 
 - [ ] 完成 submission -> RabbitMQ -> judge 的异步判题链路
 - [ ] 完成 go-judge 请求封装与状态映射
-- [ ] 接入 MinIO 存储测试数据与图片等对象数据
+- [ ] 完成本地题目资源存储与 Nginx 静态图片代理的线上联调
 - [ ] 支持多判题机负载均衡（节点管理、健康检查、故障摘除）
 - [ ] 补齐判题链路集成测试与回归测试
 

@@ -40,18 +40,18 @@ INSERT IGNORE INTO `sys_class_ta` (`class_id`, `ta_uid`) VALUES
 
 -- 用户表
 INSERT INTO `user_info` (`uuid`, `uid`, `username`, `password`, `email`, `phone`, `avatar`, `college_id`, `class_id`, `grade`, `realname`, `qq`, `status`, `cf_username`, `github`, `blog`, `ip_restricted`, `ip_whitelist`) VALUES
-('u000001', '20230001', 'admin', '$2a$10$mockhashadminxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx', 'admin@hnieoj.com', '13800000001', '/avatar/admin.png', 1, 1, '2023', '管理员', '10001', 0, 'admin_cf', 'https://github.com/admin', 'https://blog.admin.com', 0, NULL),
-('u000002', '20230002', 'teacher1', '$2a$10$mockhashteacher1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx', 'teacher1@hnieoj.com', '13800000002', '/avatar/teacher1.png', 1, 1, '2023', '张老师', '10002', 0, 'teacher_cf', NULL, NULL, 0, NULL),
-('u000003', '20230003', 'student1', '$2a$10$mockhashstudent1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx', 'student1@hnieoj.com', '13800000003', '/avatar/student1.png', 1, 1, '2023', '李同学', '10003', 0, 'student1_cf', 'https://github.com/stu1', NULL, 0, NULL),
-('u000004', '20230004', 'student2', '$2a$10$mockhashstudent2xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx', 'student2@hnieoj.com', '13800000004', '/avatar/student2.png', 2, 3, '2022', '王同学', '10004', 0, NULL, NULL, NULL, 0, NULL),
-('u000005', '20230005', 'teacher2', '$2a$10$mockhashteacher2xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx', 'teacher2@hnieoj.com', '13800000005', NULL, 2, 3, '2022', '赵老师', '10005', 0, 'teacher2_cf', NULL, NULL, 0, NULL),
-('u000006', '20230006', 'teacher3', '$2a$10$mockhashteacher3xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx', 'teacher3@hnieoj.com', '13800000006', NULL, 3, 4, '2024', '孙老师', '10006', 0, NULL, NULL, NULL, 0, NULL),
-('u000007', '20230007', 'ta1', '$2a$10$mockhashta1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx', 'ta1@hnieoj.com', '13800000007', NULL, 1, 1, '2023', '周助教', '10007', 0, NULL, NULL, NULL, 0, NULL),
-('u000008', '20230008', 'ta2', '$2a$10$mockhashta2xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx', 'ta2@hnieoj.com', '13800000008', NULL, 2, 3, '2022', '吴助教', '10008', 0, NULL, NULL, NULL, 0, NULL),
-('u000009', '20230009', 'student3', '$2a$10$mockhashstudent3xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx', 'student3@hnieoj.com', '13800000009', NULL, 1, 2, '2023', '郑同学', '10009', 0, 'student3_cf', NULL, NULL, 0, NULL),
-('u000010', '20230010', 'student4', '$2a$10$mockhashstudent4xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx', 'student4@hnieoj.com', '13800000010', NULL, 3, 4, '2024', '陈同学', '10010', 0, NULL, NULL, 'https://chen.dev', 0, NULL),
-('u000011', '20230011', 'student5', '$2a$10$mockhashstudent5xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx', 'student5@hnieoj.com', '13800000011', NULL, 4, 5, '2022', '林同学', '10011', 0, NULL, NULL, NULL, 0, NULL),
-('u000012', '20230012', 'student6', '$2a$10$mockhashstudent6xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx', 'student6@hnieoj.com', '13800000012', NULL, 5, 6, '2023', '黄同学', '10012', 0, NULL, NULL, NULL, 0, NULL);
+('u000001', '20230001', 'admin', '$2a$10$3U2N.7iadlzem5xnKCcDFOX6U/6bX7.2ReqCLHMfFQZSDW3DDMFQC', 'admin@hnieoj.com', '13800000001', '/avatar/admin.png', 1, 1, '2023', '管理员', '10001', 0, 'admin_cf', 'https://github.com/admin', 'https://blog.admin.com', 0, NULL),
+('u000002', '20230002', 'teacher1', '$2a$10$3U2N.7iadlzem5xnKCcDFOX6U/6bX7.2ReqCLHMfFQZSDW3DDMFQC', 'teacher1@hnieoj.com', '13800000002', '/avatar/teacher1.png', 1, 1, '2023', '张老师', '10002', 0, 'teacher_cf', NULL, NULL, 0, NULL),
+('u000003', '20230003', 'student1', '$2a$10$3U2N.7iadlzem5xnKCcDFOX6U/6bX7.2ReqCLHMfFQZSDW3DDMFQC', 'student1@hnieoj.com', '13800000003', '/avatar/student1.png', 1, 1, '2023', '李同学', '10003', 0, 'student1_cf', 'https://github.com/stu1', NULL, 0, NULL),
+('u000004', '20230004', 'student2', '$2a$10$3U2N.7iadlzem5xnKCcDFOX6U/6bX7.2ReqCLHMfFQZSDW3DDMFQC', 'student2@hnieoj.com', '13800000004', '/avatar/student2.png', 2, 3, '2022', '王同学', '10004', 0, NULL, NULL, NULL, 0, NULL),
+('u000005', '20230005', 'teacher2', '$2a$10$3U2N.7iadlzem5xnKCcDFOX6U/6bX7.2ReqCLHMfFQZSDW3DDMFQC', 'teacher2@hnieoj.com', '13800000005', NULL, 2, 3, '2022', '赵老师', '10005', 0, 'teacher2_cf', NULL, NULL, 0, NULL),
+('u000006', '20230006', 'teacher3', '$2a$10$3U2N.7iadlzem5xnKCcDFOX6U/6bX7.2ReqCLHMfFQZSDW3DDMFQC', 'teacher3@hnieoj.com', '13800000006', NULL, 3, 4, '2024', '孙老师', '10006', 0, NULL, NULL, NULL, 0, NULL),
+('u000007', '20230007', 'ta1', '$2a$10$3U2N.7iadlzem5xnKCcDFOX6U/6bX7.2ReqCLHMfFQZSDW3DDMFQC', 'ta1@hnieoj.com', '13800000007', NULL, 1, 1, '2023', '周助教', '10007', 0, NULL, NULL, NULL, 0, NULL),
+('u000008', '20230008', 'ta2', '$2a$10$3U2N.7iadlzem5xnKCcDFOX6U/6bX7.2ReqCLHMfFQZSDW3DDMFQC', 'ta2@hnieoj.com', '13800000008', NULL, 2, 3, '2022', '吴助教', '10008', 0, NULL, NULL, NULL, 0, NULL),
+('u000009', '20230009', 'student3', '$2a$10$3U2N.7iadlzem5xnKCcDFOX6U/6bX7.2ReqCLHMfFQZSDW3DDMFQC', 'student3@hnieoj.com', '13800000009', NULL, 1, 2, '2023', '郑同学', '10009', 0, 'student3_cf', NULL, NULL, 0, NULL),
+('u000010', '20230010', 'student4', '$2a$10$3U2N.7iadlzem5xnKCcDFOX6U/6bX7.2ReqCLHMfFQZSDW3DDMFQC', 'student4@hnieoj.com', '13800000010', NULL, 3, 4, '2024', '陈同学', '10010', 0, NULL, NULL, 'https://chen.dev', 0, NULL),
+('u000011', '20230011', 'student5', '$2a$10$3U2N.7iadlzem5xnKCcDFOX6U/6bX7.2ReqCLHMfFQZSDW3DDMFQC', 'student5@hnieoj.com', '13800000011', NULL, 4, 5, '2022', '林同学', '10011', 0, NULL, NULL, NULL, 0, NULL),
+('u000012', '20230012', 'student6', '$2a$10$3U2N.7iadlzem5xnKCcDFOX6U/6bX7.2ReqCLHMfFQZSDW3DDMFQC', 'student6@hnieoj.com', '13800000012', NULL, 5, 6, '2023', '黄同学', '10012', 0, NULL, NULL, NULL, 0, NULL);
 
 -- 用户-角色关联表 (1000: root, 1001: admin, 1002: teacher, 1003: ta, 1004: student)
 INSERT INTO `user_role` (`user_uid`, `role_id`) VALUES
@@ -83,10 +83,10 @@ INSERT INTO `achievement_apply` (`uid`, `title`, `description`, `file_url`, `sta
 
 -- 用户注册申请表
 INSERT INTO `user_register_apply` (`uid`, `username`, `password`, `email`, `college_id`, `class_id`, `grade`, `qq`, `status`, `reply_info`) VALUES
-('20239999', 'new_user', '$2a$10$mockhashnewxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx', 'new@hnieoj.com', 1, 1, '2023', '123456789', 0, NULL),
-('20239888', 'waiting_user', '$2a$10$mockhashwaitingxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx', 'waiting@hnieoj.com', 2, 3, '2022', '987654321', 0, NULL),
-('20239777', 'approved_user', '$2a$10$mockhashapprovedxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx', 'approved@hnieoj.com', 3, 4, '2024', '11223344', 1, NULL),
-('20239666', 'rejected_user', '$2a$10$mockhashrejectedxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx', 'rejected@hnieoj.com', 4, 5, '2022', '55667788', 2, '学号与系统登记不符，请核实。');
+('20239999', 'new_user', '$2a$10$3U2N.7iadlzem5xnKCcDFOX6U/6bX7.2ReqCLHMfFQZSDW3DDMFQC', 'new@hnieoj.com', 1, 1, '2023', '123456789', 0, NULL),
+('20239888', 'waiting_user', '$2a$10$3U2N.7iadlzem5xnKCcDFOX6U/6bX7.2ReqCLHMfFQZSDW3DDMFQC', 'waiting@hnieoj.com', 2, 3, '2022', '987654321', 0, NULL),
+('20239777', 'approved_user', '$2a$10$3U2N.7iadlzem5xnKCcDFOX6U/6bX7.2ReqCLHMfFQZSDW3DDMFQC', 'approved@hnieoj.com', 3, 4, '2024', '11223344', 1, NULL),
+('20239666', 'rejected_user', '$2a$10$3U2N.7iadlzem5xnKCcDFOX6U/6bX7.2ReqCLHMfFQZSDW3DDMFQC', 'rejected@hnieoj.com', 4, 5, '2022', '55667788', 2, '学号与系统登记不符，请核实。');
 
 -- ========================================================
 -- 2. 题目数据库: hnieoj_problem_db
@@ -94,14 +94,14 @@ INSERT INTO `user_register_apply` (`uid`, `username`, `password`, `email`, `coll
 USE `hnieoj_problem_db`;
 
 -- 题目表 (新增了 SPJ 和交互题样例)
-INSERT INTO `problem` (`id`, `problem_code`, `title`, `author`, `type`, `judge_mode`, `time_limit`, `memory_limit`, `stack_limit`, `description`, `input`, `output`, `examples`, `hint`, `difficulty`, `auth`, `io_score`, `is_remote`, `source`, `spj_code`, `spj_language`, `is_remove_end_blank`, `open_case_result`, `score_percentage`, `submission_count`, `accepted_count`, `modified_user`) VALUES
-(1, 'P1000', 'A+B Problem', 'admin', 0, 'default', 1000, 256, 128, '计算两个整数之和', '输入两个整数a和b，用空格分隔', '输出a+b的值', '[{"in": "1 2", "out": "3"}]', '注意整数范围，可能会超过 32 位整型。', 0, 1, 100, 0, 'HnieOJ', NULL, NULL, 1, 1, 0.00, 50, 40, 'admin'),
-(2, 'P1001', '排序', 'admin', 0, 'default', 2000, 256, 128, '给定N个数，将它们从小到大排序', '第一行一个整数N，第二行N个整数', '排序后的N个数，空格分隔', '[{"in": "5\\n3 1 4 2 5", "out": "1 2 3 4 5"}]', '建议使用快速排序 (Quick Sort) 或归并排序 (Merge Sort)。', 1, 1, 100, 0, 'HnieOJ', NULL, NULL, 1, 1, 0.00, 30, 25, 'admin'),
-(3, 'P1002', '斐波那契数列', 'teacher1', 1, 'default', 1000, 128, 64, '计算第n项斐波那契数', '输入一个整数n', '输出F(n)的值', '[{"in": "5", "out": "5"}]', 'n不超过30', 0, 1, 100, 0, '经典递归', NULL, NULL, 1, 1, 0.00, 20, 18, 'teacher1'),
-(4, 'P1003', '最大子段和', 'admin', 0, 'default', 1000, 256, 128, '求给定数组的最大连续子段和', '第一行N，第二行N个整数', '最大子段和', '[{"in": "5\\n-2 1 -3 4 -1 2 1 -5 4", "out": "6"}]', '可以使用 Kadane 算法动态规划解决。', 2, 1, 100, 0, 'LeetCode', NULL, NULL, 1, 0, 0.00, 15, 8, 'admin'),
-(5, 'P1004', '字符串反转', 'teacher2', 0, 'default', 500, 64, 32, '输入一个字符串，输出其反转', '一个字符串S', '反转后的字符串', '[{"in": "hello", "out": "olleh"}]', '无', 0, 1, 100, 0, 'HnieOJ', NULL, NULL, 1, 1, 0.00, 25, 23, 'teacher2'),
-(6, 'P1005', '素数判断', 'admin', 0, 'default', 1000, 128, 64, '判断一个数是否为素数', '一个整数n', 'Yes 或 No', '[{"in": "7", "out": "Yes"}, {"in": "10", "out": "No"}]', '2 <= n <= 10^9', 1, 1, 100, 0, '数学', NULL, NULL, 1, 1, 0.00, 40, 30, 'admin'),
-(7, 'P1006', '任何符合条件的排列 (SPJ)', 'admin', 0, 'spj', 1000, 256, 128, '给定 N，输出任意一个包含 1 到 N 的排列，要求相邻元素互质。', '输入 N (1<=N<=100)', '输出你的排列，空格隔开', '[{"in": "3", "out": "1 2 3"}]', '答案不唯一，本题采用 Special Judge。', 1, 1, 100, 0, 'HnieOJ', '#include<stdio.h>\n// 简单的特判逻辑...', 'C', 1, 1, 0.00, 10, 5, 'admin');
+INSERT INTO `problem` (`id`, `problem_code`, `title`, `author`, `type`, `judge_mode`, `time_limit`, `memory_limit`, `stack_limit`, `description`, `input`, `output`, `examples`, `hint`, `difficulty`, `auth`, `io_score`, `is_remote`, `source`, `spj_code`, `spj_language`, `is_remove_end_blank`, `open_case_result`, `score_percentage`, `submission_count`, `accepted_count`, `data_version`, `modified_user`) VALUES
+(1, 'P1000', 'A+B Problem', 'admin', 0, 'default', 1000, 256, 128, '计算两个整数之和', '输入两个整数a和b，用空格分隔', '输出a+b的值', '[{"in": "1 2", "out": "3"}]', '注意整数范围，可能会超过 32 位整型。', 0, 1, 100, 0, 'HnieOJ', NULL, NULL, 1, 1, 0.00, 50, 40, 1, 'admin'),
+(2, 'P1001', '排序', 'admin', 0, 'default', 2000, 256, 128, '给定N个数，将它们从小到大排序', '第一行一个整数N，第二行N个整数', '排序后的N个数，空格分隔', '[{"in": "5\\n3 1 4 2 5", "out": "1 2 3 4 5"}]', '建议使用快速排序 (Quick Sort) 或归并排序 (Merge Sort)。', 1, 1, 100, 0, 'HnieOJ', NULL, NULL, 1, 1, 0.00, 30, 25, 1, 'admin'),
+(3, 'P1002', '斐波那契数列', 'teacher1', 1, 'default', 1000, 128, 64, '计算第n项斐波那契数', '输入一个整数n', '输出F(n)的值', '[{"in": "5", "out": "5"}]', 'n不超过30', 0, 1, 100, 0, '经典递归', NULL, NULL, 1, 1, 0.00, 20, 18, 1, 'teacher1'),
+(4, 'P1003', '最大子段和', 'admin', 0, 'default', 1000, 256, 128, '求给定数组的最大连续子段和', '第一行N，第二行N个整数', '最大子段和', '[{"in": "5\\n-2 1 -3 4 -1 2 1 -5 4", "out": "6"}]', '可以使用 Kadane 算法动态规划解决。', 2, 1, 100, 0, 'LeetCode', NULL, NULL, 1, 0, 0.00, 15, 8, 1, 'admin'),
+(5, 'P1004', '字符串反转', 'teacher2', 0, 'default', 500, 64, 32, '输入一个字符串，输出其反转', '一个字符串S', '反转后的字符串', '[{"in": "hello", "out": "olleh"}]', '无', 0, 1, 100, 0, 'HnieOJ', NULL, NULL, 1, 1, 0.00, 25, 23, 1, 'teacher2'),
+(6, 'P1005', '素数判断', 'admin', 0, 'default', 1000, 128, 64, '判断一个数是否为素数', '一个整数n', 'Yes 或 No', '[{"in": "7", "out": "Yes"}, {"in": "10", "out": "No"}]', '2 <= n <= 10^9', 1, 1, 100, 0, '数学', NULL, NULL, 1, 1, 0.00, 40, 30, 1, 'admin'),
+(7, 'P1006', '任何符合条件的排列 (SPJ)', 'admin', 0, 'spj', 1000, 256, 128, '给定 N，输出任意一个包含 1 到 N 的排列，要求相邻元素互质。', '输入 N (1<=N<=100)', '输出你的排列，空格隔开', '[{"in": "3", "out": "1 2 3"}]', '答案不唯一，本题采用 Special Judge。', 1, 1, 100, 0, 'HnieOJ', '#include<stdio.h>\n// 简单的特判逻辑...', 'C', 1, 1, 0.00, 10, 5, 1, 'admin');
 
 -- 题目标签
 INSERT INTO `tag` (`id`, `name`, `color`, `category`) VALUES
@@ -334,7 +334,6 @@ UPDATE `sys_config` SET
 `smtp_email` = 'noreply@hnieoj.com',
 `smtp_password` = 'encrypted_smtp_password',
 `smtp_nickname` = 'HnieOJ 系统邮件',
-`judge_token` = 'judge_secret_token_123456',
 `submission_interval` = 10
 WHERE `id` = 1;
 

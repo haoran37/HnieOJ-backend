@@ -1,7 +1,7 @@
 ﻿# HnieOJ-backend
 
-> ⚠️ **项目状态：开发暂停中 / WIP**
-> 当前仓库已完成大部分业务接口，但“判题链路（异步判题 + 多判题机）”尚未完工。由于个人安排，项目长期内可能无法持续维护。
+> ⚠️ **项目状态：WIP**
+> 当前仓库已完成大部分业务接口，并已接入 RabbitMQ + 二开 go-judge 的基础判题链路；多判题机调度、心跳隔离和集成测试仍在完善中。
 
 [API文档](https://s.apifox.cn/91edc2c6-6918-4179-9852-9ec3742377c8)、[前端仓库](https://github.com/haoran37/HnieOJ)
 
@@ -15,14 +15,13 @@ HnieOJ-backend 是一个基于 **Spring Cloud Alibaba** 的在线判题系统后
 - 基础微服务骨架与网关转发
 - 认证鉴权（Sa-Token）与内部服务调用约束（`/internal/**`）
 - 用户、题目、提交、比赛、训练、讨论、公告、成就等模块的大部分接口
+- submission -> RabbitMQ -> go-judge -> submission 的基础判题回调链路
 - Nacos 配置中心接入、MyBatis-Plus 持久层、统一返回结构（`Result/ResultCode`）
 
 ### 未完成
 
-- `hnieoj-judge` 判题主流程（当前仅有部分系统/管理接口）
-- `hnieoj-submission` -> RabbitMQ -> `hnieoj-judge` 异步判题完整闭环
-- go-judge 编译执行接入（含状态映射、失败重试、结果回写）
 - 多判题机负载均衡与心跳/健康检查
+- 判题链路集成测试与回归测试
 - 本地题目资源存储的完整运维闭环（已改用 `/data/oj/problems`，仍需线上联调）
 - 等等
 
@@ -54,7 +53,7 @@ HnieOJ-backend/
 - Nacos 2.3.2（注册中心 / 配置中心）
 - Sa-Token（鉴权）
 - Spring Cloud LoadBalancer
-- RabbitMQ（判题异步链路，规划中）
+- RabbitMQ（判题异步链路）
 - MyBatis / MyBatis-Plus / Druid
 - Redis
 - Hutool
@@ -71,6 +70,7 @@ HnieOJ-backend/
 - Redis
 - Nacos 2.3.2
 - RabbitMQ（判题链路开发时需要）
+- 二开 go-judge（可通过部署脚本启动）
 - 本地文件系统目录 `/data/oj/problems`（题面、图片、测试数据）
 
 ### 配置Nacos
@@ -112,10 +112,11 @@ mvn -s deploy/maven/settings.xml clean install -DskipTests
 
 ## Docker Compose 开发部署
 
-本仓库提供服务器 Shell 脚本 + Docker Compose 编排，默认管理后端服务；RabbitMQ 提供可选 Compose 组件，MySQL、Redis、Nacos 和 go-judge 继续使用外部已部署实例。
+本仓库提供服务器 Shell 脚本 + Docker Compose 编排，默认管理后端服务；RabbitMQ 和二开 go-judge 提供可选 Compose 组件，MySQL、Redis、Nacos 继续使用外部已部署实例。
 
 - Compose 文件：`deploy/docker/docker-compose.dev.yml`
 - 可选 RabbitMQ Compose 文件：`deploy/docker/docker-compose.rabbitmq.yml`
+- 可选 go-judge Compose 文件：`deploy/docker/docker-compose.gojudge.yml`
 - 环境变量示例：`deploy/docker/.env.example`
 - 一键部署脚本：`deploy/scripts/deploy-dev.sh`
 - 默认拉取分支：`dev`
@@ -137,6 +138,7 @@ bash deploy/scripts/deploy-dev.sh ps
 bash deploy/scripts/deploy-dev.sh logs gateway
 bash deploy/scripts/deploy-dev.sh restart hnieoj-user
 bash deploy/scripts/deploy-dev.sh rabbitmq-up
+bash deploy/scripts/deploy-dev.sh gojudge-up
 ```
 
 ## 配置管理（Nacos）
@@ -152,8 +154,8 @@ bash deploy/scripts/deploy-dev.sh rabbitmq-up
 
 ## 里程碑计划
 
-- [ ] 完成 submission -> RabbitMQ -> judge 的异步判题链路
-- [ ] 完成 go-judge 请求封装与状态映射
+- [x] 完成 submission -> RabbitMQ -> go-judge 的基础异步判题链路
+- [x] 完成 go-judge 请求封装与状态映射
 - [ ] 完成本地题目资源存储与 Nginx 静态图片代理的线上联调
 - [ ] 支持多判题机负载均衡（节点管理、健康检查、故障摘除）
 - [ ] 补齐判题链路集成测试与回归测试

@@ -14,6 +14,8 @@ JAVA_BASE_IMAGE="${JAVA_BASE_IMAGE:-eclipse-temurin:17-jre-jammy}"
 GIT_REPO_URL="${GIT_REPO_URL:-https://github.com/haoran37/HnieOJ-backend.git}"
 GIT_USERNAME="${GIT_USERNAME:-x-access-token}"
 GIT_TOKEN="${GIT_TOKEN:-${GIT_AUTH_TOKEN:-}}"
+GOJUDGE_GIT_REPO_URL="${GOJUDGE_GIT_REPO_URL:-https://github.com/haoran37/go-judge.git}"
+GOJUDGE_BRANCH="${GOJUDGE_BRANCH:-master}"
 
 DEPLOY_DIR="${DEPLOY_DIR:-/opt/hnieoj/backend}"
 SOURCE_DIR="${SOURCE_DIR:-${DEPLOY_DIR}/source}"
@@ -24,11 +26,17 @@ DISCARD_LOCAL_CHANGES="${DISCARD_LOCAL_CHANGES:-true}"
 
 PROBLEM_STORAGE_DIR="${PROBLEM_STORAGE_DIR:-/data/oj/problems}"
 JUDGE_SECURITY_DIR="${JUDGE_SECURITY_DIR:-/etc/hnieoj/judge-security}"
+GOJUDGE_DEPLOY_DIR="${GOJUDGE_DEPLOY_DIR:-/opt/hnieoj/go-judge}"
+GOJUDGE_SOURCE_DIR="${GOJUDGE_SOURCE_DIR:-${GOJUDGE_DEPLOY_DIR}/source}"
+GOJUDGE_CONFIG_DIR="${GOJUDGE_CONFIG_DIR:-/etc/hnieoj/go-judge}"
+GOJUDGE_CONFIG_FILE="${GOJUDGE_CONFIG_FILE:-${GOJUDGE_CONFIG_DIR}/config.yaml}"
+GOJUDGE_CACHE_DIR="${GOJUDGE_CACHE_DIR:-/data/oj/judge-cache}"
 
 MAVEN_SETTINGS_FILE="deploy/maven/settings.xml"
 MAVEN_COMMAND="${MAVEN_COMMAND:-mvn -s ${MAVEN_SETTINGS_FILE} clean package -DskipTests}"
 COMPOSE_FILE="deploy/docker/docker-compose.dev.yml"
 RABBITMQ_COMPOSE_FILE="deploy/docker/docker-compose.rabbitmq.yml"
+GOJUDGE_COMPOSE_FILE="deploy/docker/docker-compose.gojudge.yml"
 ENV_TEMPLATE_FILE="deploy/docker/.env.example"
 LOG_TAIL="${LOG_TAIL:-200}"
 
@@ -70,6 +78,10 @@ usage() {
   rabbitmq-ps     查看 RabbitMQ 容器状态
   rabbitmq-logs   查看 RabbitMQ 容器日志
   rabbitmq-down   停止并移除 RabbitMQ 容器
+  gojudge-up      拉取、构建并启动 go-judge 沙箱与判题节点
+  gojudge-ps      查看 go-judge 容器状态
+  gojudge-logs [服务名] 查看 go-judge 日志
+  gojudge-down    停止并移除 go-judge 容器
   help            显示帮助
 
 常用示例：
@@ -78,6 +90,7 @@ usage() {
   bash deploy/scripts/deploy-dev.sh logs gateway
   bash deploy/scripts/deploy-dev.sh restart hnieoj-user
   bash deploy/scripts/deploy-dev.sh rabbitmq-up
+  bash deploy/scripts/deploy-dev.sh gojudge-up
 EOF
 }
 
@@ -153,6 +166,7 @@ check_runtime_environment() {
   mkdir -p "${DEPLOY_DIR}" || fail "无法创建部署目录：${DEPLOY_DIR}"
   require_dir "${PROBLEM_STORAGE_DIR}"
   require_dir "${JUDGE_SECURITY_DIR}"
+  mkdir -p "${GOJUDGE_CACHE_DIR}" || fail "无法创建 go-judge 缓存目录：${GOJUDGE_CACHE_DIR}"
 }
 
 check_docker_environment() {
@@ -245,11 +259,25 @@ rabbitmq_compose() {
     "$@"
 }
 
+gojudge_compose() {
+  docker compose \
+    -p "${COMPOSE_PROJECT_NAME}" \
+    --env-file "${ENV_FILE}" \
+    -f "${GOJUDGE_COMPOSE_FILE}" \
+    "$@"
+}
+
 export_compose_variables() {
   export GATEWAY_PUBLIC_PORT
   export GATEWAY_SERVER_PORT
   export JAVA_BASE_IMAGE
   export COMPOSE_PARALLEL_LIMIT
+}
+
+export_gojudge_variables() {
+  export GOJUDGE_SOURCE_DIR
+  export GOJUDGE_CONFIG_HOST_FILE="${GOJUDGE_CONFIG_FILE}"
+  export GOJUDGE_CACHE_DIR
 }
 
 deploy_compose() {
@@ -340,6 +368,95 @@ down_rabbitmq() {
   rabbitmq_compose down
 }
 
+sync_gojudge_source_code() {
+  log "开始同步 go-judge 源码"
+  setup_git_auth
+
+  if [[ ! -d "${GOJUDGE_SOURCE_DIR}/.git" ]]; then
+    if [[ -d "${GOJUDGE_SOURCE_DIR}" && -n "$(find "${GOJUDGE_SOURCE_DIR}" -mindepth 1 -maxdepth 1 -print -quit)" ]]; then
+      fail "go-judge 源码目录不是 Git 仓库且非空：${GOJUDGE_SOURCE_DIR}。请备份后清空该目录，或修改 GOJUDGE_SOURCE_DIR。"
+    fi
+    mkdir -p "$(dirname "${GOJUDGE_SOURCE_DIR}")"
+    git clone --branch "${GOJUDGE_BRANCH}" --single-branch "${GOJUDGE_GIT_REPO_URL}" "${GOJUDGE_SOURCE_DIR}"
+  fi
+
+  cd "${GOJUDGE_SOURCE_DIR}"
+
+  if [[ "${DISCARD_LOCAL_CHANGES}" == "true" ]]; then
+    log "go-judge 部署目录只作为运行环境使用，将丢弃服务器本地源码改动。"
+    git reset --hard
+    git clean -fd
+  elif ! git diff --quiet || ! git diff --cached --quiet || [[ -n "$(git ls-files --others --exclude-standard)" ]]; then
+    fail "go-judge 源码目录存在本地改动：${GOJUDGE_SOURCE_DIR}。如确认丢弃，请使用 DISCARD_LOCAL_CHANGES=true。"
+  fi
+
+  git remote set-url origin "${GOJUDGE_GIT_REPO_URL}"
+  git fetch --prune origin "${GOJUDGE_BRANCH}"
+  git checkout "${GOJUDGE_BRANCH}"
+  git reset --hard "origin/${GOJUDGE_BRANCH}"
+
+  log "go-judge 源码版本：$(git rev-parse --short HEAD)"
+}
+
+prepare_gojudge_config_file() {
+  mkdir -p "${GOJUDGE_CONFIG_DIR}" || fail "无法创建 go-judge 配置目录：${GOJUDGE_CONFIG_DIR}"
+  if [[ ! -f "${GOJUDGE_CONFIG_FILE}" ]]; then
+    require_file "${GOJUDGE_SOURCE_DIR}/deploy/config.formal.example.yaml"
+    cp "${GOJUDGE_SOURCE_DIR}/deploy/config.formal.example.yaml" "${GOJUDGE_CONFIG_FILE}"
+    chmod 600 "${GOJUDGE_CONFIG_FILE}"
+    fail "已创建 ${GOJUDGE_CONFIG_FILE}。请填写 RabbitMQ 密码与正式判题节点密文后重新执行 gojudge-up。"
+  fi
+  require_file "${GOJUDGE_CONFIG_FILE}"
+  if grep -Eq 'replace_me|encryptedToken: ""|password: ""' "${GOJUDGE_CONFIG_FILE}"; then
+    fail "${GOJUDGE_CONFIG_FILE} 仍包含占位配置，请填写真实配置后重试。"
+  fi
+}
+
+start_gojudge() {
+  check_docker_environment
+  ensure_source_ready
+  sync_gojudge_source_code
+  prepare_gojudge_config_file
+  cd "${SOURCE_DIR}"
+  require_file "${GOJUDGE_COMPOSE_FILE}"
+  export_gojudge_variables
+  gojudge_compose up -d --build
+  gojudge_compose ps
+  log "go-judge 沙箱地址：http://127.0.0.1:${GOJUDGE_PUBLIC_PORT:-5050}"
+  log "go-judge 判题节点配置：${GOJUDGE_CONFIG_FILE}"
+}
+
+show_gojudge_status() {
+  check_docker_environment
+  ensure_source_ready
+  cd "${SOURCE_DIR}"
+  require_file "${GOJUDGE_COMPOSE_FILE}"
+  export_gojudge_variables
+  gojudge_compose ps
+}
+
+show_gojudge_logs() {
+  check_docker_environment
+  ensure_source_ready
+  cd "${SOURCE_DIR}"
+  require_file "${GOJUDGE_COMPOSE_FILE}"
+  export_gojudge_variables
+  if [[ "$#" -eq 0 ]]; then
+    gojudge_compose logs -f --tail="${LOG_TAIL}" go-judge-sandbox hnieoj-judge-node
+  else
+    gojudge_compose logs -f --tail="${LOG_TAIL}" "$@"
+  fi
+}
+
+down_gojudge() {
+  check_docker_environment
+  ensure_source_ready
+  cd "${SOURCE_DIR}"
+  require_file "${GOJUDGE_COMPOSE_FILE}"
+  export_gojudge_variables
+  gojudge_compose down
+}
+
 deploy_all() {
   check_runtime_environment
   sync_source_code
@@ -409,6 +526,18 @@ main() {
       ;;
     rabbitmq-down)
       down_rabbitmq
+      ;;
+    gojudge-up)
+      start_gojudge
+      ;;
+    gojudge-ps)
+      show_gojudge_status
+      ;;
+    gojudge-logs)
+      show_gojudge_logs "$@"
+      ;;
+    gojudge-down)
+      down_gojudge
       ;;
     help|-h|--help)
       usage

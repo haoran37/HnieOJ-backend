@@ -400,7 +400,7 @@ CREATE TABLE `judge_case` (
   `gmt_modified` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   KEY `idx_submit_id` (`submit_id`),
-  KEY `idx_submit_case` (`submit_id`, `case_id`)
+  UNIQUE KEY `uk_submit_case` (`submit_id`, `case_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- 重判任务表

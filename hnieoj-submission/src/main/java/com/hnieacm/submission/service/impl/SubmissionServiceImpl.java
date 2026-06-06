@@ -137,7 +137,7 @@ public class SubmissionServiceImpl implements SubmissionService {
 
         judgeMapper.insert(judge);
 
-        judgeTaskMessagePublisher.publishAfterCommit(judge);
+        judgeTaskMessagePublisher.publishAfterCommit(judge, problem);
         log.info("Submission created, submitId={}, problemCode={}, uid={}, language={}", submitId, problemCode, uid, language);
 
         return new SubmitCodeVo(submitId);

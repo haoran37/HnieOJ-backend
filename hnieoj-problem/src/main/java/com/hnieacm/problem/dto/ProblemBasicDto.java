@@ -19,6 +19,20 @@ public class ProblemBasicDto {
     private Integer auth;
 
     private Integer type;
+
+    private String judgeMode;
+
+    private Integer timeLimit;
+
+    private Integer memoryLimit;
+
+    private Integer stackLimit;
+
+    private Integer ioScore;
+
+    private Boolean isRemoveEndBlank;
+
+    private Integer dataVersion;
 }
 
 

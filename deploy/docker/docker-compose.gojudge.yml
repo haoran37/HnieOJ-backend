@@ -1,0 +1,35 @@
+services:
+  go-judge-sandbox:
+    image: ${GOJUDGE_IMAGE:-hnieoj/go-judge:dev}
+    build:
+      context: ${GOJUDGE_SOURCE_DIR:?GOJUDGE_SOURCE_DIR is required}
+      dockerfile: Dockerfile.hnieoj
+    restart: unless-stopped
+    privileged: true
+    shm_size: ${GOJUDGE_SHM_SIZE:-512m}
+    command:
+      - /usr/local/bin/go-judge
+      - -http-addr=:5050
+      - -mount-conf=/opt/go-judge/mount.yaml
+    ports:
+      - "${GOJUDGE_PUBLIC_PORT:-5050}:5050"
+    networks:
+      - hnieoj-backend
+
+  hnieoj-judge-node:
+    image: ${GOJUDGE_IMAGE:-hnieoj/go-judge:dev}
+    restart: unless-stopped
+    command:
+      - /usr/local/bin/hnieoj-judge-node
+      - -config
+      - /etc/hnieoj/go-judge/config.yaml
+    volumes:
+      - ${GOJUDGE_CONFIG_HOST_FILE:-/etc/hnieoj/go-judge/config.yaml}:/etc/hnieoj/go-judge/config.yaml:ro
+      - ${HNIEOJ_JUDGE_SECURITY_HOST_DIR:-/etc/hnieoj/judge-security}:/etc/hnieoj/judge-security:ro
+      - ${GOJUDGE_CACHE_DIR:-/data/oj/judge-cache}:/data/oj/judge-cache
+    networks:
+      - hnieoj-backend
+
+networks:
+  hnieoj-backend:
+    driver: bridge

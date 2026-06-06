@@ -30,5 +30,27 @@ public class JudgeTaskMessage implements Serializable {
 
     private String language;
 
+    private String code;
+
+    private Integer timeLimit;
+
+    private Integer memoryLimit;
+
+    private Integer stackLimit;
+
+    private String judgeMode;
+
+    private Integer problemType;
+
+    private Integer ioScore;
+
+    private Boolean isRemoveEndBlank;
+
+    private Integer dataVersion;
+
+    private Long contestId;
+
+    private String createdAt;
+
     private Long createdAtMillis;
 }

@@ -1,6 +1,7 @@
 package com.hnieacm.submission.service;
 
 import com.hnieacm.submission.entity.Judge;
+import com.hnieacm.submission.dto.ProblemBasicDto;
 
 /**
  * @Author: HaoRan_Lyu
@@ -9,5 +10,5 @@ import com.hnieacm.submission.entity.Judge;
  */
 public interface JudgeTaskMessagePublisher {
 
-    void publishAfterCommit(Judge judge);
+    void publishAfterCommit(Judge judge, ProblemBasicDto problem);
 }

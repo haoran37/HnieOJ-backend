@@ -44,6 +44,7 @@ public class InternalProblemServiceImpl implements InternalProblemService {
         dto.setTitle(problem.getTitle());
         dto.setAuth(problem.getAuth());
         dto.setType(problem.getType());
+        fillJudgeConfig(dto, problem);
         return dto;
     }
 
@@ -84,6 +85,17 @@ public class InternalProblemServiceImpl implements InternalProblemService {
         dto.setTitle(problem.getTitle());
         dto.setAuth(problem.getAuth());
         dto.setType(problem.getType());
+        fillJudgeConfig(dto, problem);
         return dto;
+    }
+
+    private void fillJudgeConfig(ProblemBasicDto dto, Problem problem) {
+        dto.setJudgeMode(problem.getJudgeMode());
+        dto.setTimeLimit(problem.getTimeLimit());
+        dto.setMemoryLimit(problem.getMemoryLimit());
+        dto.setStackLimit(problem.getStackLimit());
+        dto.setIoScore(problem.getIoScore());
+        dto.setIsRemoveEndBlank(problem.getIsRemoveEndBlank());
+        dto.setDataVersion(problem.getDataVersion());
     }
 }

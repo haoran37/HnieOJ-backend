@@ -20,12 +20,15 @@
 - 环境变量文件：`/opt/hnieoj/backend/.env`
 - 题目资源目录：`/data/oj/problems`
 - 判题正式节点私钥目录：`/etc/hnieoj/judge-security`
+- go-judge 配置文件：`/etc/hnieoj/go-judge/config.yaml`
+- go-judge 测试数据缓存目录：`/data/oj/judge-cache`
 
 ## 首次部署前准备
 
 ```bash
 sudo mkdir -p /opt/hnieoj/backend/source /data/oj/problems /etc/hnieoj/judge-security
-sudo chown -R vipuser:vipuser /opt/hnieoj/backend /data/oj/problems
+sudo mkdir -p /opt/hnieoj/go-judge/source /etc/hnieoj/go-judge /data/oj/judge-cache
+sudo chown -R vipuser:vipuser /opt/hnieoj/backend /opt/hnieoj/go-judge /data/oj/problems /data/oj/judge-cache
 ```
 
 部署用户需要能访问 Docker daemon，例如部署用户为 `vipuser`：
@@ -156,6 +159,52 @@ bash deploy/scripts/deploy-dev.sh rabbitmq-down
 ```
 
 注意：`rabbitmq-down` 不会删除 `/opt/hnieoj/rabbitmq/data`，因此已有 vhost、用户和队列会保留。若数据目录已经初始化，修改 `.env` 中的 `RABBITMQ_DEFAULT_*` 相关值不会自动改写已有 RabbitMQ 用户，需要在管理后台或通过 `rabbitmqctl` 调整。
+
+## 可选 go-judge 容器
+
+如果要在同一台服务器上运行二开后的 go-judge，可以使用脚本拉取 `go-judge` 仓库并启动两个容器：
+
+- `go-judge-sandbox`：原始沙箱服务，默认暴露 `5050`
+- `hnieoj-judge-node`：HnieOJ 判题节点，消费 RabbitMQ 判题任务并回调后端
+
+首次执行：
+
+```bash
+bash deploy/scripts/deploy-dev.sh gojudge-up
+```
+
+如果 `/etc/hnieoj/go-judge/config.yaml` 不存在，脚本会从 go-judge 仓库的 `deploy/config.formal.example.yaml` 生成模板并中止。填写以下关键项后重新执行：
+
+```yaml
+hnieoj:
+  baseUrl: "http://gateway:8800"
+  formalToken:
+    encryptedToken: "填写 HNIEOJ_JUDGE_FORMAL_TOKEN_ENCRYPTED"
+    privateKeyPath: "/etc/hnieoj/judge-security/judge_formal_private.pem"
+rabbitmq:
+  host: "rabbitmq"
+  password: "填写 RabbitMQ 密码"
+gojudge:
+  endpoint: "http://go-judge-sandbox:5050"
+reporter:
+  mode: "http"
+```
+
+查看 go-judge：
+
+```bash
+bash deploy/scripts/deploy-dev.sh gojudge-ps
+bash deploy/scripts/deploy-dev.sh gojudge-logs
+bash deploy/scripts/deploy-dev.sh gojudge-logs hnieoj-judge-node
+```
+
+停止并移除 go-judge 容器：
+
+```bash
+bash deploy/scripts/deploy-dev.sh gojudge-down
+```
+
+注意：`gojudge-down` 不会删除 `/data/oj/judge-cache`，因此测试数据缓存会保留。
 
 ## 快捷命令
 

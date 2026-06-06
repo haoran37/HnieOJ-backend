@@ -1,6 +1,6 @@
 services:
   rabbitmq:
-    image: ${RABBITMQ_IMAGE:-rabbitmq:3.13-management}
+    image: ${RABBITMQ_IMAGE:-rabbitmq:4.2.7-management}
     restart: unless-stopped
     environment:
       TZ: ${TZ:-Asia/Shanghai}

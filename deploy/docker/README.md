@@ -106,6 +106,7 @@ bash deploy/scripts/deploy-dev.sh rabbitmq-up
 - 管理后台端口：`15672`
 - 用户：`hnieoj_judge`
 - vhost：`hnieoj`
+- 镜像：`rabbitmq:4.2.7-management`
 - 数据目录：`/opt/hnieoj/rabbitmq/data`
 
 对应 `.env` 推荐配置：
@@ -118,8 +119,18 @@ RABBITMQ_MANAGEMENT_PUBLIC_PORT=15672
 RABBITMQ_USERNAME=hnieoj_judge
 RABBITMQ_PASSWORD=请填写强密码
 RABBITMQ_VHOST=hnieoj
+RABBITMQ_IMAGE=rabbitmq:4.2.7-management
 RABBITMQ_DATA_DIR=/opt/hnieoj/rabbitmq/data
 ```
+
+RabbitMQ 管理后台登录账号密码就是 `.env` 中的：
+
+```env
+RABBITMQ_USERNAME=...
+RABBITMQ_PASSWORD=...
+```
+
+后端服务连接 RabbitMQ 也使用同一组账号、密码和 vhost。
 
 如果你已经有外部 RabbitMQ，则不需要执行 `rabbitmq-up`，只需把 `.env` 改为外部地址，例如：
 

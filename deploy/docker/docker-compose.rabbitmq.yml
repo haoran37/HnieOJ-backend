@@ -1,0 +1,26 @@
+services:
+  rabbitmq:
+    image: ${RABBITMQ_IMAGE:-rabbitmq:3.13-management}
+    restart: unless-stopped
+    environment:
+      TZ: ${TZ:-Asia/Shanghai}
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USERNAME:-hnieoj_judge}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?RABBITMQ_PASSWORD is required}
+      RABBITMQ_DEFAULT_VHOST: ${RABBITMQ_VHOST:-hnieoj}
+    ports:
+      - "${RABBITMQ_PUBLIC_PORT:-5672}:5672"
+      - "${RABBITMQ_MANAGEMENT_PUBLIC_PORT:-15672}:15672"
+    volumes:
+      - ${RABBITMQ_DATA_DIR:-/opt/hnieoj/rabbitmq/data}:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD-SHELL", "rabbitmq-diagnostics -q ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    networks:
+      - hnieoj-backend
+
+networks:
+  hnieoj-backend:
+    driver: bridge

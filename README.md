@@ -112,9 +112,10 @@ mvn -s deploy/maven/settings.xml clean install -DskipTests
 
 ## Docker Compose 开发部署
 
-本仓库提供服务器 Shell 脚本 + Docker Compose 编排，仅管理后端服务。MySQL、Redis、Nacos、RabbitMQ 和 go-judge 继续使用外部已部署实例。
+本仓库提供服务器 Shell 脚本 + Docker Compose 编排，默认管理后端服务；RabbitMQ 提供可选 Compose 组件，MySQL、Redis、Nacos 和 go-judge 继续使用外部已部署实例。
 
 - Compose 文件：`deploy/docker/docker-compose.dev.yml`
+- 可选 RabbitMQ Compose 文件：`deploy/docker/docker-compose.rabbitmq.yml`
 - 环境变量示例：`deploy/docker/.env.example`
 - 一键部署脚本：`deploy/scripts/deploy-dev.sh`
 - 默认拉取分支：`dev`
@@ -135,6 +136,7 @@ mvn -s deploy/maven/settings.xml clean install -DskipTests
 bash deploy/scripts/deploy-dev.sh ps
 bash deploy/scripts/deploy-dev.sh logs gateway
 bash deploy/scripts/deploy-dev.sh restart hnieoj-user
+bash deploy/scripts/deploy-dev.sh rabbitmq-up
 ```
 
 ## 配置管理（Nacos）

@@ -28,6 +28,7 @@ JUDGE_SECURITY_DIR="${JUDGE_SECURITY_DIR:-/etc/hnieoj/judge-security}"
 MAVEN_SETTINGS_FILE="deploy/maven/settings.xml"
 MAVEN_COMMAND="${MAVEN_COMMAND:-mvn -s ${MAVEN_SETTINGS_FILE} clean package -DskipTests}"
 COMPOSE_FILE="deploy/docker/docker-compose.dev.yml"
+RABBITMQ_COMPOSE_FILE="deploy/docker/docker-compose.rabbitmq.yml"
 ENV_TEMPLATE_FILE="deploy/docker/.env.example"
 LOG_TAIL="${LOG_TAIL:-200}"
 
@@ -65,6 +66,10 @@ usage() {
   restart [服务名...] 重启服务，不传服务名则重启全部服务
   stop [服务名...]    停止服务，不传服务名则停止全部服务
   down            停止并移除 Compose 容器
+  rabbitmq-up     启动可选 RabbitMQ 容器
+  rabbitmq-ps     查看 RabbitMQ 容器状态
+  rabbitmq-logs   查看 RabbitMQ 容器日志
+  rabbitmq-down   停止并移除 RabbitMQ 容器
   help            显示帮助
 
 常用示例：
@@ -72,6 +77,7 @@ usage() {
   bash deploy/scripts/deploy-dev.sh ps
   bash deploy/scripts/deploy-dev.sh logs gateway
   bash deploy/scripts/deploy-dev.sh restart hnieoj-user
+  bash deploy/scripts/deploy-dev.sh rabbitmq-up
 EOF
 }
 
@@ -231,6 +237,14 @@ compose() {
     "$@"
 }
 
+rabbitmq_compose() {
+  docker compose \
+    -p "${COMPOSE_PROJECT_NAME}" \
+    --env-file "${ENV_FILE}" \
+    -f "${RABBITMQ_COMPOSE_FILE}" \
+    "$@"
+}
+
 export_compose_variables() {
   export GATEWAY_PUBLIC_PORT
   export GATEWAY_SERVER_PORT
@@ -291,6 +305,41 @@ down_services() {
   compose down
 }
 
+start_rabbitmq() {
+  check_docker_environment
+  ensure_source_ready
+  cd "${SOURCE_DIR}"
+  require_file "${RABBITMQ_COMPOSE_FILE}"
+  rabbitmq_compose up -d
+  rabbitmq_compose ps
+  log "RabbitMQ AMQP 地址：127.0.0.1:${RABBITMQ_PUBLIC_PORT:-5672}"
+  log "RabbitMQ 管理后台：http://127.0.0.1:${RABBITMQ_MANAGEMENT_PUBLIC_PORT:-15672}"
+}
+
+show_rabbitmq_status() {
+  check_docker_environment
+  ensure_source_ready
+  cd "${SOURCE_DIR}"
+  require_file "${RABBITMQ_COMPOSE_FILE}"
+  rabbitmq_compose ps
+}
+
+show_rabbitmq_logs() {
+  check_docker_environment
+  ensure_source_ready
+  cd "${SOURCE_DIR}"
+  require_file "${RABBITMQ_COMPOSE_FILE}"
+  rabbitmq_compose logs -f --tail="${LOG_TAIL}" rabbitmq
+}
+
+down_rabbitmq() {
+  check_docker_environment
+  ensure_source_ready
+  cd "${SOURCE_DIR}"
+  require_file "${RABBITMQ_COMPOSE_FILE}"
+  rabbitmq_compose down
+}
+
 deploy_all() {
   check_runtime_environment
   sync_source_code
@@ -348,6 +397,18 @@ main() {
       ;;
     down)
       down_services
+      ;;
+    rabbitmq-up)
+      start_rabbitmq
+      ;;
+    rabbitmq-ps)
+      show_rabbitmq_status
+      ;;
+    rabbitmq-logs)
+      show_rabbitmq_logs
+      ;;
+    rabbitmq-down)
+      down_rabbitmq
       ;;
     help|-h|--help)
       usage

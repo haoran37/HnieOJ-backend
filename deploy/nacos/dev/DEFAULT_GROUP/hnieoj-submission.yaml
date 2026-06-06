@@ -9,6 +9,12 @@ spring:
       host: ${hnieoj.redis.host}
       port: ${hnieoj.redis.port}
       password: ${hnieoj.redis.password}
+  rabbitmq:
+    host: ${hnieoj.rabbitmq.host}
+    port: ${hnieoj.rabbitmq.port}
+    username: ${hnieoj.rabbitmq.username}
+    password: ${hnieoj.rabbitmq.password}
+    virtual-host: ${hnieoj.rabbitmq.virtual-host}
 
 sa-token:
   is-print: false

@@ -92,6 +92,60 @@ bash deploy/scripts/deploy-dev.sh
 
 首次运行若 `/opt/hnieoj/backend/.env` 不存在，脚本会从 `deploy/docker/.env.example` 生成模板并中止。填入真实数据库、Redis、RabbitMQ、Nacos 与安全配置后，重新执行脚本即可。
 
+## 可选 RabbitMQ 容器
+
+如果服务器没有单独维护 RabbitMQ，可以使用项目提供的可选 Compose 文件启动 RabbitMQ：
+
+```bash
+bash deploy/scripts/deploy-dev.sh rabbitmq-up
+```
+
+该命令会使用同一个 `/opt/hnieoj/backend/.env`，默认创建：
+
+- AMQP 端口：`5672`
+- 管理后台端口：`15672`
+- 用户：`hnieoj_judge`
+- vhost：`hnieoj`
+- 数据目录：`/opt/hnieoj/rabbitmq/data`
+
+对应 `.env` 推荐配置：
+
+```env
+RABBITMQ_HOST=rabbitmq
+RABBITMQ_PORT=5672
+RABBITMQ_PUBLIC_PORT=5672
+RABBITMQ_MANAGEMENT_PUBLIC_PORT=15672
+RABBITMQ_USERNAME=hnieoj_judge
+RABBITMQ_PASSWORD=请填写强密码
+RABBITMQ_VHOST=hnieoj
+RABBITMQ_DATA_DIR=/opt/hnieoj/rabbitmq/data
+```
+
+如果你已经有外部 RabbitMQ，则不需要执行 `rabbitmq-up`，只需把 `.env` 改为外部地址，例如：
+
+```env
+RABBITMQ_HOST=host.docker.internal
+RABBITMQ_PORT=5672
+RABBITMQ_USERNAME=hnieoj_judge
+RABBITMQ_PASSWORD=请填写强密码
+RABBITMQ_VHOST=hnieoj
+```
+
+查看 RabbitMQ：
+
+```bash
+bash deploy/scripts/deploy-dev.sh rabbitmq-ps
+bash deploy/scripts/deploy-dev.sh rabbitmq-logs
+```
+
+停止并移除 RabbitMQ 容器：
+
+```bash
+bash deploy/scripts/deploy-dev.sh rabbitmq-down
+```
+
+注意：`rabbitmq-down` 不会删除 `/opt/hnieoj/rabbitmq/data`，因此已有 vhost、用户和队列会保留。若数据目录已经初始化，修改 `.env` 中的 `RABBITMQ_DEFAULT_*` 相关值不会自动改写已有 RabbitMQ 用户，需要在管理后台或通过 `rabbitmqctl` 调整。
+
 ## 快捷命令
 
 ```bash
@@ -119,6 +173,9 @@ bash deploy/scripts/deploy-dev.sh build
 
 # 停止并移除 Compose 容器
 bash deploy/scripts/deploy-dev.sh down
+
+# 启动可选 RabbitMQ 容器
+bash deploy/scripts/deploy-dev.sh rabbitmq-up
 ```
 
 服务名与 `deploy/docker/docker-compose.dev.yml` 中的服务一致，例如 `gateway`、`hnieoj-auth`、`hnieoj-user`、`hnieoj-problem`、`hnieoj-submission`、`hnieoj-judge`。

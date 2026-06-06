@@ -18,6 +18,7 @@ import com.hnieacm.problem.mapper.ProblemMapper;
 import com.hnieacm.problem.mapper.ProblemTagMapper;
 import com.hnieacm.problem.mapper.TagMapper;
 import com.hnieacm.problem.service.AdminProblemService;
+import com.hnieacm.problem.service.ProblemFileStorageService;
 import com.hnieacm.problem.vo.AdminProblemListVo;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -41,6 +42,7 @@ public class AdminProblemServiceImpl implements AdminProblemService {
     private final TagMapper tagMapper;
     private final ProblemTagMapper problemTagMapper;
     private final ObjectMapper objectMapper;
+    private final ProblemFileStorageService problemFileStorageService;
 
     /**
      * @MethodName listProblems
@@ -146,6 +148,7 @@ public class AdminProblemServiceImpl implements AdminProblemService {
 
         problemMapper.insert(entity);
         saveProblemTags(entity.getId(), request.getTags());
+        problemFileStorageService.initializeProblemResources(entity.getId());
     }
 
     /**
@@ -214,6 +217,7 @@ public class AdminProblemServiceImpl implements AdminProblemService {
 
         ProblemServiceSupport.deleteProblemTagsByProblemId(problemTagMapper, id);
         problemMapper.deleteById(id);
+        problemFileStorageService.deleteProblemResources(id);
     }
 
     /**

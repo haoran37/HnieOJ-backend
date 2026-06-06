@@ -57,6 +57,32 @@ public class ProblemFileStorageServiceImpl implements ProblemFileStorageService 
     private final ProblemStorageProperties storageProperties;
 
     @Override
+    public void initializeProblemResources(Long problemId) {
+        Path problemDir = resolveProblemDir(problemId);
+        try {
+            Files.createDirectories(ensureChildPath(problemDir, IMAGES_DIR));
+            Files.createDirectories(ensureChildPath(problemDir, TESTDATA_DIR));
+        } catch (IOException e) {
+            log.error("Initialize problem resources failed, problemId: {}", problemId, e);
+            throw new BizException(ResultCode.INTERNAL_ERROR, "初始化题目资源目录失败");
+        }
+    }
+
+    @Override
+    public void deleteProblemResources(Long problemId) {
+        Path problemDir = resolveProblemDir(problemId);
+        if (!Files.exists(problemDir)) {
+            return;
+        }
+        try {
+            deleteDirectory(problemDir);
+        } catch (IOException e) {
+            log.error("Delete problem resources failed, problemId: {}", problemId, e);
+            throw new BizException(ResultCode.INTERNAL_ERROR, "删除题目资源目录失败");
+        }
+    }
+
+    @Override
     public String saveImage(Long problemId, MultipartFile file) {
         if (file == null || file.isEmpty()) {
             throw new BizException(ResultCode.BAD_REQUEST, "图片文件不能为空");
@@ -293,9 +319,7 @@ public class ProblemFileStorageServiceImpl implements ProblemFileStorageService 
         try (Stream<Path> stream = Files.walk(directory)) {
             List<Path> paths = stream.sorted(Comparator.reverseOrder()).toList();
             for (Path path : paths) {
-                if (!path.equals(directory)) {
-                    Files.delete(path);
-                }
+                Files.delete(path);
             }
         }
     }

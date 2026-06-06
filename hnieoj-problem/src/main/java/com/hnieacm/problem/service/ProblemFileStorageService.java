@@ -11,6 +11,10 @@ import java.io.OutputStream;
  */
 public interface ProblemFileStorageService {
 
+    void initializeProblemResources(Long problemId);
+
+    void deleteProblemResources(Long problemId);
+
     String saveImage(Long problemId, MultipartFile file);
 
     void deleteImage(Long problemId, String filename);

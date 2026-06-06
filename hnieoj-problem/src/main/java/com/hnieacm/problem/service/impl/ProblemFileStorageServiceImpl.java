@@ -53,6 +53,7 @@ public class ProblemFileStorageServiceImpl implements ProblemFileStorageService 
     private static final String TESTDATA_IN_SUFFIX = ".in";
     private static final String TESTDATA_OUT_SUFFIX = ".out";
     private static final int BUFFER_SIZE = 8192;
+    private static final int IMAGE_FILENAME_GENERATE_MAX_RETRY = 10;
 
     private final ProblemStorageProperties storageProperties;
 
@@ -87,9 +88,10 @@ public class ProblemFileStorageServiceImpl implements ProblemFileStorageService 
         if (file == null || file.isEmpty()) {
             throw new BizException(ResultCode.BAD_REQUEST, "图片文件不能为空");
         }
-        String filename = normalizeFilename(file.getOriginalFilename());
+        String originalFilename = normalizeFilename(file.getOriginalFilename());
         Path imageDir = resolveProblemPath(problemId, IMAGES_DIR);
-        Path targetPath = ensureChildPath(imageDir, filename);
+        Path targetPath = generateImageStoragePath(imageDir, originalFilename);
+        String filename = targetPath.getFileName().toString();
         try {
             Files.createDirectories(imageDir);
             file.transferTo(targetPath);
@@ -99,6 +101,23 @@ public class ProblemFileStorageServiceImpl implements ProblemFileStorageService 
         }
         String prefix = StrUtil.removeSuffix(storageProperties.getImageUrlPrefix(), "/");
         return prefix + "/" + problemId + "/" + filename;
+    }
+
+    private Path generateImageStoragePath(Path imageDir, String originalFilename) {
+        for (int i = 0; i < IMAGE_FILENAME_GENERATE_MAX_RETRY; i++) {
+            String filename = generateImageStorageFilename(originalFilename);
+            Path targetPath = ensureChildPath(imageDir, filename);
+            if (!Files.exists(targetPath)) {
+                return targetPath;
+            }
+        }
+        throw new BizException(ResultCode.INTERNAL_ERROR, "生成图片文件名失败");
+    }
+
+    private String generateImageStorageFilename(String originalFilename) {
+        String extension = StringUtils.getFilenameExtension(originalFilename);
+        String suffix = StrUtil.isBlank(extension) ? "" : "." + extension.toLowerCase();
+        return UUID.randomUUID().toString().replace("-", "").toUpperCase() + suffix;
     }
 
     @Override

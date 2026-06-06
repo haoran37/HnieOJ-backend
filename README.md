@@ -125,6 +125,16 @@ mvn -s deploy/maven/settings.xml clean install -DskipTests
 
 私有仓库使用 HTTPS 拉取时，需要在服务器执行前设置 `GIT_TOKEN`，该 Token 只用于 Git 拉取代码，不会写入仓库。
 
+若 Docker Hub 拉取基础镜像较慢，可通过 `JAVA_BASE_IMAGE` 指定可访问的 Java 17 运行时镜像，或在服务器配置 Docker registry mirror。
+
+常用运维命令：
+
+```bash
+bash deploy/scripts/deploy-dev.sh ps
+bash deploy/scripts/deploy-dev.sh logs gateway
+bash deploy/scripts/deploy-dev.sh restart hnieoj-user
+```
+
 ## 配置管理（Nacos）
 
 当前项目配置依赖 Nacos，建议区分为：

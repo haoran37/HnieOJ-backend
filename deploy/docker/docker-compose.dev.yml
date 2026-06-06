@@ -49,6 +49,7 @@ services:
       context: ../..
       dockerfile: deploy/docker/Dockerfile
       args:
+        JAVA_BASE_IMAGE: ${JAVA_BASE_IMAGE:-eclipse-temurin:17-jre-jammy}
         SERVICE_NAME: gateway
     environment:
       <<: *common-environment
@@ -64,6 +65,7 @@ services:
       context: ../..
       dockerfile: deploy/docker/Dockerfile
       args:
+        JAVA_BASE_IMAGE: ${JAVA_BASE_IMAGE:-eclipse-temurin:17-jre-jammy}
         SERVICE_NAME: hnieoj-auth
     environment:
       <<: *common-environment
@@ -77,6 +79,7 @@ services:
       context: ../..
       dockerfile: deploy/docker/Dockerfile
       args:
+        JAVA_BASE_IMAGE: ${JAVA_BASE_IMAGE:-eclipse-temurin:17-jre-jammy}
         SERVICE_NAME: hnieoj-user
     environment:
       <<: *common-environment
@@ -90,6 +93,7 @@ services:
       context: ../..
       dockerfile: deploy/docker/Dockerfile
       args:
+        JAVA_BASE_IMAGE: ${JAVA_BASE_IMAGE:-eclipse-temurin:17-jre-jammy}
         SERVICE_NAME: hnieoj-problem
     environment:
       <<: *common-environment
@@ -105,6 +109,7 @@ services:
       context: ../..
       dockerfile: deploy/docker/Dockerfile
       args:
+        JAVA_BASE_IMAGE: ${JAVA_BASE_IMAGE:-eclipse-temurin:17-jre-jammy}
         SERVICE_NAME: hnieoj-submission
     environment:
       <<: *common-environment
@@ -118,6 +123,7 @@ services:
       context: ../..
       dockerfile: deploy/docker/Dockerfile
       args:
+        JAVA_BASE_IMAGE: ${JAVA_BASE_IMAGE:-eclipse-temurin:17-jre-jammy}
         SERVICE_NAME: hnieoj-judge
     environment:
       <<: *common-environment
@@ -133,6 +139,7 @@ services:
       context: ../..
       dockerfile: deploy/docker/Dockerfile
       args:
+        JAVA_BASE_IMAGE: ${JAVA_BASE_IMAGE:-eclipse-temurin:17-jre-jammy}
         SERVICE_NAME: hnieoj-contest
     environment:
       <<: *common-environment
@@ -146,6 +153,7 @@ services:
       context: ../..
       dockerfile: deploy/docker/Dockerfile
       args:
+        JAVA_BASE_IMAGE: ${JAVA_BASE_IMAGE:-eclipse-temurin:17-jre-jammy}
         SERVICE_NAME: hnieoj-training
     environment:
       <<: *common-environment
@@ -159,6 +167,7 @@ services:
       context: ../..
       dockerfile: deploy/docker/Dockerfile
       args:
+        JAVA_BASE_IMAGE: ${JAVA_BASE_IMAGE:-eclipse-temurin:17-jre-jammy}
         SERVICE_NAME: hnieoj-discussion
     environment:
       <<: *common-environment
@@ -172,6 +181,7 @@ services:
       context: ../..
       dockerfile: deploy/docker/Dockerfile
       args:
+        JAVA_BASE_IMAGE: ${JAVA_BASE_IMAGE:-eclipse-temurin:17-jre-jammy}
         SERVICE_NAME: hnieoj-achievement
     environment:
       <<: *common-environment
@@ -185,6 +195,7 @@ services:
       context: ../..
       dockerfile: deploy/docker/Dockerfile
       args:
+        JAVA_BASE_IMAGE: ${JAVA_BASE_IMAGE:-eclipse-temurin:17-jre-jammy}
         SERVICE_NAME: hnieoj-announcement
     environment:
       <<: *common-environment

@@ -1,4 +1,5 @@
-FROM eclipse-temurin:17-jre-jammy
+ARG JAVA_BASE_IMAGE=eclipse-temurin:17-jre-jammy
+FROM ${JAVA_BASE_IMAGE}
 
 ARG SERVICE_NAME
 

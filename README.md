@@ -123,6 +123,8 @@ mvn -s deploy/maven/settings.xml clean install -DskipTests
 
 首次部署直接执行 `bash deploy/scripts/deploy-dev.sh`。如果 `/opt/hnieoj/backend/.env` 不存在，脚本会自动生成模板并中止；填入真实密钥后重新执行即可。
 
+私有仓库使用 HTTPS 拉取时，需要在服务器执行前设置 `GIT_TOKEN`，该 Token 只用于 Git 拉取代码，不会写入仓库。
+
 ## 配置管理（Nacos）
 
 当前项目配置依赖 Nacos，建议区分为：

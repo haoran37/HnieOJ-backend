@@ -53,7 +53,8 @@ bash deploy/scripts/deploy-dev.sh
 - `DEPLOY_BRANCH`：拉取分支，默认 `dev`
 - `GATEWAY_PUBLIC_PORT`：网关宿主机端口，默认 `8800`
 - `GATEWAY_SERVER_PORT`：网关容器内端口，默认 `8800`
-- `GIT_REPO_URL`：代码仓库地址
+- `GIT_REPO_URL`：代码仓库地址，默认使用 HTTPS 地址
+- `GIT_TOKEN`：私有仓库 HTTPS 拉取使用的 GitHub Token，不要写入仓库
 - `DEPLOY_DIR`：部署根目录，默认 `/opt/hnieoj/backend`
 
 临时覆盖示例：
@@ -61,6 +62,15 @@ bash deploy/scripts/deploy-dev.sh
 ```bash
 DEPLOY_BRANCH=dev GATEWAY_PUBLIC_PORT=8800 bash deploy/scripts/deploy-dev.sh
 ```
+
+私有仓库需要提供 GitHub Token，推荐只给仓库读取权限：
+
+```bash
+export GIT_TOKEN=你的GitHubToken
+bash deploy/scripts/deploy-dev.sh
+```
+
+脚本会通过临时 `GIT_ASKPASS` 传递 Token，不会把 Token 写入 `git remote -v`。
 
 首次运行若 `/opt/hnieoj/backend/.env` 不存在，脚本会从 `deploy/docker/.env.example` 生成模板并中止。填入真实数据库、Redis、RabbitMQ、Nacos 与安全配置后，重新执行脚本即可。
 

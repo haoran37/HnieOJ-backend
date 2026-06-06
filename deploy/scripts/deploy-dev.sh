@@ -10,7 +10,9 @@ DEPLOY_BRANCH="${DEPLOY_BRANCH:-dev}"
 GATEWAY_PUBLIC_PORT="${GATEWAY_PUBLIC_PORT:-8800}"
 GATEWAY_SERVER_PORT="${GATEWAY_SERVER_PORT:-8800}"
 
-GIT_REPO_URL="${GIT_REPO_URL:-git@github.com:haoran37/HnieOJ-backend.git}"
+GIT_REPO_URL="${GIT_REPO_URL:-https://github.com/haoran37/HnieOJ-backend.git}"
+GIT_USERNAME="${GIT_USERNAME:-x-access-token}"
+GIT_TOKEN="${GIT_TOKEN:-${GIT_AUTH_TOKEN:-}}"
 DEPLOY_DIR="${DEPLOY_DIR:-/opt/hnieoj/backend}"
 SOURCE_DIR="${SOURCE_DIR:-${DEPLOY_DIR}/source}"
 ENV_FILE="${ENV_FILE:-${DEPLOY_DIR}/.env}"
@@ -22,6 +24,15 @@ JUDGE_SECURITY_DIR="${JUDGE_SECURITY_DIR:-/etc/hnieoj/judge-security}"
 MAVEN_SETTINGS_FILE="deploy/maven/settings.xml"
 COMPOSE_FILE="deploy/docker/docker-compose.dev.yml"
 ENV_TEMPLATE_FILE="deploy/docker/.env.example"
+GIT_ASKPASS_FILE=""
+
+cleanup() {
+  if [[ -n "${GIT_ASKPASS_FILE}" && -f "${GIT_ASKPASS_FILE}" ]]; then
+    rm -f "${GIT_ASKPASS_FILE}"
+  fi
+}
+
+trap cleanup EXIT
 
 log() {
   printf '[%s] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*"
@@ -47,6 +58,33 @@ require_file() {
   log "文件检查通过：$1"
 }
 
+setup_git_auth() {
+  if [[ "${GIT_REPO_URL}" != http* ]]; then
+    return
+  fi
+
+  export GIT_TERMINAL_PROMPT=0
+
+  if [[ -z "${GIT_TOKEN}" ]]; then
+    log "未配置 GIT_TOKEN。若仓库为私有仓库，拉取代码会失败。"
+    return
+  fi
+
+  GIT_ASKPASS_FILE="$(mktemp)"
+  cat > "${GIT_ASKPASS_FILE}" <<'EOF'
+#!/usr/bin/env bash
+case "$1" in
+  *Username*) printf '%s\n' "${GIT_USERNAME:-x-access-token}" ;;
+  *Password*) printf '%s\n' "${GIT_TOKEN}" ;;
+  *) printf '\n' ;;
+esac
+EOF
+  chmod 700 "${GIT_ASKPASS_FILE}"
+  export GIT_ASKPASS="${GIT_ASKPASS_FILE}"
+  export GIT_USERNAME
+  export GIT_TOKEN
+}
+
 upsert_env_value() {
   local key="$1"
   local value="$2"
@@ -61,6 +99,7 @@ upsert_env_value() {
 check_runtime_environment() {
   log "开始检查运行环境"
   log "部署分支：${DEPLOY_BRANCH}"
+  log "代码仓库：${GIT_REPO_URL}"
   log "网关端口映射：${GATEWAY_PUBLIC_PORT}:${GATEWAY_SERVER_PORT}"
   log "当前用户：$(id)"
 
@@ -78,8 +117,12 @@ check_runtime_environment() {
 
 sync_source_code() {
   log "开始同步源码"
+  setup_git_auth
 
   if [[ ! -d "${SOURCE_DIR}/.git" ]]; then
+    if [[ -d "${SOURCE_DIR}" && -n "$(find "${SOURCE_DIR}" -mindepth 1 -maxdepth 1 -print -quit)" ]]; then
+      fail "源码目录不是 Git 仓库且非空：${SOURCE_DIR}。请备份后清空该目录，或修改 SOURCE_DIR。"
+    fi
     mkdir -p "$(dirname "${SOURCE_DIR}")"
     git clone --branch "${DEPLOY_BRANCH}" --single-branch "${GIT_REPO_URL}" "${SOURCE_DIR}"
   fi

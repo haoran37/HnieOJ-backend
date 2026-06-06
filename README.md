@@ -112,16 +112,16 @@ mvn -s deploy/maven/settings.xml clean install -DskipTests
 
 ## Docker Compose 开发部署
 
-本仓库提供自托管 runner 使用的 Docker Compose 编排，仅管理后端服务。MySQL、Redis、Nacos、RabbitMQ 和 go-judge 继续使用外部已部署实例。
+本仓库提供服务器 Shell 脚本 + Docker Compose 编排，仅管理后端服务。MySQL、Redis、Nacos、RabbitMQ 和 go-judge 继续使用外部已部署实例。
 
 - Compose 文件：`deploy/docker/docker-compose.dev.yml`
 - 环境变量示例：`deploy/docker/.env.example`
-- GitHub Actions：`.github/workflows/deploy-dev.yml`
-- 监听分支：`dev`
+- 一键部署脚本：`deploy/scripts/deploy-dev.sh`
+- 默认拉取分支：`dev`
 - 默认部署目录：`/opt/hnieoj/backend`
 - 默认 Gateway 端口映射：`8800:8800`
 
-首次部署前，在服务器创建 `/opt/hnieoj/backend/.env`，内容可参考 `deploy/docker/.env.example`，真实密钥不要提交到 Git。
+首次部署直接执行 `bash deploy/scripts/deploy-dev.sh`。如果 `/opt/hnieoj/backend/.env` 不存在，脚本会自动生成模板并中止；填入真实密钥后重新执行即可。
 
 ## 配置管理（Nacos）
 

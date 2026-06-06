@@ -7,7 +7,6 @@ import com.hnieacm.common.constant.RoleConstant;
 import com.hnieacm.common.dto.PageVo;
 import com.hnieacm.common.result.Result;
 import com.hnieacm.problem.service.ProblemQueryService;
-import com.hnieacm.problem.service.ProblemResourceService;
 import com.hnieacm.problem.vo.ProblemCheckVo;
 import com.hnieacm.problem.vo.ProblemDetailVo;
 import com.hnieacm.problem.vo.ProblemListVo;
@@ -37,7 +36,6 @@ import java.util.List;
 public class ProblemController {
 
     private final ProblemQueryService problemQueryService;
-    private final ProblemResourceService problemResourceService;
 
     @Operation(summary = "获取题目列表")
     @SaCheckLogin
@@ -55,13 +53,6 @@ public class ProblemController {
     @GetMapping("/{problemCode}")
     public Result<ProblemDetailVo> detail(@PathVariable String problemCode) {
         return Result.success(problemQueryService.getProblemDetail(problemCode));
-    }
-
-    @Operation(summary = "获取题面 Markdown")
-    @SaCheckLogin
-    @GetMapping("/{id}/statement")
-    public Result<String> statement(@PathVariable @Min(value = 1, message = "id 必须大于 0") Long id) {
-        return Result.success(problemResourceService.getStatement(id));
     }
 
     @Operation(summary = "检查题目是否存在")

@@ -11,10 +11,6 @@ import java.io.OutputStream;
  */
 public interface ProblemResourceService {
 
-    String getStatement(Long problemId);
-
-    void updateStatement(Long problemId, String markdown);
-
     String uploadImage(Long problemId, MultipartFile file);
 
     void deleteImage(Long problemId, String filename);

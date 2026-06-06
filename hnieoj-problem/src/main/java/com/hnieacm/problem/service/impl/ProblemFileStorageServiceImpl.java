@@ -48,7 +48,6 @@ import java.util.zip.ZipOutputStream;
 @RequiredArgsConstructor
 public class ProblemFileStorageServiceImpl implements ProblemFileStorageService {
 
-    private static final String STATEMENT_FILE = "statement.md";
     private static final String IMAGES_DIR = "images";
     private static final String TESTDATA_DIR = "testdata";
     private static final String TESTDATA_IN_SUFFIX = ".in";
@@ -56,34 +55,6 @@ public class ProblemFileStorageServiceImpl implements ProblemFileStorageService 
     private static final int BUFFER_SIZE = 8192;
 
     private final ProblemStorageProperties storageProperties;
-
-    @Override
-    public String readStatement(Long problemId) {
-        Path statementPath = resolveProblemPath(problemId, STATEMENT_FILE);
-        if (!Files.isRegularFile(statementPath)) {
-            throw new BizException(ResultCode.NOT_FOUND, "题面文件不存在");
-        }
-        try {
-            return Files.readString(statementPath, StandardCharsets.UTF_8);
-        } catch (IOException e) {
-            log.error("Read problem statement failed, problemId: {}", problemId, e);
-            throw new BizException(ResultCode.INTERNAL_ERROR, "读取题面失败");
-        }
-    }
-
-    @Override
-    public void writeStatement(Long problemId, String markdown) {
-        Path statementPath = resolveProblemPath(problemId, STATEMENT_FILE);
-        try {
-            Files.createDirectories(statementPath.getParent());
-            Files.createDirectories(resolveProblemPath(problemId, IMAGES_DIR));
-            Files.createDirectories(resolveProblemPath(problemId, TESTDATA_DIR));
-            Files.writeString(statementPath, markdown == null ? "" : markdown, StandardCharsets.UTF_8);
-        } catch (IOException e) {
-            log.error("Write problem statement failed, problemId: {}", problemId, e);
-            throw new BizException(ResultCode.INTERNAL_ERROR, "保存题面失败");
-        }
-    }
 
     @Override
     public String saveImage(Long problemId, MultipartFile file) {

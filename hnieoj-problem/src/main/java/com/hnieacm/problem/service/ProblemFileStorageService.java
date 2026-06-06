@@ -11,10 +11,6 @@ import java.io.OutputStream;
  */
 public interface ProblemFileStorageService {
 
-    String readStatement(Long problemId);
-
-    void writeStatement(Long problemId, String markdown);
-
     String saveImage(Long problemId, MultipartFile file);
 
     void deleteImage(Long problemId, String filename);

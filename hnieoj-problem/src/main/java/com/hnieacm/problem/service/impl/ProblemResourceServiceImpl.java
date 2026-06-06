@@ -1,11 +1,8 @@
 package com.hnieacm.problem.service.impl;
 
-import cn.dev33.satoken.stp.StpUtil;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
-import com.hnieacm.common.constant.PermissionConstant;
 import com.hnieacm.common.exception.BizException;
 import com.hnieacm.common.result.ResultCode;
-import com.hnieacm.problem.constant.ProblemAuthConstant;
 import com.hnieacm.problem.entity.Problem;
 import com.hnieacm.problem.mapper.ProblemMapper;
 import com.hnieacm.problem.service.ProblemFileStorageService;
@@ -32,19 +29,6 @@ public class ProblemResourceServiceImpl implements ProblemResourceService {
 
     private final ProblemMapper problemMapper;
     private final ProblemFileStorageService fileStorageService;
-
-    @Override
-    public String getStatement(Long problemId) {
-        Problem problem = requireProblem(problemId);
-        checkStatementReadable(problem);
-        return fileStorageService.readStatement(problemId);
-    }
-
-    @Override
-    public void updateStatement(Long problemId, String markdown) {
-        requireProblem(problemId);
-        fileStorageService.writeStatement(problemId, markdown);
-    }
 
     @Override
     public String uploadImage(Long problemId, MultipartFile file) {
@@ -105,11 +89,4 @@ public class ProblemResourceServiceImpl implements ProblemResourceService {
         return problem;
     }
 
-    private void checkStatementReadable(Problem problem) {
-        if (problem.getAuth() == null || problem.getAuth() != ProblemAuthConstant.PUBLIC) {
-            if (!StpUtil.hasPermission(PermissionConstant.PROBLEM_UPDATE)) {
-                throw new BizException(ResultCode.FORBIDDEN, "该题目当前不可访问");
-            }
-        }
-    }
 }

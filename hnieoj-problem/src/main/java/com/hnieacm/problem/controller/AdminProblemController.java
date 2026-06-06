@@ -78,15 +78,6 @@ public class AdminProblemController {
         return Result.success("修改成功", null);
     }
 
-    @Operation(summary = "更新题面 Markdown")
-    @SaCheckPermission(PermissionConstant.PROBLEM_UPDATE)
-    @PutMapping("/{id}/statement")
-    public Result<Void> updateStatement(@PathVariable @Min(value = 1, message = "id 必须大于 0") Long id,
-                                        @RequestBody(required = false) String markdown) {
-        problemResourceService.updateStatement(id, markdown);
-        return Result.success("保存成功", null);
-    }
-
     @Operation(summary = "上传或更新测试数据")
     @SaCheckPermission(PermissionConstant.PROBLEM_UPDATE)
     @PostMapping(value = "/{id}/testdata", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)

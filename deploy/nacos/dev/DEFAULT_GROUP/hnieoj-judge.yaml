@@ -28,7 +28,7 @@ hnieoj:
       dead-letter-exchange: ${HNIEOJ_JUDGE_MQ_DLX:hnieoj.judge.dlx}
       dead-letter-queue: ${HNIEOJ_JUDGE_MQ_DLQ:hnieoj.judge.task.dlq}
       dead-letter-routing-key: ${HNIEOJ_JUDGE_MQ_DLX_ROUTING_KEY:judge.submission.created.dlq}
-      consumer-enabled: ${HNIEOJ_JUDGE_MQ_CONSUMER_ENABLED:true}
+      consumer-enabled: ${HNIEOJ_JUDGE_MQ_CONSUMER_ENABLED:false}
     security:
       temp-token-ttl-seconds: ${HNIEOJ_JUDGE_TEMP_TOKEN_TTL_SECONDS:7200}
       auth-code-ttl-seconds: ${HNIEOJ_JUDGE_AUTH_CODE_TTL_SECONDS:1800}

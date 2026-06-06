@@ -20,4 +20,7 @@ public class JudgeNodeConstant {
     public static final String TOKEN_ACTIVE = "active";
     public static final String TOKEN_REVOKED = "revoked";
     public static final String TOKEN_EXPIRED = "expired";
+
+    public static final String FORMAL_TOKEN_ACTIVE = "active";
+    public static final String FORMAL_TOKEN_ROTATED = "rotated";
 }

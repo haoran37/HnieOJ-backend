@@ -26,6 +26,8 @@ DISCARD_LOCAL_CHANGES="${DISCARD_LOCAL_CHANGES:-true}"
 
 PROBLEM_STORAGE_DIR="${PROBLEM_STORAGE_DIR:-/data/oj/problems}"
 JUDGE_SECURITY_DIR="${JUDGE_SECURITY_DIR:-/etc/hnieoj/judge-security}"
+JUDGE_FORMAL_PRIVATE_KEY_PATH="${JUDGE_FORMAL_PRIVATE_KEY_PATH:-${JUDGE_SECURITY_DIR}/judge_formal_private.pem}"
+JUDGE_FORMAL_PUBLIC_KEY_PATH="${JUDGE_FORMAL_PUBLIC_KEY_PATH:-${JUDGE_SECURITY_DIR}/judge_formal_public.pem}"
 GOJUDGE_DEPLOY_DIR="${GOJUDGE_DEPLOY_DIR:-/opt/hnieoj/go-judge}"
 GOJUDGE_SOURCE_DIR="${GOJUDGE_SOURCE_DIR:-${GOJUDGE_DEPLOY_DIR}/source}"
 GOJUDGE_CONFIG_DIR="${GOJUDGE_CONFIG_DIR:-/etc/hnieoj/go-judge}"
@@ -65,28 +67,28 @@ usage() {
   bash deploy/scripts/deploy-dev.sh [命令] [服务名...]
 
 命令：
-  deploy          拉取代码、打包并重新部署，默认命令
-  pull            只拉取 ${DEPLOY_BRANCH} 最新代码
-  build           拉取代码并执行 Maven 打包
-  up [服务名...]  使用 Docker Compose 构建并启动服务
-  ps              查看容器状态
-  logs [服务名]   查看日志，默认跟随全部服务日志
+  deploy              拉取代码、生成必要安全材料、打包并重新部署，默认命令
+  pull                只拉取 ${DEPLOY_BRANCH} 最新代码
+  build               拉取代码并执行 Maven 打包
+  up [服务名...]      使用 Docker Compose 构建并启动服务
+  ps                  查看容器状态
+  logs [服务名...]    查看日志，默认跟随全部服务日志
   restart [服务名...] 重启服务，不传服务名则重启全部服务
   stop [服务名...]    停止服务，不传服务名则停止全部服务
-  down            停止并移除 Compose 容器
-  rabbitmq-up     启动可选 RabbitMQ 容器
-  rabbitmq-ps     查看 RabbitMQ 容器状态
-  rabbitmq-logs   查看 RabbitMQ 容器日志
-  rabbitmq-down   停止并移除 RabbitMQ 容器
-  gojudge-up      拉取、构建并启动 go-judge 沙箱与判题节点
-  gojudge-ps      查看 go-judge 容器状态
-  gojudge-logs [服务名] 查看 go-judge 日志
-  gojudge-down    停止并移除 go-judge 容器
-  help            显示帮助
+  down                停止并移除 Compose 容器
+  rabbitmq-up         启动 RabbitMQ 容器
+  rabbitmq-ps         查看 RabbitMQ 容器状态
+  rabbitmq-logs       查看 RabbitMQ 容器日志
+  rabbitmq-down       停止并移除 RabbitMQ 容器
+  gojudge-up          拉取、构建并启动 go-judge 沙箱与判题节点
+  gojudge-ps          查看 go-judge 容器状态
+  gojudge-logs        查看 go-judge 日志
+  gojudge-down        停止并移除 go-judge 容器
+  security-init       只生成/补齐 JWT Secret 与正式节点 RSA 公私钥
+  help                显示帮助
 
 常用示例：
   bash deploy/scripts/deploy-dev.sh
-  bash deploy/scripts/deploy-dev.sh ps
   bash deploy/scripts/deploy-dev.sh logs gateway
   bash deploy/scripts/deploy-dev.sh restart hnieoj-user
   bash deploy/scripts/deploy-dev.sh rabbitmq-up
@@ -99,23 +101,17 @@ require_command() {
   log "命令检查通过：$1"
 }
 
-require_dir() {
-  [[ -d "$1" ]] || fail "缺少目录：$1"
-  log "目录检查通过：$1"
-}
-
 require_file() {
   [[ -f "$1" ]] || fail "缺少文件：$1"
   log "文件检查通过：$1"
 }
 
 setup_git_auth() {
-  if [[ "${GIT_REPO_URL}" != http* ]]; then
+  if [[ "${GIT_REPO_URL}" != http* && "${GOJUDGE_GIT_REPO_URL}" != http* ]]; then
     return
   fi
 
   export GIT_TERMINAL_PROMPT=0
-
   if [[ -z "${GIT_TOKEN}" ]]; then
     log "未配置 GIT_TOKEN。若仓库为私有仓库，拉取代码会失败。"
     return
@@ -139,12 +135,89 @@ EOF
 upsert_env_value() {
   local key="$1"
   local value="$2"
+  local tmp_file
 
-  if ! grep -q "^${key}=" "${ENV_FILE}"; then
-    printf '%s=%s\n' "${key}" "${value}" >> "${ENV_FILE}"
-  else
-    sed -i "s|^${key}=.*|${key}=${value}|" "${ENV_FILE}"
+  mkdir -p "$(dirname "${ENV_FILE}")"
+  touch "${ENV_FILE}"
+  tmp_file="$(mktemp)"
+  awk -v k="${key}" -v v="${value}" '
+    BEGIN { found = 0 }
+    $0 ~ "^" k "=" { print k "=" v; found = 1; next }
+    { print }
+    END { if (found == 0) print k "=" v }
+  ' "${ENV_FILE}" > "${tmp_file}"
+  mv "${tmp_file}" "${ENV_FILE}"
+  chmod 600 "${ENV_FILE}"
+}
+
+env_value() {
+  local key="$1"
+  grep -E "^${key}=" "${ENV_FILE}" 2>/dev/null | tail -n 1 | cut -d= -f2- || true
+}
+
+is_blank_or_placeholder() {
+  local value="$1"
+  [[ -z "${value}" || "${value}" == "replace_me" || "${value}" == *"replace_me"* ]]
+}
+
+openssl_random_urlsafe() {
+  openssl rand -base64 "$1" | tr '+/' '-_' | tr -d '=\n'
+}
+
+ensure_judge_security_materials() {
+  require_command openssl
+  mkdir -p "${JUDGE_SECURITY_DIR}"
+  chmod 700 "${JUDGE_SECURITY_DIR}"
+
+  if [[ ! -f "${JUDGE_FORMAL_PRIVATE_KEY_PATH}" ]]; then
+    log "生成正式判题节点 RSA 私钥：${JUDGE_FORMAL_PRIVATE_KEY_PATH}"
+    openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out "${JUDGE_FORMAL_PRIVATE_KEY_PATH}"
+    chmod 600 "${JUDGE_FORMAL_PRIVATE_KEY_PATH}"
   fi
+
+  if [[ ! -f "${JUDGE_FORMAL_PUBLIC_KEY_PATH}" ]]; then
+    log "从私钥导出正式判题节点 RSA 公钥：${JUDGE_FORMAL_PUBLIC_KEY_PATH}"
+    openssl rsa -pubout -in "${JUDGE_FORMAL_PRIVATE_KEY_PATH}" -out "${JUDGE_FORMAL_PUBLIC_KEY_PATH}"
+    chmod 644 "${JUDGE_FORMAL_PUBLIC_KEY_PATH}"
+  fi
+
+  if [[ -f "${ENV_FILE}" ]]; then
+    local jwt_secret
+    local internal_token
+    jwt_secret="$(env_value HNIEOJ_JUDGE_JWT_SECRET)"
+    internal_token="$(env_value HNIEOJ_INTERNAL_TOKEN)"
+
+    if is_blank_or_placeholder "${jwt_secret}"; then
+      upsert_env_value "HNIEOJ_JUDGE_JWT_SECRET" "$(openssl_random_urlsafe 64)"
+      log "已写入 HNIEOJ_JUDGE_JWT_SECRET"
+    fi
+    if is_blank_or_placeholder "${internal_token}"; then
+      upsert_env_value "HNIEOJ_INTERNAL_TOKEN" "$(openssl_random_urlsafe 48)"
+      log "已写入 HNIEOJ_INTERNAL_TOKEN"
+    fi
+    upsert_env_value "HNIEOJ_JUDGE_SECURITY_HOST_DIR" "${JUDGE_SECURITY_DIR}"
+    upsert_env_value "HNIEOJ_JUDGE_FORMAL_TOKEN_PUBLIC_KEY_PATH" "/etc/hnieoj/judge-security/$(basename "${JUDGE_FORMAL_PUBLIC_KEY_PATH}")"
+    upsert_env_value "HNIEOJ_JUDGE_FORMAL_TOKEN_PRIVATE_KEY_PATH" "/etc/hnieoj/judge-security/$(basename "${JUDGE_FORMAL_PRIVATE_KEY_PATH}")"
+    upsert_env_value "HNIEOJ_JUDGE_FORMAL_TOKEN_NACOS_DATA_ID" "hnieoj-judge-formal-token.yaml"
+    upsert_env_value "HNIEOJ_JUDGE_FORMAL_TOKEN_NACOS_GROUP" "HNIEOJ_SECRET_GROUP"
+  fi
+}
+
+prepare_env_template_if_missing() {
+  if [[ -f "${ENV_FILE}" ]]; then
+    return
+  fi
+
+  mkdir -p "$(dirname "${ENV_FILE}")"
+  if [[ -f "${SOURCE_DIR}/${ENV_TEMPLATE_FILE}" ]]; then
+    cp "${SOURCE_DIR}/${ENV_TEMPLATE_FILE}" "${ENV_FILE}"
+  elif [[ -f "${ENV_TEMPLATE_FILE}" ]]; then
+    cp "${ENV_TEMPLATE_FILE}" "${ENV_FILE}"
+  else
+    touch "${ENV_FILE}"
+  fi
+  chmod 600 "${ENV_FILE}"
+  log "已创建 ${ENV_FILE}"
 }
 
 check_runtime_environment() {
@@ -159,14 +232,14 @@ check_runtime_environment() {
   require_command git
   require_command mvn
   require_command docker
+  require_command openssl
 
   docker compose version >/dev/null 2>&1 || fail "Docker Compose v2 不可用"
   docker info >/dev/null 2>&1 || fail "当前用户无法访问 Docker daemon"
 
-  mkdir -p "${DEPLOY_DIR}" || fail "无法创建部署目录：${DEPLOY_DIR}"
-  require_dir "${PROBLEM_STORAGE_DIR}"
-  require_dir "${JUDGE_SECURITY_DIR}"
-  mkdir -p "${GOJUDGE_CACHE_DIR}" || fail "无法创建 go-judge 缓存目录：${GOJUDGE_CACHE_DIR}"
+  mkdir -p "${DEPLOY_DIR}" "${PROBLEM_STORAGE_DIR}" "${JUDGE_SECURITY_DIR}" "${GOJUDGE_CACHE_DIR}"
+  log "目录检查通过：${PROBLEM_STORAGE_DIR}"
+  log "目录检查通过：${JUDGE_SECURITY_DIR}"
 }
 
 check_docker_environment() {
@@ -175,38 +248,49 @@ check_docker_environment() {
   docker info >/dev/null 2>&1 || fail "当前用户无法访问 Docker daemon"
 }
 
-sync_source_code() {
-  log "开始同步源码"
+sync_git_repo() {
+  local repo_url="$1"
+  local branch="$2"
+  local target_dir="$3"
+  local label="$4"
+
+  log "开始同步 ${label} 源码"
   setup_git_auth
 
-  if [[ ! -d "${SOURCE_DIR}/.git" ]]; then
-    if [[ -d "${SOURCE_DIR}" && -n "$(find "${SOURCE_DIR}" -mindepth 1 -maxdepth 1 -print -quit)" ]]; then
-      fail "源码目录不是 Git 仓库且非空：${SOURCE_DIR}。请备份后清空该目录，或修改 SOURCE_DIR。"
+  if [[ ! -d "${target_dir}/.git" ]]; then
+    if [[ -d "${target_dir}" && -n "$(find "${target_dir}" -mindepth 1 -maxdepth 1 -print -quit)" ]]; then
+      fail "${label} 源码目录不是 Git 仓库且非空：${target_dir}"
     fi
-    mkdir -p "$(dirname "${SOURCE_DIR}")"
-    git clone --branch "${DEPLOY_BRANCH}" --single-branch "${GIT_REPO_URL}" "${SOURCE_DIR}"
+    mkdir -p "$(dirname "${target_dir}")"
+    git clone --branch "${branch}" --single-branch "${repo_url}" "${target_dir}"
   fi
 
-  cd "${SOURCE_DIR}"
-
+  cd "${target_dir}"
   if [[ "${DISCARD_LOCAL_CHANGES}" == "true" ]]; then
-    log "部署目录只作为运行环境使用，将丢弃服务器本地源码改动。"
+    log "${label} 部署目录只作为运行环境使用，将丢弃服务器本地源码改动。"
     git reset --hard
     git clean -fd
   elif ! git diff --quiet || ! git diff --cached --quiet || [[ -n "$(git ls-files --others --exclude-standard)" ]]; then
-    fail "源码目录存在本地改动：${SOURCE_DIR}。如确认丢弃，请使用 DISCARD_LOCAL_CHANGES=true。"
+    fail "${label} 源码目录存在本地改动：${target_dir}"
   fi
 
-  git remote set-url origin "${GIT_REPO_URL}"
-  git fetch --prune origin "${DEPLOY_BRANCH}"
-  git checkout "${DEPLOY_BRANCH}"
-  git reset --hard "origin/${DEPLOY_BRANCH}"
+  git remote set-url origin "${repo_url}"
+  git fetch --prune origin "${branch}"
+  git checkout "${branch}"
+  git reset --hard "origin/${branch}"
+  log "${label} 源码版本：$(git rev-parse --short HEAD)"
+}
 
-  log "源码版本：$(git rev-parse --short HEAD)"
+sync_source_code() {
+  sync_git_repo "${GIT_REPO_URL}" "${DEPLOY_BRANCH}" "${SOURCE_DIR}" "backend"
+}
+
+sync_gojudge_source_code() {
+  sync_git_repo "${GOJUDGE_GIT_REPO_URL}" "${GOJUDGE_BRANCH}" "${GOJUDGE_SOURCE_DIR}" "go-judge"
 }
 
 ensure_source_ready() {
-  [[ -d "${SOURCE_DIR}/.git" ]] || fail "源码目录不存在，请先执行：bash deploy/scripts/deploy-dev.sh deploy"
+  [[ -d "${SOURCE_DIR}/.git" ]] || fail "源码目录不存在，请先执行 deploy"
   cd "${SOURCE_DIR}"
   require_file "${COMPOSE_FILE}"
   require_file "${ENV_FILE}"
@@ -217,22 +301,16 @@ prepare_environment_file() {
   cd "${SOURCE_DIR}"
   require_file "${ENV_TEMPLATE_FILE}"
 
-  if [[ ! -f "${ENV_FILE}" ]]; then
-    cp "${ENV_TEMPLATE_FILE}" "${ENV_FILE}"
-    chmod 600 "${ENV_FILE}"
-    upsert_env_value "GATEWAY_PUBLIC_PORT" "${GATEWAY_PUBLIC_PORT}"
-    upsert_env_value "GATEWAY_SERVER_PORT" "${GATEWAY_SERVER_PORT}"
-    upsert_env_value "JAVA_BASE_IMAGE" "${JAVA_BASE_IMAGE}"
-    fail "已创建 ${ENV_FILE}。请填写真实 MySQL/Redis/RabbitMQ/Nacos/安全配置后重新执行脚本。"
-  fi
+  prepare_env_template_if_missing
 
   require_file "${ENV_FILE}"
   upsert_env_value "GATEWAY_PUBLIC_PORT" "${GATEWAY_PUBLIC_PORT}"
   upsert_env_value "GATEWAY_SERVER_PORT" "${GATEWAY_SERVER_PORT}"
   upsert_env_value "JAVA_BASE_IMAGE" "${JAVA_BASE_IMAGE}"
+  ensure_judge_security_materials
 
-  if grep -Eq '=(replace_me|)$' "${ENV_FILE}"; then
-    log "警告：${ENV_FILE} 仍包含空值或 replace_me，占位配置未填写时 Compose 可能失败。"
+  if grep -Eq '^(MYSQL_PASSWORD|REDIS_PASSWORD|RABBITMQ_PASSWORD)=($|replace_me)' "${ENV_FILE}"; then
+    fail "${ENV_FILE} 仍包含未填写的 MySQL/Redis/RabbitMQ 密码，请填写后重试。"
   fi
 }
 
@@ -244,34 +322,19 @@ build_project() {
 }
 
 compose() {
-  docker compose \
-    -p "${COMPOSE_PROJECT_NAME}" \
-    --env-file "${ENV_FILE}" \
-    -f "${COMPOSE_FILE}" \
-    "$@"
+  docker compose -p "${COMPOSE_PROJECT_NAME}" --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" "$@"
 }
 
 rabbitmq_compose() {
-  docker compose \
-    -p "${COMPOSE_PROJECT_NAME}" \
-    --env-file "${ENV_FILE}" \
-    -f "${RABBITMQ_COMPOSE_FILE}" \
-    "$@"
+  docker compose -p "${COMPOSE_PROJECT_NAME}" --env-file "${ENV_FILE}" -f "${RABBITMQ_COMPOSE_FILE}" "$@"
 }
 
 gojudge_compose() {
-  docker compose \
-    -p "${COMPOSE_PROJECT_NAME}" \
-    --env-file "${ENV_FILE}" \
-    -f "${GOJUDGE_COMPOSE_FILE}" \
-    "$@"
+  docker compose -p "${COMPOSE_PROJECT_NAME}" --env-file "${ENV_FILE}" -f "${GOJUDGE_COMPOSE_FILE}" "$@"
 }
 
 export_compose_variables() {
-  export GATEWAY_PUBLIC_PORT
-  export GATEWAY_SERVER_PORT
-  export JAVA_BASE_IMAGE
-  export COMPOSE_PARALLEL_LIMIT
+  export GATEWAY_PUBLIC_PORT GATEWAY_SERVER_PORT JAVA_BASE_IMAGE COMPOSE_PARALLEL_LIMIT
 }
 
 export_gojudge_variables() {
@@ -300,11 +363,7 @@ show_logs() {
   check_docker_environment
   ensure_source_ready
   export_compose_variables
-  if [[ "$#" -eq 0 ]]; then
-    compose logs -f --tail="${LOG_TAIL}"
-  else
-    compose logs -f --tail="${LOG_TAIL}" "$@"
-  fi
+  compose logs -f --tail="${LOG_TAIL}" "$@"
 }
 
 restart_services() {
@@ -319,11 +378,7 @@ stop_services() {
   check_docker_environment
   ensure_source_ready
   export_compose_variables
-  if [[ "$#" -eq 0 ]]; then
-    compose stop
-  else
-    compose stop "$@"
-  fi
+  compose stop "$@"
 }
 
 down_services() {
@@ -344,70 +399,16 @@ start_rabbitmq() {
   log "RabbitMQ 管理后台：http://127.0.0.1:${RABBITMQ_MANAGEMENT_PUBLIC_PORT:-15672}"
 }
 
-show_rabbitmq_status() {
-  check_docker_environment
-  ensure_source_ready
-  cd "${SOURCE_DIR}"
-  require_file "${RABBITMQ_COMPOSE_FILE}"
-  rabbitmq_compose ps
-}
-
-show_rabbitmq_logs() {
-  check_docker_environment
-  ensure_source_ready
-  cd "${SOURCE_DIR}"
-  require_file "${RABBITMQ_COMPOSE_FILE}"
-  rabbitmq_compose logs -f --tail="${LOG_TAIL}" rabbitmq
-}
-
-down_rabbitmq() {
-  check_docker_environment
-  ensure_source_ready
-  cd "${SOURCE_DIR}"
-  require_file "${RABBITMQ_COMPOSE_FILE}"
-  rabbitmq_compose down
-}
-
-sync_gojudge_source_code() {
-  log "开始同步 go-judge 源码"
-  setup_git_auth
-
-  if [[ ! -d "${GOJUDGE_SOURCE_DIR}/.git" ]]; then
-    if [[ -d "${GOJUDGE_SOURCE_DIR}" && -n "$(find "${GOJUDGE_SOURCE_DIR}" -mindepth 1 -maxdepth 1 -print -quit)" ]]; then
-      fail "go-judge 源码目录不是 Git 仓库且非空：${GOJUDGE_SOURCE_DIR}。请备份后清空该目录，或修改 GOJUDGE_SOURCE_DIR。"
-    fi
-    mkdir -p "$(dirname "${GOJUDGE_SOURCE_DIR}")"
-    git clone --branch "${GOJUDGE_BRANCH}" --single-branch "${GOJUDGE_GIT_REPO_URL}" "${GOJUDGE_SOURCE_DIR}"
-  fi
-
-  cd "${GOJUDGE_SOURCE_DIR}"
-
-  if [[ "${DISCARD_LOCAL_CHANGES}" == "true" ]]; then
-    log "go-judge 部署目录只作为运行环境使用，将丢弃服务器本地源码改动。"
-    git reset --hard
-    git clean -fd
-  elif ! git diff --quiet || ! git diff --cached --quiet || [[ -n "$(git ls-files --others --exclude-standard)" ]]; then
-    fail "go-judge 源码目录存在本地改动：${GOJUDGE_SOURCE_DIR}。如确认丢弃，请使用 DISCARD_LOCAL_CHANGES=true。"
-  fi
-
-  git remote set-url origin "${GOJUDGE_GIT_REPO_URL}"
-  git fetch --prune origin "${GOJUDGE_BRANCH}"
-  git checkout "${GOJUDGE_BRANCH}"
-  git reset --hard "origin/${GOJUDGE_BRANCH}"
-
-  log "go-judge 源码版本：$(git rev-parse --short HEAD)"
-}
-
 prepare_gojudge_config_file() {
-  mkdir -p "${GOJUDGE_CONFIG_DIR}" || fail "无法创建 go-judge 配置目录：${GOJUDGE_CONFIG_DIR}"
+  mkdir -p "${GOJUDGE_CONFIG_DIR}"
   if [[ ! -f "${GOJUDGE_CONFIG_FILE}" ]]; then
     require_file "${GOJUDGE_SOURCE_DIR}/deploy/config.formal.example.yaml"
     cp "${GOJUDGE_SOURCE_DIR}/deploy/config.formal.example.yaml" "${GOJUDGE_CONFIG_FILE}"
     chmod 600 "${GOJUDGE_CONFIG_FILE}"
-    fail "已创建 ${GOJUDGE_CONFIG_FILE}。请填写 RabbitMQ 密码与正式判题节点密文后重新执行 gojudge-up。"
+    fail "已创建 ${GOJUDGE_CONFIG_FILE}，请填写 RabbitMQ 密码与 Nacos 信息后重新执行 gojudge-up。"
   fi
   require_file "${GOJUDGE_CONFIG_FILE}"
-  if grep -Eq 'replace_me|encryptedToken: ""|password: ""' "${GOJUDGE_CONFIG_FILE}"; then
+  if grep -Eq 'replace_me|password: ""' "${GOJUDGE_CONFIG_FILE}"; then
     fail "${GOJUDGE_CONFIG_FILE} 仍包含占位配置，请填写真实配置后重试。"
   fi
 }
@@ -415,6 +416,7 @@ prepare_gojudge_config_file() {
 start_gojudge() {
   check_docker_environment
   ensure_source_ready
+  ensure_judge_security_materials
   sync_gojudge_source_code
   prepare_gojudge_config_file
   cd "${SOURCE_DIR}"
@@ -424,37 +426,6 @@ start_gojudge() {
   gojudge_compose ps
   log "go-judge 沙箱地址：http://127.0.0.1:${GOJUDGE_PUBLIC_PORT:-5050}"
   log "go-judge 判题节点配置：${GOJUDGE_CONFIG_FILE}"
-}
-
-show_gojudge_status() {
-  check_docker_environment
-  ensure_source_ready
-  cd "${SOURCE_DIR}"
-  require_file "${GOJUDGE_COMPOSE_FILE}"
-  export_gojudge_variables
-  gojudge_compose ps
-}
-
-show_gojudge_logs() {
-  check_docker_environment
-  ensure_source_ready
-  cd "${SOURCE_DIR}"
-  require_file "${GOJUDGE_COMPOSE_FILE}"
-  export_gojudge_variables
-  if [[ "$#" -eq 0 ]]; then
-    gojudge_compose logs -f --tail="${LOG_TAIL}" go-judge-sandbox hnieoj-judge-node
-  else
-    gojudge_compose logs -f --tail="${LOG_TAIL}" "$@"
-  fi
-}
-
-down_gojudge() {
-  check_docker_environment
-  ensure_source_ready
-  cd "${SOURCE_DIR}"
-  require_file "${GOJUDGE_COMPOSE_FILE}"
-  export_gojudge_variables
-  gojudge_compose down
 }
 
 deploy_all() {
@@ -480,6 +451,12 @@ up_only() {
   deploy_compose "$@"
 }
 
+security_init_only() {
+  mkdir -p "${DEPLOY_DIR}"
+  prepare_env_template_if_missing
+  ensure_judge_security_materials
+}
+
 main() {
   local command="${1:-deploy}"
   if [[ "$#" -gt 0 ]]; then
@@ -487,65 +464,26 @@ main() {
   fi
 
   case "${command}" in
-    deploy)
-      deploy_all "$@"
-      ;;
-    pull)
-      require_command git
-      sync_source_code
-      ;;
-    build)
-      build_only
-      ;;
-    up)
-      up_only "$@"
-      ;;
-    ps|status)
-      show_status
-      ;;
-    logs)
-      show_logs "$@"
-      ;;
-    restart)
-      restart_services "$@"
-      ;;
-    stop)
-      stop_services "$@"
-      ;;
-    down)
-      down_services
-      ;;
-    rabbitmq-up)
-      start_rabbitmq
-      ;;
-    rabbitmq-ps)
-      show_rabbitmq_status
-      ;;
-    rabbitmq-logs)
-      show_rabbitmq_logs
-      ;;
-    rabbitmq-down)
-      down_rabbitmq
-      ;;
-    gojudge-up)
-      start_gojudge
-      ;;
-    gojudge-ps)
-      show_gojudge_status
-      ;;
-    gojudge-logs)
-      show_gojudge_logs "$@"
-      ;;
-    gojudge-down)
-      down_gojudge
-      ;;
-    help|-h|--help)
-      usage
-      ;;
-    *)
-      usage
-      fail "未知命令：${command}"
-      ;;
+    deploy) deploy_all "$@" ;;
+    pull) require_command git; sync_source_code ;;
+    build) build_only ;;
+    up) up_only "$@" ;;
+    ps|status) show_status ;;
+    logs) show_logs "$@" ;;
+    restart) restart_services "$@" ;;
+    stop) stop_services "$@" ;;
+    down) down_services ;;
+    rabbitmq-up) start_rabbitmq ;;
+    rabbitmq-ps) check_docker_environment; ensure_source_ready; rabbitmq_compose ps ;;
+    rabbitmq-logs) check_docker_environment; ensure_source_ready; rabbitmq_compose logs -f --tail="${LOG_TAIL}" rabbitmq ;;
+    rabbitmq-down) check_docker_environment; ensure_source_ready; rabbitmq_compose down ;;
+    gojudge-up) start_gojudge ;;
+    gojudge-ps) check_docker_environment; ensure_source_ready; export_gojudge_variables; gojudge_compose ps ;;
+    gojudge-logs) check_docker_environment; ensure_source_ready; export_gojudge_variables; gojudge_compose logs -f --tail="${LOG_TAIL}" "$@" ;;
+    gojudge-down) check_docker_environment; ensure_source_ready; export_gojudge_variables; gojudge_compose down ;;
+    security-init) security_init_only ;;
+    help|-h|--help) usage ;;
+    *) usage; fail "未知命令：${command}" ;;
   esac
 }
 

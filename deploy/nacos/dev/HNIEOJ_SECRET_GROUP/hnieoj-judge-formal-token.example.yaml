@@ -1,0 +1,7 @@
+hnieoj:
+  judge:
+    formal-token:
+      # 由 hnieoj-judge 管理端轮换接口自动写入。不要手动填写正式 Token 明文。
+      encrypted-token: ""
+      version: 0
+      updated-at: ""

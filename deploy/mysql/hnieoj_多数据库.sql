@@ -347,6 +347,23 @@ CREATE TABLE `judge_node_token` (
   KEY `idx_status_expire` (`status`, `expire_time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='判题节点短期 Token 审计记录';
 
+-- 正式判题节点长期 Token 哈希记录
+DROP TABLE IF EXISTS `judge_formal_token`;
+CREATE TABLE `judge_formal_token` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `version` int(11) NOT NULL COMMENT '正式 Token 版本号',
+  `token_hash` varchar(128) NOT NULL COMMENT '正式 Token SHA-256 摘要',
+  `hash_algorithm` varchar(32) NOT NULL DEFAULT 'SHA-256' COMMENT '哈希算法',
+  `encrypted_token` text NOT NULL COMMENT '使用正式节点公钥加密后的 Token 密文',
+  `status` varchar(20) NOT NULL DEFAULT 'active' COMMENT 'active, rotated',
+  `rotated_by` varchar(50) DEFAULT NULL COMMENT '轮换管理员',
+  `gmt_create` datetime DEFAULT CURRENT_TIMESTAMP,
+  `gmt_modified` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_version` (`version`),
+  KEY `idx_status_version` (`status`, `version`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='正式判题节点长期 Token 哈希记录';
+
 -- 提交记录 (Status)
 DROP TABLE IF EXISTS `judge`;
 CREATE TABLE `judge` (

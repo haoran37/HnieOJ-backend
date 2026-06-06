@@ -35,3 +35,7 @@ hnieoj:
       auth-code-max-exchange: ${HNIEOJ_JUDGE_AUTH_CODE_MAX_EXCHANGE:1}
     formal-token:
       cipher-algorithm: RSA/ECB/OAEPWithSHA-256AndMGF1Padding
+      public-key: ${HNIEOJ_JUDGE_FORMAL_TOKEN_PUBLIC_KEY:}
+      public-key-path: ${HNIEOJ_JUDGE_FORMAL_TOKEN_PUBLIC_KEY_PATH:/etc/hnieoj/judge-security/judge_formal_public.pem}
+      nacos-data-id: ${HNIEOJ_JUDGE_FORMAL_TOKEN_NACOS_DATA_ID:hnieoj-judge-formal-token.yaml}
+      nacos-group: ${HNIEOJ_JUDGE_FORMAL_TOKEN_NACOS_GROUP:HNIEOJ_SECRET_GROUP}

@@ -25,5 +25,7 @@ public interface ProblemFileStorageService {
 
     void writeTestdataZip(Long problemId, OutputStream outputStream);
 
+    void writeTestdataCaseZip(Long problemId, Integer caseNo, OutputStream outputStream);
+
     boolean hasAvailableTestdata(Long problemId);
 }

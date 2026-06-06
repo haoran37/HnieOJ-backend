@@ -21,6 +21,8 @@ public interface ProblemResourceService {
 
     void writeTestdataZip(Long problemId, OutputStream outputStream);
 
+    void writeTestdataCaseZip(Long problemId, Integer caseNo, OutputStream outputStream);
+
     record TestdataDownloadDecision(boolean notModified, Integer dataVersion) {
     }
 }

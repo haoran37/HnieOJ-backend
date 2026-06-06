@@ -78,6 +78,12 @@ public class ProblemResourceServiceImpl implements ProblemResourceService {
         fileStorageService.writeTestdataZip(problemId, outputStream);
     }
 
+    @Override
+    public void writeTestdataCaseZip(Long problemId, Integer caseNo, OutputStream outputStream) {
+        requireProblem(problemId);
+        fileStorageService.writeTestdataCaseZip(problemId, caseNo, outputStream);
+    }
+
     private Problem requireProblem(Long problemId) {
         if (problemId == null || problemId <= 0) {
             throw new BizException(ResultCode.BAD_REQUEST, "problemId 不合法");

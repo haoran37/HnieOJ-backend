@@ -98,7 +98,7 @@ public class ProblemFileStorageServiceImpl implements ProblemFileStorageService 
             throw new BizException(ResultCode.INTERNAL_ERROR, "保存图片失败");
         }
         String prefix = StrUtil.removeSuffix(storageProperties.getImageUrlPrefix(), "/");
-        return prefix + "/" + problemId + "/" + IMAGES_DIR + "/" + filename;
+        return prefix + "/" + problemId + "/" + filename;
     }
 
     @Override
@@ -183,6 +183,30 @@ public class ProblemFileStorageServiceImpl implements ProblemFileStorageService 
         } catch (IOException e) {
             log.error("Write problem testdata zip failed, problemId: {}", problemId, e);
             throw new BizException(ResultCode.INTERNAL_ERROR, "下载测试数据失败");
+        }
+    }
+
+    @Override
+    public void writeTestdataCaseZip(Long problemId, Integer caseNo, OutputStream outputStream) {
+        if (caseNo == null || caseNo <= 0) {
+            throw new BizException(ResultCode.BAD_REQUEST, "测试点编号必须从 1 开始");
+        }
+        Path testdataDir = resolveProblemPath(problemId, TESTDATA_DIR);
+        List<TestdataPair> pairs = listTestdataPairs(testdataDir);
+        if (pairs.isEmpty()) {
+            throw new BizException(ResultCode.NOT_FOUND, "测试数据不存在");
+        }
+        if (caseNo > pairs.size()) {
+            throw new BizException(ResultCode.BAD_REQUEST, "测试点编号超出范围");
+        }
+
+        TestdataPair pair = pairs.get(caseNo - 1);
+        try (ZipOutputStream zipOutputStream = new ZipOutputStream(outputStream, StandardCharsets.UTF_8)) {
+            writeFileToZip(zipOutputStream, pair.inputFile());
+            writeFileToZip(zipOutputStream, pair.outputFile());
+        } catch (IOException e) {
+            log.error("Write problem testdata case zip failed, problemId: {}, caseNo: {}", problemId, caseNo, e);
+            throw new BizException(ResultCode.INTERNAL_ERROR, "下载测试点失败");
         }
     }
 
@@ -343,6 +367,45 @@ public class ProblemFileStorageServiceImpl implements ProblemFileStorageService 
         return files;
     }
 
+    private List<TestdataPair> listTestdataPairs(Path testdataDir) {
+        List<Path> files = listTestdataFiles(testdataDir);
+        if (files.isEmpty()) {
+            return List.of();
+        }
+        Map<String, TestdataPairBuilder> pairMap = new TreeMap<>(Comparator.naturalOrder());
+        for (Path file : files) {
+            String filename = file.getFileName().toString();
+            String baseName = filename.substring(0, filename.lastIndexOf('.'));
+            TestdataPairBuilder builder = pairMap.computeIfAbsent(baseName, key -> new TestdataPairBuilder());
+            if (filename.endsWith(TESTDATA_IN_SUFFIX)) {
+                builder.inputFile = file;
+            } else if (filename.endsWith(TESTDATA_OUT_SUFFIX)) {
+                builder.outputFile = file;
+            }
+        }
+        List<TestdataPair> pairs = new ArrayList<>();
+        for (Map.Entry<String, TestdataPairBuilder> entry : pairMap.entrySet()) {
+            TestdataPairBuilder builder = entry.getValue();
+            if (builder.inputFile != null && builder.outputFile != null) {
+                pairs.add(new TestdataPair(builder.inputFile, builder.outputFile));
+            }
+        }
+        return pairs;
+    }
+
+    private void writeFileToZip(ZipOutputStream zipOutputStream, Path file) throws IOException {
+        ZipEntry entry = new ZipEntry(file.getFileName().toString());
+        zipOutputStream.putNextEntry(entry);
+        byte[] buffer = new byte[BUFFER_SIZE];
+        try (var inputStream = Files.newInputStream(file)) {
+            int len;
+            while ((len = inputStream.read(buffer)) != -1) {
+                zipOutputStream.write(buffer, 0, len);
+            }
+        }
+        zipOutputStream.closeEntry();
+    }
+
     private Path resolveProblemPath(Long problemId, String relativePath) {
         return ensureChildPath(resolveProblemDir(problemId), relativePath);
     }
@@ -377,5 +440,13 @@ public class ProblemFileStorageServiceImpl implements ProblemFileStorageService 
 
     private Path rootPath() {
         return Paths.get(storageProperties.getRootPath()).toAbsolutePath().normalize();
+    }
+
+    private static class TestdataPairBuilder {
+        private Path inputFile;
+        private Path outputFile;
+    }
+
+    private record TestdataPair(Path inputFile, Path outputFile) {
     }
 }

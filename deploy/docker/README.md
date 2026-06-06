@@ -63,6 +63,9 @@ bash deploy/scripts/deploy-dev.sh deploy
 - `GIT_REPO_URL`：代码仓库地址，默认使用 HTTPS 地址
 - `GIT_TOKEN`：私有仓库 HTTPS 拉取使用的 GitHub Token，不要写入仓库
 - `DEPLOY_DIR`：部署根目录，默认 `/opt/hnieoj/backend`
+- `DISCARD_LOCAL_CHANGES`：是否丢弃服务器源码目录本地改动，默认 `true`
+
+服务器源码目录只作为部署目录使用，默认每次部署都会丢弃 `/opt/hnieoj/backend/source` 中的本地修改，并强制对齐远端 `dev` 分支。
 
 临时覆盖示例：
 

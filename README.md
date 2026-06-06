@@ -127,6 +127,8 @@ mvn -s deploy/maven/settings.xml clean install -DskipTests
 
 若 Docker Hub 拉取基础镜像较慢，可通过 `JAVA_BASE_IMAGE` 指定可访问的 Java 17 运行时镜像，或在服务器配置 Docker registry mirror。
 
+服务器源码目录只作为部署目录使用，默认部署会丢弃其中的本地改动并对齐远端 `dev` 分支。
+
 常用运维命令：
 
 ```bash

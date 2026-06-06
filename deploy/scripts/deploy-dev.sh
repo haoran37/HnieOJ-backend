@@ -20,6 +20,7 @@ SOURCE_DIR="${SOURCE_DIR:-${DEPLOY_DIR}/source}"
 ENV_FILE="${ENV_FILE:-${DEPLOY_DIR}/.env}"
 COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-hnieoj-dev}"
 COMPOSE_PARALLEL_LIMIT="${COMPOSE_PARALLEL_LIMIT:-2}"
+DISCARD_LOCAL_CHANGES="${DISCARD_LOCAL_CHANGES:-true}"
 
 PROBLEM_STORAGE_DIR="${PROBLEM_STORAGE_DIR:-/data/oj/problems}"
 JUDGE_SECURITY_DIR="${JUDGE_SECURITY_DIR:-/etc/hnieoj/judge-security}"
@@ -133,6 +134,7 @@ check_runtime_environment() {
   log "代码仓库：${GIT_REPO_URL}"
   log "网关端口映射：${GATEWAY_PUBLIC_PORT}:${GATEWAY_SERVER_PORT}"
   log "Java 基础镜像：${JAVA_BASE_IMAGE}"
+  log "丢弃服务器本地源码改动：${DISCARD_LOCAL_CHANGES}"
   log "当前用户：$(id)"
 
   require_command git
@@ -167,8 +169,12 @@ sync_source_code() {
 
   cd "${SOURCE_DIR}"
 
-  if ! git diff --quiet || ! git diff --cached --quiet; then
-    fail "源码目录存在本地未提交变更：${SOURCE_DIR}"
+  if [[ "${DISCARD_LOCAL_CHANGES}" == "true" ]]; then
+    log "部署目录只作为运行环境使用，将丢弃服务器本地源码改动。"
+    git reset --hard
+    git clean -fd
+  elif ! git diff --quiet || ! git diff --cached --quiet || [[ -n "$(git ls-files --others --exclude-standard)" ]]; then
+    fail "源码目录存在本地改动：${SOURCE_DIR}。如确认丢弃，请使用 DISCARD_LOCAL_CHANGES=true。"
   fi
 
   git remote set-url origin "${GIT_REPO_URL}"

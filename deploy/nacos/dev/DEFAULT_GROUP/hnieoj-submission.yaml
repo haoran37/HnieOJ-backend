@@ -21,6 +21,14 @@ sa-token:
 
 # 本地调试
 hnieoj:
+  judge:
+    mq:
+      exchange: ${HNIEOJ_JUDGE_MQ_EXCHANGE:hnieoj.judge.exchange}
+      task-queue: ${HNIEOJ_JUDGE_MQ_TASK_QUEUE:hnieoj.judge.task}
+      routing-key: ${HNIEOJ_JUDGE_MQ_ROUTING_KEY:judge.submission.created}
+      dead-letter-exchange: ${HNIEOJ_JUDGE_MQ_DLX:hnieoj.judge.dlx}
+      dead-letter-queue: ${HNIEOJ_JUDGE_MQ_DLQ:hnieoj.judge.task.dlq}
+      dead-letter-routing-key: ${HNIEOJ_JUDGE_MQ_DLX_ROUTING_KEY:judge.submission.created.dlq}
   submission:
     websocket:
       allowed-origins:

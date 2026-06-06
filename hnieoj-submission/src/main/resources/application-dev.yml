@@ -12,3 +12,19 @@ spring:
       host: ${REDIS_HOST:127.0.0.1}
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD:}
+  rabbitmq:
+    host: ${RABBITMQ_HOST:127.0.0.1}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:hnieoj_judge}
+    password: ${RABBITMQ_PASSWORD:}
+    virtual-host: ${RABBITMQ_VHOST:hnieoj}
+
+hnieoj:
+  judge:
+    mq:
+      exchange: ${HNIEOJ_JUDGE_MQ_EXCHANGE:hnieoj.judge.exchange}
+      task-queue: ${HNIEOJ_JUDGE_MQ_TASK_QUEUE:hnieoj.judge.task}
+      routing-key: ${HNIEOJ_JUDGE_MQ_ROUTING_KEY:judge.submission.created}
+      dead-letter-exchange: ${HNIEOJ_JUDGE_MQ_DLX:hnieoj.judge.dlx}
+      dead-letter-queue: ${HNIEOJ_JUDGE_MQ_DLQ:hnieoj.judge.task.dlq}
+      dead-letter-routing-key: ${HNIEOJ_JUDGE_MQ_DLX_ROUTING_KEY:judge.submission.created.dlq}

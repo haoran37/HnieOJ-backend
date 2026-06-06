@@ -23,6 +23,7 @@ import com.hnieacm.submission.feign.ProblemInternalFeignClient;
 import com.hnieacm.submission.feign.UserProfileFeignClient;
 import com.hnieacm.submission.mapper.JudgeCaseMapper;
 import com.hnieacm.submission.mapper.JudgeMapper;
+import com.hnieacm.submission.service.JudgeTaskMessagePublisher;
 import com.hnieacm.submission.service.SubmissionService;
 import com.hnieacm.submission.vo.SubmissionCaseVo;
 import com.hnieacm.submission.vo.SubmissionDetailVo;
@@ -60,6 +61,7 @@ public class SubmissionServiceImpl implements SubmissionService {
     private final JudgeCaseMapper judgeCaseMapper;
     private final ProblemInternalFeignClient problemInternalFeignClient;
     private final UserProfileFeignClient userProfileFeignClient;
+    private final JudgeTaskMessagePublisher judgeTaskMessagePublisher;
 
     /**
      * @MethodName submit
@@ -135,7 +137,7 @@ public class SubmissionServiceImpl implements SubmissionService {
 
         judgeMapper.insert(judge);
 
-        // TODO: 这里后续通过 RocketMQ 下发判题任务，当前仅记录提交日志。
+        judgeTaskMessagePublisher.publishAfterCommit(judge);
         log.info("Submission created, submitId={}, problemCode={}, uid={}, language={}", submitId, problemCode, uid, language);
 
         return new SubmitCodeVo(submitId);

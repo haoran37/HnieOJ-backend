@@ -285,6 +285,11 @@ public class AdminProblemServiceImpl implements AdminProblemService {
         entity.setSource(pr.getSource());
         entity.setSpjCode(pr.getSpjCode());
         entity.setSpjLanguage(pr.getSpjLanguage());
+        entity.setSpjTimeLimit(pr.getSpjTimeLimit());
+        entity.setSpjMemoryLimit(pr.getSpjMemoryLimit());
+        entity.setSpjStackLimit(pr.getSpjStackLimit());
+        entity.setSpjOutputLimit(pr.getSpjOutputLimit());
+        entity.setSpjProtocol(pr.getSpjProtocol());
         entity.setIsRemoveEndBlank(pr.getIsRemoveEndBlank());
         entity.setOpenCaseResult(pr.getOpenCaseResult());
 

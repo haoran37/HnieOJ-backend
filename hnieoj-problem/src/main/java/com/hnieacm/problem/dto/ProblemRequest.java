@@ -68,6 +68,16 @@ public class ProblemRequest {
 
     private String spjLanguage;
 
+    private Integer spjTimeLimit;
+
+    private Integer spjMemoryLimit;
+
+    private Integer spjStackLimit;
+
+    private Integer spjOutputLimit;
+
+    private String spjProtocol;
+
     private Boolean isRemoveEndBlank;
 
     private Boolean openCaseResult;

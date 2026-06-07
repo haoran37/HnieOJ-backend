@@ -49,6 +49,12 @@ public class RabbitJudgeTaskMessagePublisher implements JudgeTaskMessagePublishe
     private static final int DEFAULT_STACK_LIMIT = 128;
     private static final int DEFAULT_IO_SCORE = 100;
     private static final int DEFAULT_DATA_VERSION = 1;
+    private static final int DEFAULT_SPJ_TIME_LIMIT = 2000;
+    private static final int DEFAULT_SPJ_MEMORY_LIMIT = 256;
+    private static final int DEFAULT_SPJ_STACK_LIMIT = 128;
+    private static final int DEFAULT_SPJ_OUTPUT_LIMIT = 16777216;
+    private static final String DEFAULT_SPJ_PROTOCOL = "testlib";
+    private static final String SPJ_JUDGE_MODE = "spj";
     private static final int DEFAULT_RETRY_BATCH_SIZE = 20;
     private static final int DEFAULT_MAX_RETRY_COUNT = 10;
     private static final long DEFAULT_RETRY_BACKOFF_SECONDS = 30L;
@@ -270,12 +276,29 @@ public class RabbitJudgeTaskMessagePublisher implements JudgeTaskMessagePublishe
         message.setTimeLimit(defaultInteger(problem == null ? null : problem.getTimeLimit(), DEFAULT_TIME_LIMIT));
         message.setMemoryLimit(defaultInteger(problem == null ? null : problem.getMemoryLimit(), DEFAULT_MEMORY_LIMIT));
         message.setStackLimit(defaultInteger(problem == null ? null : problem.getStackLimit(), DEFAULT_STACK_LIMIT));
+        message.setChecker(buildChecker(message.getJudgeMode(), problem));
         message.setIoScore(defaultInteger(problem == null ? null : problem.getIoScore(), DEFAULT_IO_SCORE));
         message.setIsRemoveEndBlank(problem == null || !Boolean.FALSE.equals(problem.getIsRemoveEndBlank()));
         message.setDataVersion(defaultInteger(problem == null ? null : problem.getDataVersion(), DEFAULT_DATA_VERSION));
         message.setCreatedAt(OffsetDateTime.now(ZoneId.systemDefault()).toString());
         message.setCreatedAtMillis(System.currentTimeMillis());
         return message;
+    }
+
+    private JudgeTaskMessage.JudgeAsset buildChecker(String judgeMode, ProblemBasicDto problem) {
+        if (!SPJ_JUDGE_MODE.equalsIgnoreCase(defaultString(judgeMode, DEFAULT_JUDGE_MODE)) || problem == null) {
+            return null;
+        }
+        JudgeTaskMessage.JudgeAsset checker = new JudgeTaskMessage.JudgeAsset();
+        checker.setLanguage(problem.getSpjLanguage());
+        checker.setSource(problem.getSpjCode());
+        checker.setArtifactFileId(null);
+        checker.setTimeLimit(defaultInteger(problem.getSpjTimeLimit(), DEFAULT_SPJ_TIME_LIMIT));
+        checker.setMemoryLimit(defaultInteger(problem.getSpjMemoryLimit(), DEFAULT_SPJ_MEMORY_LIMIT));
+        checker.setStackLimit(defaultInteger(problem.getSpjStackLimit(), DEFAULT_SPJ_STACK_LIMIT));
+        checker.setOutputLimit(defaultInteger(problem.getSpjOutputLimit(), DEFAULT_SPJ_OUTPUT_LIMIT));
+        checker.setProtocol(defaultString(problem.getSpjProtocol(), DEFAULT_SPJ_PROTOCOL));
+        return checker;
     }
 
     private Integer defaultInteger(Integer value, Integer defaultValue) {

@@ -59,6 +59,8 @@ public class SubmissionServiceImpl implements SubmissionService {
     private static final int DEFAULT_PAGE_SIZE = 20;
     private static final int MAX_PAGE_SIZE = 100;
     private static final String DEFAULT_JUDGE_MODE = "default";
+    private static final String SPJ_JUDGE_MODE = "spj";
+    private static final String INTERACTIVE_JUDGE_MODE = "interactive";
 
     private final JudgeMapper judgeMapper;
     private final JudgeCaseMapper judgeCaseMapper;
@@ -431,6 +433,23 @@ public class SubmissionServiceImpl implements SubmissionService {
         if (!supported) {
             throw new BizException(ResultCode.BAD_REQUEST, "当前判题节点暂不支持该题目的判题模式: " + judgeMode);
         }
+        ensureJudgeModeContract(problem, judgeMode);
+    }
+
+    private void ensureJudgeModeContract(ProblemBasicDto problem, String judgeMode) {
+        if (DEFAULT_JUDGE_MODE.equalsIgnoreCase(judgeMode)) {
+            return;
+        }
+        if (SPJ_JUDGE_MODE.equalsIgnoreCase(judgeMode)) {
+            if (StrUtil.isBlank(problem.getSpjCode()) || StrUtil.isBlank(problem.getSpjLanguage())) {
+                throw new BizException(ResultCode.BAD_REQUEST, "SPJ 题目必须配置 checker 源码和语言");
+            }
+            return;
+        }
+        if (INTERACTIVE_JUDGE_MODE.equalsIgnoreCase(judgeMode)) {
+            throw new BizException(ResultCode.BAD_REQUEST, "交互题判题合约尚未开放");
+        }
+        throw new BizException(ResultCode.BAD_REQUEST, "不支持的判题模式: " + judgeMode);
     }
 
     private void ensureSubmissionRejudgeAllowed(Judge judge) {

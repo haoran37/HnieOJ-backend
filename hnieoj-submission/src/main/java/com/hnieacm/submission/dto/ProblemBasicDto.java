@@ -19,6 +19,13 @@ public class ProblemBasicDto {
     private Integer timeLimit;
     private Integer memoryLimit;
     private Integer stackLimit;
+    private String spjCode;
+    private String spjLanguage;
+    private Integer spjTimeLimit;
+    private Integer spjMemoryLimit;
+    private Integer spjStackLimit;
+    private Integer spjOutputLimit;
+    private String spjProtocol;
     private Integer ioScore;
     private Boolean isRemoveEndBlank;
     private Integer dataVersion;

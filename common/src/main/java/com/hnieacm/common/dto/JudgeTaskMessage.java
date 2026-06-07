@@ -42,6 +42,10 @@ public class JudgeTaskMessage implements Serializable {
 
     private String judgeMode;
 
+    private JudgeAsset checker;
+
+    private JudgeAsset interactor;
+
     private Integer problemType;
 
     private Integer ioScore;
@@ -55,4 +59,27 @@ public class JudgeTaskMessage implements Serializable {
     private String createdAt;
 
     private Long createdAtMillis;
+
+    @Data
+    public static class JudgeAsset implements Serializable {
+
+        @Serial
+        private static final long serialVersionUID = 1L;
+
+        private String language;
+
+        private String source;
+
+        private String artifactFileId;
+
+        private Integer timeLimit;
+
+        private Integer memoryLimit;
+
+        private Integer stackLimit;
+
+        private Integer outputLimit;
+
+        private String protocol;
+    }
 }

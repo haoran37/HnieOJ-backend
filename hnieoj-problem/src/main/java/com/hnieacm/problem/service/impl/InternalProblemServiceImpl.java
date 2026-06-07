@@ -65,7 +65,12 @@ public class InternalProblemServiceImpl implements InternalProblemService {
         }
 
         List<Problem> problems = problemMapper.selectList(new LambdaQueryWrapper<Problem>()
-                .select(Problem::getId, Problem::getProblemCode, Problem::getTitle, Problem::getAuth, Problem::getType)
+                .select(Problem::getId, Problem::getProblemCode, Problem::getTitle, Problem::getAuth,
+                        Problem::getType, Problem::getJudgeMode, Problem::getTimeLimit, Problem::getMemoryLimit,
+                        Problem::getStackLimit, Problem::getSpjCode, Problem::getSpjLanguage,
+                        Problem::getSpjTimeLimit, Problem::getSpjMemoryLimit, Problem::getSpjStackLimit,
+                        Problem::getSpjOutputLimit, Problem::getSpjProtocol, Problem::getIoScore,
+                        Problem::getIsRemoveEndBlank, Problem::getDataVersion)
                 .in(Problem::getId, normalizedIds));
         if (problems == null || problems.isEmpty()) {
             return Collections.emptyList();
@@ -96,6 +101,13 @@ public class InternalProblemServiceImpl implements InternalProblemService {
         dto.setTimeLimit(problem.getTimeLimit());
         dto.setMemoryLimit(problem.getMemoryLimit());
         dto.setStackLimit(problem.getStackLimit());
+        dto.setSpjCode(problem.getSpjCode());
+        dto.setSpjLanguage(problem.getSpjLanguage());
+        dto.setSpjTimeLimit(problem.getSpjTimeLimit());
+        dto.setSpjMemoryLimit(problem.getSpjMemoryLimit());
+        dto.setSpjStackLimit(problem.getSpjStackLimit());
+        dto.setSpjOutputLimit(problem.getSpjOutputLimit());
+        dto.setSpjProtocol(problem.getSpjProtocol());
         dto.setIoScore(problem.getIoScore());
         dto.setIsRemoveEndBlank(problem.getIsRemoveEndBlank());
         dto.setDataVersion(problem.getDataVersion());

@@ -35,6 +35,16 @@ public class JudgeNodeToken {
 
     private LocalDateTime lastUsedTime;
 
+    private LocalDateTime lastHeartbeatTime;
+
+    private Integer maxConcurrency;
+
+    private Long runningTasks;
+
+    private Integer cpuCore;
+
+    private String version;
+
     private LocalDateTime revokedTime;
 
     private String revokedBy;

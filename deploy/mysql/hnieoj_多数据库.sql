@@ -337,6 +337,11 @@ CREATE TABLE `judge_node_token` (
   `auth_code_id` bigint(20) DEFAULT NULL COMMENT '来源授权码 ID',
   `expire_time` datetime NOT NULL COMMENT 'Token 过期时间',
   `last_used_time` datetime DEFAULT NULL COMMENT '最近使用时间',
+  `last_heartbeat_time` datetime DEFAULT NULL COMMENT '最近心跳时间',
+  `max_concurrency` int(11) DEFAULT NULL COMMENT '节点最大并发',
+  `running_tasks` bigint(20) DEFAULT NULL COMMENT '当前运行任务数',
+  `cpu_core` int(11) DEFAULT NULL COMMENT 'CPU 核心数',
+  `version` varchar(100) DEFAULT NULL COMMENT '节点版本',
   `revoked_time` datetime DEFAULT NULL COMMENT '吊销时间',
   `revoked_by` varchar(50) DEFAULT NULL COMMENT '吊销管理员',
   `gmt_create` datetime DEFAULT CURRENT_TIMESTAMP,
@@ -344,6 +349,7 @@ CREATE TABLE `judge_node_token` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_token_id` (`token_id`),
   KEY `idx_node_id` (`node_id`),
+  KEY `idx_last_heartbeat_time` (`last_heartbeat_time`),
   KEY `idx_status_expire` (`status`, `expire_time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='判题节点短期 Token 审计记录';
 

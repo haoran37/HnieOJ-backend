@@ -56,8 +56,8 @@ public class JudgeNodeSecurityServiceImpl implements JudgeNodeSecurityService {
     private static final String CLAIM_NODE_TYPE = "type";
     private static final String CLAIM_EXPIRE_TIME = "exp";
     private static final String CLAIM_ISSUED_AT = "iat";
-    //TODO
     private static final String DEFAULT_SECRET_MARK = "replace_me";
+    private static final long HEARTBEAT_ONLINE_TIMEOUT_SECONDS = 90;
 
     private final JudgeNodeAuthCodeMapper authCodeMapper;
     private final JudgeNodeTokenMapper tokenMapper;
@@ -445,8 +445,21 @@ public class JudgeNodeSecurityServiceImpl implements JudgeNodeSecurityService {
         vo.setStatus(token.getStatus());
         vo.setExpireTime(token.getExpireTime());
         vo.setLastUsedTime(token.getLastUsedTime());
+        vo.setLastHeartbeatTime(token.getLastHeartbeatTime());
+        vo.setOnline(isOnline(token));
+        vo.setMaxConcurrency(token.getMaxConcurrency());
+        vo.setRunningTasks(token.getRunningTasks());
+        vo.setCpuCore(token.getCpuCore());
+        vo.setVersion(token.getVersion());
         vo.setGmtCreate(token.getGmtCreate());
         return vo;
+    }
+
+    private Boolean isOnline(JudgeNodeToken token) {
+        if (token.getLastHeartbeatTime() == null || !JudgeNodeConstant.TOKEN_ACTIVE.equals(token.getStatus())) {
+            return false;
+        }
+        return token.getLastHeartbeatTime().isAfter(LocalDateTime.now().minusSeconds(HEARTBEAT_ONLINE_TIMEOUT_SECONDS));
     }
 
     /**

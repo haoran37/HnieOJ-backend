@@ -226,6 +226,10 @@ gojudge:
   endpoint: "http://go-judge-sandbox:5050"
 reporter:
   mode: "http"
+heartbeat:
+  enabled: true
+  endpoint: "/judge/nodes/heartbeat"
+  interval: "30s"
 ```
 
 正式节点长期 Token 不在配置文件中填写。`hnieoj-judge` 启动后如果数据库中没有 active 正式 Token，会自动生成 Token、保存哈希、使用公钥加密并发布到 Nacos。

@@ -26,5 +26,17 @@ public class JudgeNodeTokenVo {
 
     private LocalDateTime lastUsedTime;
 
+    private LocalDateTime lastHeartbeatTime;
+
+    private Boolean online;
+
+    private Integer maxConcurrency;
+
+    private Long runningTasks;
+
+    private Integer cpuCore;
+
+    private String version;
+
     private LocalDateTime gmtCreate;
 }

@@ -39,6 +39,7 @@ public class SaTokenConfig {
                 .addExclude("/api/judge/temp-token")
                 .addExclude("/judge/problems/**")
                 .addExclude("/judge/submissions/**")
+                .addExclude("/judge/nodes/**")
                 .addExclude("/ws/submissions/**")
                 .setAuth(obj -> {
                     // 统一登录态校验（双重保险：exclude + notMatch，避免误拦截登录/注册）
@@ -53,6 +54,7 @@ public class SaTokenConfig {
                                     "/api/judge/temp-token",
                                     "/judge/problems/**",
                                     "/judge/submissions/**",
+                                    "/judge/nodes/**",
                                     "/ws/submissions/**"
                             )
                             .check(r -> {

@@ -43,6 +43,12 @@ public class AdminJudgeNodeController {
         return Result.success(judgeNodeSecurityService.createAuthCode(request));
     }
 
+    @Operation(summary = "查询判题节点状态")
+    @GetMapping
+    public Result<List<JudgeNodeTokenVo>> listNodes(@RequestParam(required = false) String status) {
+        return Result.success(judgeNodeSecurityService.listTokens(status));
+    }
+
     @Operation(summary = "查询判题节点短期 Token")
     @GetMapping("/tokens")
     public Result<List<JudgeNodeTokenVo>> listTokens(@RequestParam(required = false) String status) {

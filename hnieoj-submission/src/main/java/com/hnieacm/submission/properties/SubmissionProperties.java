@@ -20,4 +20,35 @@ public class SubmissionProperties {
      * 单次提交代码最大字节数，按 UTF-8 编码计算。
      */
     private Integer maxCodeBytes = 65536;
+
+    private JudgeOutbox judgeOutbox = new JudgeOutbox();
+
+    @Data
+    public static class JudgeOutbox {
+
+        /**
+         * 重试扫描间隔，单位毫秒。
+         */
+        private Long retryIntervalMs = 10000L;
+
+        /**
+         * 单次扫描最多处理的 outbox 数量。
+         */
+        private Integer retryBatchSize = 20;
+
+        /**
+         * 最大投递次数。
+         */
+        private Integer maxRetryCount = 10;
+
+        /**
+         * 每次失败后的下次重试间隔，单位秒。
+         */
+        private Long retryBackoffSeconds = 30L;
+
+        /**
+         * processing 状态超时时间，单位秒。
+         */
+        private Long processingTimeoutSeconds = 120L;
+    }
 }

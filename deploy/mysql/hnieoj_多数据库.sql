@@ -432,6 +432,31 @@ CREATE TABLE `judge_case` (
   UNIQUE KEY `uk_submit_case` (`submit_id`, `case_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- 判题任务 outbox，用于提交事务成功但 MQ 投递失败时自动补偿
+DROP TABLE IF EXISTS `judge_task_outbox`;
+CREATE TABLE `judge_task_outbox` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `message_id` varchar(64) NOT NULL COMMENT 'RabbitMQ 消息 ID',
+  `judge_task_id` varchar(64) NOT NULL COMMENT '判题任务 ID',
+  `submission_id` varchar(64) NOT NULL COMMENT '提交展示 ID',
+  `exchange_name` varchar(128) NOT NULL COMMENT 'RabbitMQ exchange',
+  `routing_key` varchar(128) NOT NULL COMMENT 'RabbitMQ routing key',
+  `payload` longtext NOT NULL COMMENT '判题任务消息 JSON',
+  `status` varchar(20) NOT NULL DEFAULT 'pending' COMMENT 'pending, processing, sent, failed, exhausted',
+  `retry_count` int(11) NOT NULL DEFAULT '0',
+  `max_retry_count` int(11) NOT NULL DEFAULT '10',
+  `next_retry_time` datetime DEFAULT CURRENT_TIMESTAMP,
+  `sent_time` datetime DEFAULT NULL,
+  `last_error` text,
+  `gmt_create` datetime DEFAULT CURRENT_TIMESTAMP,
+  `gmt_modified` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_message_id` (`message_id`),
+  KEY `idx_status_next_retry` (`status`, `next_retry_time`),
+  KEY `idx_submission_id` (`submission_id`),
+  KEY `idx_judge_task_id` (`judge_task_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='判题任务 outbox';
+
 -- 重判任务表
 DROP TABLE IF EXISTS `rejudge_task`;
 CREATE TABLE `rejudge_task` (

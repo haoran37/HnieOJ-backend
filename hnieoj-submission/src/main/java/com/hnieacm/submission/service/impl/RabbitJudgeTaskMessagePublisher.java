@@ -1,20 +1,33 @@
 package com.hnieacm.submission.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hnieacm.common.dto.JudgeTaskMessage;
+import com.hnieacm.common.exception.BizException;
 import com.hnieacm.common.properties.JudgeMqProperties;
+import com.hnieacm.common.result.ResultCode;
+import com.hnieacm.submission.constant.JudgeTaskOutboxStatusConstant;
 import com.hnieacm.submission.dto.ProblemBasicDto;
 import com.hnieacm.submission.entity.Judge;
+import com.hnieacm.submission.entity.JudgeTaskOutbox;
+import com.hnieacm.submission.mapper.JudgeTaskOutboxMapper;
+import com.hnieacm.submission.properties.SubmissionProperties;
 import com.hnieacm.submission.service.JudgeTaskMessagePublisher;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.core.MessageDeliveryMode;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -34,41 +47,155 @@ public class RabbitJudgeTaskMessagePublisher implements JudgeTaskMessagePublishe
     private static final int DEFAULT_STACK_LIMIT = 128;
     private static final int DEFAULT_IO_SCORE = 100;
     private static final int DEFAULT_DATA_VERSION = 1;
+    private static final int DEFAULT_RETRY_BATCH_SIZE = 20;
+    private static final int DEFAULT_MAX_RETRY_COUNT = 10;
+    private static final long DEFAULT_RETRY_BACKOFF_SECONDS = 30L;
+    private static final long DEFAULT_PROCESSING_TIMEOUT_SECONDS = 120L;
+    private static final int MAX_ERROR_LENGTH = 1000;
 
     private final RabbitTemplate rabbitTemplate;
     private final JudgeMqProperties properties;
+    private final JudgeTaskOutboxMapper outboxMapper;
+    private final ObjectMapper objectMapper;
+    private final SubmissionProperties submissionProperties;
 
     @Override
     public void publishAfterCommit(Judge judge, ProblemBasicDto problem) {
         if (judge == null) {
             return;
         }
+        JudgeTaskMessage message = buildMessage(judge, problem);
+        JudgeTaskOutbox outbox = createOutbox(message);
+        outboxMapper.insert(outbox);
         if (TransactionSynchronizationManager.isActualTransactionActive()) {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override
                 public void afterCommit() {
-                    publish(judge, problem);
+                    publishOutbox(outbox.getId());
                 }
             });
             return;
         }
-        publish(judge, problem);
+        publishOutbox(outbox.getId());
     }
 
-    private void publish(Judge judge, ProblemBasicDto problem) {
-        JudgeTaskMessage message = buildMessage(judge, problem);
+    @Scheduled(fixedDelayString = "${hnieoj.submission.judge-outbox.retry-interval-ms:10000}")
+    public void retryPendingOutbox() {
+        List<JudgeTaskOutbox> candidates = queryRetryCandidates();
+        if (candidates.isEmpty()) {
+            return;
+        }
+        for (JudgeTaskOutbox outbox : candidates) {
+            publishOutbox(outbox.getId());
+        }
+    }
+
+    private void publishOutbox(Long outboxId) {
+        if (outboxId == null) {
+            return;
+        }
+        JudgeTaskOutbox outbox = outboxMapper.selectById(outboxId);
+        if (outbox == null || JudgeTaskOutboxStatusConstant.SENT.equals(outbox.getStatus())) {
+            return;
+        }
+        if (!markProcessing(outbox)) {
+            return;
+        }
         try {
-            rabbitTemplate.convertAndSend(properties.getExchange(), properties.getRoutingKey(), message, item -> {
+            JudgeTaskMessage message = objectMapper.readValue(outbox.getPayload(), JudgeTaskMessage.class);
+            rabbitTemplate.convertAndSend(outbox.getExchangeName(), outbox.getRoutingKey(), message, item -> {
                 item.getMessageProperties().setMessageId(message.getMessageId());
                 item.getMessageProperties().setDeliveryMode(MessageDeliveryMode.PERSISTENT);
                 return item;
             });
+            markSent(outbox.getId());
             log.info("Judge task message published, submissionId: {}, judgeId: {}, messageId: {}",
                     message.getSubmissionId(), message.getJudgeId(), message.getMessageId());
         } catch (Exception e) {
-            log.error("Publish judge task message failed, submissionId: {}, judgeId: {}",
-                    message.getSubmissionId(), message.getJudgeId(), e);
+            markFailed(outbox, e);
+            log.error("Publish judge task message failed, outboxId: {}, submissionId: {}, messageId: {}",
+                    outbox.getId(), outbox.getSubmissionId(), outbox.getMessageId(), e);
         }
+    }
+
+    private JudgeTaskOutbox createOutbox(JudgeTaskMessage message) {
+        JudgeTaskOutbox outbox = new JudgeTaskOutbox();
+        outbox.setMessageId(message.getMessageId());
+        outbox.setJudgeTaskId(message.getJudgeTaskId());
+        outbox.setSubmissionId(message.getSubmissionId());
+        outbox.setExchangeName(properties.getExchange());
+        outbox.setRoutingKey(properties.getRoutingKey());
+        outbox.setStatus(JudgeTaskOutboxStatusConstant.PENDING);
+        outbox.setRetryCount(0);
+        outbox.setMaxRetryCount(maxRetryCount());
+        outbox.setNextRetryTime(LocalDateTime.now());
+        try {
+            outbox.setPayload(objectMapper.writeValueAsString(message));
+        } catch (JsonProcessingException e) {
+            throw new BizException(ResultCode.INTERNAL_ERROR, "创建判题任务失败");
+        }
+        return outbox;
+    }
+
+    private List<JudgeTaskOutbox> queryRetryCandidates() {
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime staleProcessingTime = now.minusSeconds(processingTimeoutSeconds());
+        return outboxMapper.selectList(new LambdaQueryWrapper<JudgeTaskOutbox>()
+                .lt(JudgeTaskOutbox::getRetryCount, maxRetryCount())
+                .and(wrapper -> wrapper
+                        .and(item -> item.in(JudgeTaskOutbox::getStatus,
+                                        JudgeTaskOutboxStatusConstant.PENDING,
+                                        JudgeTaskOutboxStatusConstant.FAILED)
+                                .le(JudgeTaskOutbox::getNextRetryTime, now))
+                        .or(item -> item.eq(JudgeTaskOutbox::getStatus, JudgeTaskOutboxStatusConstant.PROCESSING)
+                                .le(JudgeTaskOutbox::getGmtModified, staleProcessingTime)))
+                .orderByAsc(JudgeTaskOutbox::getNextRetryTime)
+                .orderByAsc(JudgeTaskOutbox::getId)
+                .last("limit " + retryBatchSize()));
+    }
+
+    private boolean markProcessing(JudgeTaskOutbox outbox) {
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime staleProcessingTime = now.minusSeconds(processingTimeoutSeconds());
+        int updated = outboxMapper.update(null, new LambdaUpdateWrapper<JudgeTaskOutbox>()
+                .eq(JudgeTaskOutbox::getId, outbox.getId())
+                .lt(JudgeTaskOutbox::getRetryCount, maxRetryCount())
+                .and(wrapper -> wrapper
+                        .and(item -> item.in(JudgeTaskOutbox::getStatus,
+                                        JudgeTaskOutboxStatusConstant.PENDING,
+                                        JudgeTaskOutboxStatusConstant.FAILED)
+                                .le(JudgeTaskOutbox::getNextRetryTime, now))
+                        .or(item -> item.eq(JudgeTaskOutbox::getStatus, JudgeTaskOutboxStatusConstant.PROCESSING)
+                                .le(JudgeTaskOutbox::getGmtModified, staleProcessingTime)))
+                .set(JudgeTaskOutbox::getStatus, JudgeTaskOutboxStatusConstant.PROCESSING));
+        return updated > 0;
+    }
+
+    private void markSent(Long outboxId) {
+        outboxMapper.update(null, new LambdaUpdateWrapper<JudgeTaskOutbox>()
+                .eq(JudgeTaskOutbox::getId, outboxId)
+                .set(JudgeTaskOutbox::getStatus, JudgeTaskOutboxStatusConstant.SENT)
+                .set(JudgeTaskOutbox::getSentTime, LocalDateTime.now())
+                .set(JudgeTaskOutbox::getLastError, null)
+                .set(JudgeTaskOutbox::getNextRetryTime, null));
+    }
+
+    private void markFailed(JudgeTaskOutbox outbox, Exception e) {
+        int nextRetryCount = defaultInteger(outbox.getRetryCount(), 0) + 1;
+        boolean exhausted = nextRetryCount >= maxRetryCount();
+        LambdaUpdateWrapper<JudgeTaskOutbox> wrapper = new LambdaUpdateWrapper<JudgeTaskOutbox>()
+                .eq(JudgeTaskOutbox::getId, outbox.getId())
+                .set(JudgeTaskOutbox::getRetryCount, nextRetryCount)
+                .set(JudgeTaskOutbox::getStatus, exhausted
+                        ? JudgeTaskOutboxStatusConstant.EXHAUSTED : JudgeTaskOutboxStatusConstant.FAILED)
+                .set(JudgeTaskOutbox::getLastError, truncateError(e.getMessage()));
+        if (exhausted) {
+            wrapper.set(JudgeTaskOutbox::getNextRetryTime, null);
+        } else {
+            wrapper.set(JudgeTaskOutbox::getNextRetryTime,
+                    LocalDateTime.now().plusSeconds(retryBackoffSeconds()));
+        }
+        outboxMapper.update(null, wrapper);
     }
 
     private JudgeTaskMessage buildMessage(Judge judge, ProblemBasicDto problem) {
@@ -103,5 +230,32 @@ public class RabbitJudgeTaskMessagePublisher implements JudgeTaskMessagePublishe
 
     private String defaultString(String value, String defaultValue) {
         return value == null || value.isBlank() ? defaultValue : value;
+    }
+
+    private int retryBatchSize() {
+        Integer value = submissionProperties.getJudgeOutbox().getRetryBatchSize();
+        return value == null || value <= 0 ? DEFAULT_RETRY_BATCH_SIZE : value;
+    }
+
+    private int maxRetryCount() {
+        Integer value = submissionProperties.getJudgeOutbox().getMaxRetryCount();
+        return value == null || value <= 0 ? DEFAULT_MAX_RETRY_COUNT : value;
+    }
+
+    private long retryBackoffSeconds() {
+        Long value = submissionProperties.getJudgeOutbox().getRetryBackoffSeconds();
+        return value == null || value <= 0 ? DEFAULT_RETRY_BACKOFF_SECONDS : value;
+    }
+
+    private long processingTimeoutSeconds() {
+        Long value = submissionProperties.getJudgeOutbox().getProcessingTimeoutSeconds();
+        return value == null || value <= 0 ? DEFAULT_PROCESSING_TIMEOUT_SECONDS : value;
+    }
+
+    private String truncateError(String message) {
+        if (message == null) {
+            return null;
+        }
+        return message.length() <= MAX_ERROR_LENGTH ? message : message.substring(0, MAX_ERROR_LENGTH);
     }
 }

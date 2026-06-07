@@ -30,3 +30,9 @@ hnieoj:
       dead-letter-routing-key: ${HNIEOJ_JUDGE_MQ_DLX_ROUTING_KEY:judge.submission.created.dlq}
   submission:
     max-code-bytes: ${HNIEOJ_SUBMISSION_MAX_CODE_BYTES:65536}
+    judge-outbox:
+      retry-interval-ms: ${HNIEOJ_JUDGE_OUTBOX_RETRY_INTERVAL_MS:10000}
+      retry-batch-size: ${HNIEOJ_JUDGE_OUTBOX_RETRY_BATCH_SIZE:20}
+      max-retry-count: ${HNIEOJ_JUDGE_OUTBOX_MAX_RETRY_COUNT:10}
+      retry-backoff-seconds: ${HNIEOJ_JUDGE_OUTBOX_RETRY_BACKOFF_SECONDS:30}
+      processing-timeout-seconds: ${HNIEOJ_JUDGE_OUTBOX_PROCESSING_TIMEOUT_SECONDS:120}

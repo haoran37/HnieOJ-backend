@@ -32,6 +32,17 @@ hnieoj:
   submission:
     # 单次提交代码最大字节数，按 UTF-8 编码计算。
     max-code-bytes: ${HNIEOJ_SUBMISSION_MAX_CODE_BYTES:65536}
+    judge-outbox:
+      # 判题任务 outbox 重试扫描间隔，单位毫秒。
+      retry-interval-ms: ${HNIEOJ_JUDGE_OUTBOX_RETRY_INTERVAL_MS:10000}
+      # 单次扫描最多处理的 outbox 数量。
+      retry-batch-size: ${HNIEOJ_JUDGE_OUTBOX_RETRY_BATCH_SIZE:20}
+      # 最大投递次数，超过后状态置为 exhausted，需要人工处理。
+      max-retry-count: ${HNIEOJ_JUDGE_OUTBOX_MAX_RETRY_COUNT:10}
+      # 每次投递失败后的下次重试间隔，单位秒。
+      retry-backoff-seconds: ${HNIEOJ_JUDGE_OUTBOX_RETRY_BACKOFF_SECONDS:30}
+      # processing 状态超时时间，超过后允许重新投递，单位秒。
+      processing-timeout-seconds: ${HNIEOJ_JUDGE_OUTBOX_PROCESSING_TIMEOUT_SECONDS:120}
     websocket:
       allowed-origins:
         - "http://localhost:3000"

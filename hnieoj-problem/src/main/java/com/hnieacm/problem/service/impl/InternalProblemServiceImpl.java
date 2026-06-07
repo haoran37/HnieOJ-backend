@@ -5,6 +5,7 @@ import com.hnieacm.problem.dto.ProblemBasicDto;
 import com.hnieacm.problem.entity.Problem;
 import com.hnieacm.problem.mapper.ProblemMapper;
 import com.hnieacm.problem.service.InternalProblemService;
+import com.hnieacm.problem.service.ProblemFileStorageService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -25,6 +26,7 @@ import java.util.stream.Collectors;
 public class InternalProblemServiceImpl implements InternalProblemService {
 
     private final ProblemMapper problemMapper;
+    private final ProblemFileStorageService problemFileStorageService;
 
     /**
      * @MethodName getProblemBasicByProblemCode
@@ -97,5 +99,8 @@ public class InternalProblemServiceImpl implements InternalProblemService {
         dto.setIoScore(problem.getIoScore());
         dto.setIsRemoveEndBlank(problem.getIsRemoveEndBlank());
         dto.setDataVersion(problem.getDataVersion());
+        int testdataCaseCount = problemFileStorageService.countAvailableTestdataCases(problem.getId());
+        dto.setHasTestdata(testdataCaseCount > 0);
+        dto.setTestdataCaseCount(testdataCaseCount);
     }
 }

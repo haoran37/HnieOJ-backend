@@ -33,6 +33,10 @@ public class ProblemBasicDto {
     private Boolean isRemoveEndBlank;
 
     private Integer dataVersion;
+
+    private Boolean hasTestdata;
+
+    private Integer testdataCaseCount;
 }
 
 

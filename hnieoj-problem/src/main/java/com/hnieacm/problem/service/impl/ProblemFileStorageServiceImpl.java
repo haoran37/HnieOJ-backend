@@ -231,8 +231,13 @@ public class ProblemFileStorageServiceImpl implements ProblemFileStorageService 
 
     @Override
     public boolean hasAvailableTestdata(Long problemId) {
+        return countAvailableTestdataCases(problemId) > 0;
+    }
+
+    @Override
+    public int countAvailableTestdataCases(Long problemId) {
         Path testdataDir = resolveProblemPath(problemId, TESTDATA_DIR);
-        return !listTestdataFiles(testdataDir).isEmpty();
+        return listTestdataPairs(testdataDir).size();
     }
 
     private Map<String, byte[]> readAndValidateTestdataZip(MultipartFile file) {

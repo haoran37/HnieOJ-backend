@@ -22,4 +22,6 @@ public class ProblemBasicDto {
     private Integer ioScore;
     private Boolean isRemoveEndBlank;
     private Integer dataVersion;
+    private Boolean hasTestdata;
+    private Integer testdataCaseCount;
 }

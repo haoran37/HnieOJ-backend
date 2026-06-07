@@ -28,4 +28,6 @@ public interface ProblemFileStorageService {
     void writeTestdataCaseZip(Long problemId, Integer caseNo, OutputStream outputStream);
 
     boolean hasAvailableTestdata(Long problemId);
+
+    int countAvailableTestdataCases(Long problemId);
 }

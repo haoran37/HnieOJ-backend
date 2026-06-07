@@ -340,6 +340,9 @@ public class SubmissionServiceImpl implements SubmissionService {
         if (problem.getAuth() != ProblemAuthConstant.PUBLIC && !StpUtil.hasPermission(PermissionConstant.PROBLEM_UPDATE)) {
             throw new BizException(ResultCode.FORBIDDEN, "该题目当前不可提交");
         }
+        if (!Boolean.TRUE.equals(problem.getHasTestdata()) || defaultZero(problem.getTestdataCaseCount()) <= 0) {
+            throw new BizException(ResultCode.BAD_REQUEST, "题目测试数据未配置，暂不能提交");
+        }
     }
 
     /**

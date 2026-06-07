@@ -18,6 +18,10 @@ spring:
     username: ${RABBITMQ_USERNAME:hnieoj_judge}
     password: ${RABBITMQ_PASSWORD:}
     virtual-host: ${RABBITMQ_VHOST:hnieoj}
+    publisher-confirm-type: correlated
+    publisher-returns: true
+    template:
+      mandatory: true
 
 hnieoj:
   judge:

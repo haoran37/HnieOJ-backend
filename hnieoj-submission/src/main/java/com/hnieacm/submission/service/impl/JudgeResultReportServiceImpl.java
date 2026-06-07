@@ -14,6 +14,7 @@ import com.hnieacm.submission.mapper.JudgeMapper;
 import com.hnieacm.submission.service.JudgeResultReportService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -177,10 +178,20 @@ public class JudgeResultReportServiceImpl implements JudgeResultReportService {
         entity.setScore(defaultZero(result.getScore()));
         entity.setUserOutput(StrUtil.trimToNull(result.getUserOutput()));
         if (exist == null) {
-            judgeCaseMapper.insert(entity);
+            try {
+                judgeCaseMapper.insert(entity);
+            } catch (DuplicateKeyException e) {
+                updateJudgeCase(judge.getId(), caseId, entity);
+            }
         } else {
             judgeCaseMapper.updateById(entity);
         }
+    }
+
+    private void updateJudgeCase(Long judgeId, String caseId, JudgeCase entity) {
+        judgeCaseMapper.update(entity, new LambdaUpdateWrapper<JudgeCase>()
+                .eq(JudgeCase::getSubmitId, judgeId)
+                .eq(JudgeCase::getCaseId, caseId));
     }
 
     private boolean isCurrentJudgeTask(Judge judge, JudgeResultEventRequest request) {

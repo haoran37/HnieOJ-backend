@@ -15,9 +15,11 @@ import com.hnieacm.submission.entity.JudgeTaskOutbox;
 import com.hnieacm.submission.mapper.JudgeTaskOutboxMapper;
 import com.hnieacm.submission.properties.SubmissionProperties;
 import com.hnieacm.submission.service.JudgeTaskMessagePublisher;
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.core.MessageDeliveryMode;
+import org.springframework.amqp.rabbit.connection.CorrelationData;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -58,6 +60,33 @@ public class RabbitJudgeTaskMessagePublisher implements JudgeTaskMessagePublishe
     private final JudgeTaskOutboxMapper outboxMapper;
     private final ObjectMapper objectMapper;
     private final SubmissionProperties submissionProperties;
+
+    @PostConstruct
+    public void initRabbitCallbacks() {
+        rabbitTemplate.setMandatory(true);
+        rabbitTemplate.setConfirmCallback((correlationData, ack, cause) -> {
+            Long outboxId = parseOutboxId(correlationData == null ? null : correlationData.getId());
+            if (outboxId == null) {
+                log.warn("Rabbit confirm ignored because correlation id is missing, ack: {}, cause: {}", ack, cause);
+                return;
+            }
+            if (ack) {
+                markSent(outboxId);
+                return;
+            }
+            markFailed(outboxId, new IllegalStateException(defaultString(cause, "RabbitMQ publisher confirm nack")));
+        });
+        rabbitTemplate.setReturnsCallback(returned -> {
+            Long outboxId = parseOutboxId(returned.getMessage().getMessageProperties().getCorrelationId());
+            if (outboxId == null) {
+                log.warn("Rabbit returned message ignored because correlation id is missing, replyCode: {}, replyText: {}",
+                        returned.getReplyCode(), returned.getReplyText());
+                return;
+            }
+            markFailed(outboxId, new IllegalStateException("RabbitMQ returned message, replyCode: "
+                    + returned.getReplyCode() + ", replyText: " + returned.getReplyText()));
+        });
+    }
 
     @Override
     public void publishAfterCommit(Judge judge, ProblemBasicDto problem) {
@@ -120,11 +149,11 @@ public class RabbitJudgeTaskMessagePublisher implements JudgeTaskMessagePublishe
             JudgeTaskMessage message = objectMapper.readValue(outbox.getPayload(), JudgeTaskMessage.class);
             rabbitTemplate.convertAndSend(outbox.getExchangeName(), outbox.getRoutingKey(), message, item -> {
                 item.getMessageProperties().setMessageId(message.getMessageId());
+                item.getMessageProperties().setCorrelationId(String.valueOf(outbox.getId()));
                 item.getMessageProperties().setDeliveryMode(MessageDeliveryMode.PERSISTENT);
                 return item;
-            });
-            markSent(outbox.getId());
-            log.info("Judge task message published, submissionId: {}, judgeId: {}, messageId: {}",
+            }, new CorrelationData(String.valueOf(outbox.getId())));
+            log.info("Judge task message sent to RabbitTemplate, submissionId: {}, judgeId: {}, messageId: {}",
                     message.getSubmissionId(), message.getJudgeId(), message.getMessageId());
         } catch (Exception e) {
             markFailed(outbox, e);
@@ -189,10 +218,19 @@ public class RabbitJudgeTaskMessagePublisher implements JudgeTaskMessagePublishe
     private void markSent(Long outboxId) {
         outboxMapper.update(null, new LambdaUpdateWrapper<JudgeTaskOutbox>()
                 .eq(JudgeTaskOutbox::getId, outboxId)
+                .eq(JudgeTaskOutbox::getStatus, JudgeTaskOutboxStatusConstant.PROCESSING)
                 .set(JudgeTaskOutbox::getStatus, JudgeTaskOutboxStatusConstant.SENT)
                 .set(JudgeTaskOutbox::getSentTime, LocalDateTime.now())
                 .set(JudgeTaskOutbox::getLastError, null)
                 .set(JudgeTaskOutbox::getNextRetryTime, null));
+    }
+
+    private void markFailed(Long outboxId, Exception e) {
+        JudgeTaskOutbox outbox = outboxMapper.selectById(outboxId);
+        if (outbox == null) {
+            return;
+        }
+        markFailed(outbox, e);
     }
 
     private void markFailed(JudgeTaskOutbox outbox, Exception e) {
@@ -200,6 +238,7 @@ public class RabbitJudgeTaskMessagePublisher implements JudgeTaskMessagePublishe
         boolean exhausted = nextRetryCount >= maxRetryCount();
         LambdaUpdateWrapper<JudgeTaskOutbox> wrapper = new LambdaUpdateWrapper<JudgeTaskOutbox>()
                 .eq(JudgeTaskOutbox::getId, outbox.getId())
+                .eq(JudgeTaskOutbox::getStatus, JudgeTaskOutboxStatusConstant.PROCESSING)
                 .set(JudgeTaskOutbox::getRetryCount, nextRetryCount)
                 .set(JudgeTaskOutbox::getStatus, exhausted
                         ? JudgeTaskOutboxStatusConstant.EXHAUSTED : JudgeTaskOutboxStatusConstant.FAILED)
@@ -272,5 +311,16 @@ public class RabbitJudgeTaskMessagePublisher implements JudgeTaskMessagePublishe
             return null;
         }
         return message.length() <= MAX_ERROR_LENGTH ? message : message.substring(0, MAX_ERROR_LENGTH);
+    }
+
+    private Long parseOutboxId(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return Long.parseLong(value);
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 }

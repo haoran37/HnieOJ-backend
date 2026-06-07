@@ -15,6 +15,10 @@ spring:
     username: ${hnieoj.rabbitmq.username}
     password: ${hnieoj.rabbitmq.password}
     virtual-host: ${hnieoj.rabbitmq.virtual-host}
+    publisher-confirm-type: correlated
+    publisher-returns: true
+    template:
+      mandatory: true
 
 sa-token:
   is-print: false

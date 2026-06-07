@@ -173,6 +173,19 @@ bash deploy/scripts/deploy-dev.sh rabbitmq-ps
 bash deploy/scripts/deploy-dev.sh rabbitmq-logs
 ```
 
+查看判题任务队列与死信队列积压：
+```bash
+bash deploy/scripts/deploy-dev.sh judge-dlq-status
+```
+
+将判题死信队列中的消息重投回任务队列，默认最多重投 10 条，也可以显式指定数量：
+```bash
+bash deploy/scripts/deploy-dev.sh judge-dlq-requeue
+bash deploy/scripts/deploy-dev.sh judge-dlq-requeue 20
+```
+
+该命令使用 RabbitMQ Management HTTP API，需要 `.env` 中的 `RABBITMQ_MANAGEMENT_URL`、`RABBITMQ_MANAGEMENT_USERNAME`、`RABBITMQ_MANAGEMENT_PASSWORD` 可用。使用项目自带 RabbitMQ 容器时默认指向 `http://127.0.0.1:15672`。
+
 停止并移除 RabbitMQ 容器：
 
 ```bash

@@ -36,3 +36,9 @@ hnieoj:
       max-retry-count: ${HNIEOJ_JUDGE_OUTBOX_MAX_RETRY_COUNT:10}
       retry-backoff-seconds: ${HNIEOJ_JUDGE_OUTBOX_RETRY_BACKOFF_SECONDS:30}
       processing-timeout-seconds: ${HNIEOJ_JUDGE_OUTBOX_PROCESSING_TIMEOUT_SECONDS:120}
+    judge-timeout:
+      enabled: ${HNIEOJ_JUDGE_TIMEOUT_ENABLED:true}
+      scan-interval-ms: ${HNIEOJ_JUDGE_TIMEOUT_SCAN_INTERVAL_MS:60000}
+      batch-size: ${HNIEOJ_JUDGE_TIMEOUT_BATCH_SIZE:100}
+      pending-timeout-seconds: ${HNIEOJ_JUDGE_PENDING_TIMEOUT_SECONDS:1800}
+      active-timeout-seconds: ${HNIEOJ_JUDGE_ACTIVE_TIMEOUT_SECONDS:1800}

@@ -23,6 +23,8 @@ public class SubmissionProperties {
 
     private JudgeOutbox judgeOutbox = new JudgeOutbox();
 
+    private JudgeTimeout judgeTimeout = new JudgeTimeout();
+
     @Data
     public static class JudgeOutbox {
 
@@ -50,5 +52,34 @@ public class SubmissionProperties {
          * processing 状态超时时间，单位秒。
          */
         private Long processingTimeoutSeconds = 120L;
+    }
+
+    @Data
+    public static class JudgeTimeout {
+
+        /**
+         * 是否启用卡住提交扫描。
+         */
+        private Boolean enabled = Boolean.TRUE;
+
+        /**
+         * 扫描间隔，单位毫秒。
+         */
+        private Long scanIntervalMs = 60000L;
+
+        /**
+         * 单次最多处理的提交数量。
+         */
+        private Integer batchSize = 100;
+
+        /**
+         * Pending 状态超时时间，单位秒。
+         */
+        private Long pendingTimeoutSeconds = 1800L;
+
+        /**
+         * Compiling/Running 状态超时时间，单位秒。
+         */
+        private Long activeTimeoutSeconds = 1800L;
     }
 }

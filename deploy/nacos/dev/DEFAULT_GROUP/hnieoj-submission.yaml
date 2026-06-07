@@ -43,6 +43,17 @@ hnieoj:
       retry-backoff-seconds: ${HNIEOJ_JUDGE_OUTBOX_RETRY_BACKOFF_SECONDS:30}
       # processing 状态超时时间，超过后允许重新投递，单位秒。
       processing-timeout-seconds: ${HNIEOJ_JUDGE_OUTBOX_PROCESSING_TIMEOUT_SECONDS:120}
+    judge-timeout:
+      # 是否启用卡住提交扫描。
+      enabled: ${HNIEOJ_JUDGE_TIMEOUT_ENABLED:true}
+      # 扫描间隔，单位毫秒。
+      scan-interval-ms: ${HNIEOJ_JUDGE_TIMEOUT_SCAN_INTERVAL_MS:60000}
+      # 单次最多处理的提交数量。
+      batch-size: ${HNIEOJ_JUDGE_TIMEOUT_BATCH_SIZE:100}
+      # Pending 状态超时时间，单位秒。
+      pending-timeout-seconds: ${HNIEOJ_JUDGE_PENDING_TIMEOUT_SECONDS:1800}
+      # Compiling/Running 状态超时时间，单位秒。
+      active-timeout-seconds: ${HNIEOJ_JUDGE_ACTIVE_TIMEOUT_SECONDS:1800}
     websocket:
       allowed-origins:
         - "http://localhost:3000"

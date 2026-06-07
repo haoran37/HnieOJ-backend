@@ -1,0 +1,33 @@
+# HnieOJ 判题节点运行配置
+# 只放非敏感、可多节点统一调整的配置。
+# 不要在这里放 RabbitMQ 密码、正式节点私钥路径、临时授权码、节点名称等节点私有或敏感配置。
+
+node:
+  # 单个判题节点最大并发任务数；也可以用环境变量 HNIEOJ_NODE_MAX_CONCURRENCY 按节点覆盖。
+  maxConcurrency: 2
+
+rabbitmq:
+  # RabbitMQ 消费预取数量，通常与 maxConcurrency 保持一致。
+  prefetch: 2
+  # 单条判题任务消费失败后的最大重试次数。
+  maxRetries: 3
+  # 判题任务重试退避时间。
+  retryBackoff: "10s"
+
+testdata:
+  # 测试数据缓存最大占用字节数，0 表示不按容量清理。默认 20GB。
+  maxCacheBytes: 21474836480
+  # 测试数据多久未使用后可被清理，0 表示不按时间清理。
+  maxUnusedDuration: "72h"
+  # 缓存清理任务执行间隔。
+  cleanupInterval: "1h"
+  # 缓存与磁盘统计采样间隔，心跳会复用最近一次采样值。
+  statsInterval: "5m"
+
+heartbeat:
+  # 是否启用判题节点心跳。生产环境建议开启。
+  enabled: true
+  # 后端内部心跳接口路径，不对前端暴露。
+  endpoint: "/judge/nodes/heartbeat"
+  # 心跳发送间隔；后端按最近心跳判断节点在线状态。
+  interval: "30s"

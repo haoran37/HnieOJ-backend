@@ -248,6 +248,8 @@ POST /api/admin/judge/nodes/formal-token/rotate
 bash deploy/scripts/deploy-dev.sh gojudge-ps
 bash deploy/scripts/deploy-dev.sh gojudge-logs
 bash deploy/scripts/deploy-dev.sh gojudge-logs hnieoj-judge-node
+bash deploy/scripts/deploy-dev.sh gojudge-cache-status
+bash deploy/scripts/deploy-dev.sh gojudge-cache-clean 7
 ```
 
 停止并移除 go-judge 容器：
@@ -256,7 +258,7 @@ bash deploy/scripts/deploy-dev.sh gojudge-logs hnieoj-judge-node
 bash deploy/scripts/deploy-dev.sh gojudge-down
 ```
 
-注意：`gojudge-down` 不会删除 `/data/oj/judge-cache`，因此测试数据缓存会保留。
+注意：`gojudge-down` 不会删除 `/data/oj/judge-cache`，因此测试数据缓存会保留。缓存清理策略默认由 Nacos `HNIEOJ_JUDGE_GROUP/hnieoj-judge-node.yaml` 管理；脚本中的 `gojudge-cache-clean` 用于临时手动清理。
 
 ## 快捷命令
 
@@ -291,6 +293,10 @@ bash deploy/scripts/deploy-dev.sh rabbitmq-up
 ```
 
 服务名与 `deploy/docker/docker-compose.dev.yml` 中的服务一致，例如 `gateway`、`hnieoj-auth`、`hnieoj-user`、`hnieoj-problem`、`hnieoj-submission`、`hnieoj-judge`。
+
+go-judge 节点启用心跳后，会通过内部心跳上报节点运行状态和缓存状态。后台接口 `GET /api/admin/judge/nodes` 可查看 `online`、`runningTasks`、`maxConcurrency`、`cacheUsedBytes`、`cacheProblemCount`、`diskTotalBytes`、`diskFreeBytes` 等字段。缓存统计来自 `GOJUDGE_CACHE_DIR`，默认约 5 分钟采样一次，用于前端展示判题机负载、测试数据缓存占用和磁盘风险。
+
+多判题机部署时，建议把非敏感运行参数放入 Nacos `HNIEOJ_JUDGE_GROUP/hnieoj-judge-node.yaml` 统一管理，例如 `testdata.maxCacheBytes`、`testdata.maxUnusedDuration`、`testdata.cleanupInterval`、`heartbeat.interval`、`rabbitmq.maxRetries`。节点名称、私钥路径、RabbitMQ 密码、临时授权码等仍保留在服务器 `.env` 或 `/etc/hnieoj/go-judge/config.yaml`。
 
 ## 检查命令
 

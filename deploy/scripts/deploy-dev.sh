@@ -83,6 +83,8 @@ usage() {
   gojudge-up          拉取、构建并启动 go-judge 沙箱与判题节点
   gojudge-ps          查看 go-judge 容器状态
   gojudge-logs        查看 go-judge 日志
+  gojudge-cache-status 查看 go-judge 测试数据缓存占用
+  gojudge-cache-clean [天数] 清理 N 天未修改的 go-judge 测试数据缓存，默认 7 天
   gojudge-down        停止并移除 go-judge 容器
   security-init       只生成/补齐 JWT Secret 与正式节点 RSA 公私钥
   help                显示帮助
@@ -440,6 +442,39 @@ start_gojudge() {
   log "go-judge 判题节点配置：${GOJUDGE_CONFIG_FILE}"
 }
 
+gojudge_cache_status() {
+  check_docker_environment
+  mkdir -p "${GOJUDGE_CACHE_DIR}"
+  log "go-judge 缓存目录：${GOJUDGE_CACHE_DIR}"
+  du -sh "${GOJUDGE_CACHE_DIR}" 2>/dev/null || true
+  df -h "${GOJUDGE_CACHE_DIR}" || true
+  if [[ -d "${GOJUDGE_CACHE_DIR}/problems" ]]; then
+    find "${GOJUDGE_CACHE_DIR}/problems" -mindepth 1 -maxdepth 1 -type d | wc -l | awk '{print "已缓存题目数量：" $1}'
+  else
+    log "已缓存题目数量：0"
+  fi
+}
+
+gojudge_cache_clean() {
+  local keep_days="${1:-7}"
+  local problem_cache_dir="${GOJUDGE_CACHE_DIR}/problems"
+  local resolved_cache_dir
+  local resolved_problem_dir
+
+  if ! [[ "${keep_days}" =~ ^[0-9]+$ ]]; then
+    fail "天数必须为非负整数"
+  fi
+  mkdir -p "${problem_cache_dir}"
+  resolved_cache_dir="$(realpath "${GOJUDGE_CACHE_DIR}")"
+  resolved_problem_dir="$(realpath "${problem_cache_dir}")"
+  if [[ "${resolved_problem_dir}" != "${resolved_cache_dir}/problems" ]]; then
+    fail "缓存目录校验失败，拒绝清理：${resolved_problem_dir}"
+  fi
+  log "开始清理 ${keep_days} 天未修改的 go-judge 测试数据缓存：${resolved_problem_dir}"
+  find "${resolved_problem_dir}" -mindepth 1 -maxdepth 1 -type d -mtime "+${keep_days}" -print -exec rm -rf {} +
+  gojudge_cache_status
+}
+
 rabbitmq_management_command() {
   local action="$1"
   local limit="${2:-10}"
@@ -645,6 +680,8 @@ main() {
     gojudge-up) start_gojudge ;;
     gojudge-ps) check_docker_environment; ensure_source_ready; export_gojudge_variables; gojudge_compose ps ;;
     gojudge-logs) check_docker_environment; ensure_source_ready; export_gojudge_variables; gojudge_compose logs -f --tail="${LOG_TAIL}" "$@" ;;
+    gojudge-cache-status) gojudge_cache_status ;;
+    gojudge-cache-clean) gojudge_cache_clean "${1:-7}" ;;
     gojudge-down) check_docker_environment; ensure_source_ready; export_gojudge_variables; gojudge_compose down ;;
     security-init) security_init_only ;;
     help|-h|--help) usage ;;

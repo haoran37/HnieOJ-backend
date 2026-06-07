@@ -146,6 +146,7 @@ bash deploy/scripts/deploy-dev.sh gojudge-up
 当前项目配置依赖 Nacos，建议区分为：
 
 - `DEFAULT_GROUP`：可公开的业务配置（端口、开关、路由、非敏感参数）
+- `HNIEOJ_JUDGE_GROUP`：判题节点非敏感运行配置（缓存清理、心跳间隔、MQ 重试等）
 - `HNIEOJ_SECRET_GROUP`：敏感配置（数据库密码、Redis 密码、内部 token、MQ 凭证等）
 
 仓库中的 Nacos 配置快照目录：`deploy/nacos`（详见 `deploy/nacos/README.md`）。

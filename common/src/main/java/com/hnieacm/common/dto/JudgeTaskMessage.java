@@ -18,6 +18,8 @@ public class JudgeTaskMessage implements Serializable {
 
     private String messageId;
 
+    private String judgeTaskId;
+
     private Long judgeId;
 
     private String submissionId;

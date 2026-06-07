@@ -73,7 +73,9 @@ public class RabbitJudgeTaskMessagePublisher implements JudgeTaskMessagePublishe
 
     private JudgeTaskMessage buildMessage(Judge judge, ProblemBasicDto problem) {
         JudgeTaskMessage message = new JudgeTaskMessage();
-        message.setMessageId(UUID.randomUUID().toString().replace("-", ""));
+        String messageId = UUID.randomUUID().toString().replace("-", "");
+        message.setMessageId(messageId);
+        message.setJudgeTaskId(defaultString(judge.getJudgeTaskId(), messageId));
         message.setJudgeId(judge.getId());
         message.setSubmissionId(judge.getSubmitId());
         message.setProblemId(judge.getProblemId());

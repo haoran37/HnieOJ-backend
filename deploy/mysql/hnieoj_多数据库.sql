@@ -379,6 +379,7 @@ DROP TABLE IF EXISTS `judge`;
 CREATE TABLE `judge` (
   `id` bigint(20) NOT NULL AUTO_INCREMENT,
   `submit_id` varchar(64) NOT NULL COMMENT 'UUID 用于展示',
+  `judge_task_id` varchar(64) DEFAULT NULL COMMENT '当前判题任务ID，用于过滤旧任务回调',
   `problem_id` bigint(20) NOT NULL COMMENT '题目DB ID',
   `problem_code` varchar(50) NOT NULL COMMENT '题目展示ID',
   `uid` varchar(50) NOT NULL COMMENT '用户UID',
@@ -404,6 +405,7 @@ CREATE TABLE `judge` (
   `gmt_modified` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_submit_id` (`submit_id`),
+  KEY `idx_judge_task_id` (`judge_task_id`),
   KEY `idx_uid_problem_id` (`uid`, `problem_id`),
   KEY `idx_cid` (`cid`),
   KEY `idx_status` (`status`),

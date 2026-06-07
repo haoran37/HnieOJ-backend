@@ -3,6 +3,7 @@ package com.hnieacm.submission.service.impl;
 import cn.dev33.satoken.stp.StpUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.hnieacm.common.constant.PermissionConstant;
 import com.hnieacm.common.constant.RoleConstant;
@@ -125,6 +126,7 @@ public class SubmissionServiceImpl implements SubmissionService {
         judge.setLanguage(language);
         judge.setCode(code);
         judge.setStatus(SubmissionStatusConstant.PENDING);
+        judge.setJudgeTaskId(generateUuid32());
         judge.setCid(cid);
         judge.setTotalCase(0);
         judge.setJudgedCase(0);
@@ -141,6 +143,47 @@ public class SubmissionServiceImpl implements SubmissionService {
         log.info("Submission created, submitId={}, problemCode={}, uid={}, language={}", submitId, problemCode, uid, language);
 
         return new SubmitCodeVo(submitId);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public SubmitCodeVo rejudgeSubmission(String submissionId) {
+        String normalizedSubmissionId = trimToNull(submissionId);
+        if (normalizedSubmissionId == null) {
+            throw new BizException(ResultCode.BAD_REQUEST, "submissionId 不能为空");
+        }
+
+        Judge judge = queryJudge(normalizedSubmissionId);
+        ProblemBasicDto problem = queryProblemBasic(judge.getProblemCode());
+        ensureProblemHasTestdata(problem);
+
+        String judgeTaskId = generateUuid32();
+        // 重判必须生成新的任务 ID，避免旧判题任务的延迟回调污染新一轮结果。
+        judgeMapper.update(null, new LambdaUpdateWrapper<Judge>()
+                .eq(Judge::getId, judge.getId())
+                .set(Judge::getJudgeTaskId, judgeTaskId)
+                .set(Judge::getStatus, SubmissionStatusConstant.PENDING)
+                .set(Judge::getErrorMessage, null)
+                .set(Judge::getTime, null)
+                .set(Judge::getMemory, null)
+                .set(Judge::getScore, null)
+                .set(Judge::getTotalCase, 0)
+                .set(Judge::getJudgedCase, 0)
+                .set(Judge::getCurrentCase, 0)
+                .set(Judge::getJudger, null)
+                .set(Judge::getIsManual, true));
+        judgeCaseMapper.delete(new LambdaQueryWrapper<JudgeCase>()
+                .eq(JudgeCase::getSubmitId, judge.getId()));
+
+        judge.setJudgeTaskId(judgeTaskId);
+        judge.setStatus(SubmissionStatusConstant.PENDING);
+        judge.setTotalCase(0);
+        judge.setJudgedCase(0);
+        judge.setCurrentCase(0);
+        judgeTaskMessagePublisher.publishAfterCommit(judge, problem);
+        log.info("Submission rejudge task published, submissionId={}, judgeId={}, operator={}",
+                normalizedSubmissionId, judge.getId(), StpUtil.getLoginIdAsString());
+        return new SubmitCodeVo(normalizedSubmissionId);
     }
 
     @Override
@@ -247,16 +290,21 @@ public class SubmissionServiceImpl implements SubmissionService {
             throw new BizException(ResultCode.BAD_REQUEST, "submissionId 不能为空");
         }
 
-        Judge judge = judgeMapper.selectOne(new LambdaQueryWrapper<Judge>()
-                .eq(Judge::getSubmitId, normalizedSubmissionId)
-                .last("limit 1"));
-        if (judge == null) {
-            throw new BizException(ResultCode.SUBMISSION_NOT_FOUND, "提交记录不存在");
-        }
+        Judge judge = queryJudge(normalizedSubmissionId);
 
         String currentUid = StpUtil.getLoginIdAsString();
         if (!currentUid.equals(judge.getUid()) && !isAdmin()) {
             throw new BizException(ResultCode.FORBIDDEN, "无权访问该提交记录");
+        }
+        return judge;
+    }
+
+    private Judge queryJudge(String submissionId) {
+        Judge judge = judgeMapper.selectOne(new LambdaQueryWrapper<Judge>()
+                .eq(Judge::getSubmitId, submissionId)
+                .last("limit 1"));
+        if (judge == null) {
+            throw new BizException(ResultCode.SUBMISSION_NOT_FOUND, "提交记录不存在");
         }
         return judge;
     }
@@ -342,6 +390,15 @@ public class SubmissionServiceImpl implements SubmissionService {
         }
         if (!Boolean.TRUE.equals(problem.getHasTestdata()) || defaultZero(problem.getTestdataCaseCount()) <= 0) {
             throw new BizException(ResultCode.BAD_REQUEST, "题目测试数据未配置，暂不能提交");
+        }
+    }
+
+    private void ensureProblemHasTestdata(ProblemBasicDto problem) {
+        if (problem.getAuth() == null) {
+            throw new BizException(ResultCode.PROBLEM_NOT_FOUND, "题目不存在");
+        }
+        if (!Boolean.TRUE.equals(problem.getHasTestdata()) || defaultZero(problem.getTestdataCaseCount()) <= 0) {
+            throw new BizException(ResultCode.BAD_REQUEST, "题目测试数据未配置，暂不能重判");
         }
     }
 

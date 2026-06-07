@@ -20,6 +20,8 @@ public interface SubmissionService {
 
     SubmitCodeVo submit(SubmitCodeRequest request, MultipartFile file);
 
+    SubmitCodeVo rejudgeSubmission(String submissionId);
+
     PageVo<SubmissionListItemVo> listSubmissions(SubmissionListQueryRequest request);
 
     SubmissionDetailVo getSubmissionDetail(String submissionId);

@@ -43,7 +43,7 @@ spring:
           uri: lb://hnieoj-submission
           predicates:
             # 提交记录路由
-            - Path=/api/submissions/**,/judge/submissions/**
+            - Path=/api/submissions/**,/api/admin/submissions/**,/judge/submissions/**
         - id: hnieoj-submission-ws
           uri: lb:ws://hnieoj-submission
           predicates:

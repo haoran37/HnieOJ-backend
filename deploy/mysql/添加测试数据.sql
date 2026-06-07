@@ -138,16 +138,16 @@ INSERT INTO `judge_server` (`id`, `name`, `ip`, `port`, `url`, `cpu_core`, `task
 (3, 'remote-judge-1', '10.0.0.1', 80, 'http://10.0.0.1', 4, 0, 2, 0, 1);
 
 -- 提交记录 (cid, cpid 等外键关联均设置为安全值)
-INSERT INTO `judge` (`id`, `submit_id`, `problem_id`, `problem_code`, `uid`, `username`, `language`, `code`, `status`, `error_message`, `time`, `memory`, `score`, `cid`, `total_case`, `judged_case`, `current_case`, `cpid`, `tid`, `hid`, `judger`, `ip`, `is_manual`) VALUES
-(1, 's0001', 1, 'P1000', '20230003', 'student1', 'C++17', '#include <iostream>\nint main() { int a,b; std::cin>>a>>b; std::cout<<a+b; return 0; }', 0, NULL, 10, 1024, 100, 0, 1, 1, 1, 0, 0, 0, 'judge-1', '127.0.0.1', 0),
-(2, 's0002', 2, 'P1001', '20230004', 'student2', 'Python3', 'n=int(input())\na=list(map(int,input().split()))\na.sort()\nprint(*a)', 1, 'Runtime Error', 50, 2048, 80, 0, 2, 2, 2, 0, 0, 0, 'judge-1', '192.168.1.2', 0),
-(3, 's0003', 1, 'P1000', '20230009', 'student3', 'Java', 'import java.util.*;\npublic class Main{public static void main(String[] args){Scanner sc=new Scanner(System.in);System.out.println(sc.nextInt()+sc.nextInt());}}', 0, NULL, 15, 2048, 100, 0, 1, 1, 1, 0, 0, 0, 'judge-2', '10.0.0.5', 0),
-(4, 's0004', 3, 'P1002', '20230010', 'student4', 'C', '#include <stdio.h>\nint main() { int n; scanf("%d",&n); printf("%d",fib(n)); }', 2, 'Compile Error: function fib not declared.', NULL, NULL, NULL, 0, 0, 0, 0, 0, 0, 0, 'judge-1', '10.0.0.6', 0),
-(5, 's0005', 4, 'P1003', '20230011', 'student5', 'C++17', '...', -10, NULL, NULL, NULL, NULL, 0, 10, 0, 0, 0, 0, 0, NULL, NULL, 0),
-(6, 's0006', 5, 'P1004', '20230012', 'student6', 'Python3', 'print(input()[::-1])', 0, NULL, 5, 512, 100, 0, 1, 1, 1, 0, 0, 0, 'judge-2', '192.168.1.3', 0),
-(7, 's0007', 2, 'P1001', '20230003', 'student1', 'C++17', '...', 3, 'Wrong Answer', 8, 1024, 50, 1, 2, 2, 2, 1, 0, 0, 'judge-1', '127.0.0.1', 0),
-(8, 's0008', 7, 'P1006', '20230003', 'student1', 'C++17', '#include <iostream>\nint main(){std::cout<<"1 2 3";}', -8, NULL, NULL, NULL, NULL, 0, 10, 2, 3, 0, 0, 0, 'judge-1', '127.0.0.1', 0),
-(9, 's0009', 1, 'P1000', '20230003', 'student1', 'C++17', '#include <iostream>\nint main(){return 0;}', -9, NULL, NULL, NULL, NULL, 0, 10, 0, 0, 0, 0, 0, 'judge-1', '127.0.0.1', 0);
+INSERT INTO `judge` (`id`, `submit_id`, `judge_task_id`, `problem_id`, `problem_code`, `uid`, `username`, `language`, `code`, `status`, `error_message`, `time`, `memory`, `score`, `cid`, `total_case`, `judged_case`, `current_case`, `cpid`, `tid`, `hid`, `judger`, `ip`, `is_manual`) VALUES
+(1, 's0001', 'task-s0001', 1, 'P1000', '20230003', 'student1', 'C++17', '#include <iostream>\nint main() { int a,b; std::cin>>a>>b; std::cout<<a+b; return 0; }', 0, NULL, 10, 1024, 100, 0, 1, 1, 1, 0, 0, 0, 'judge-1', '127.0.0.1', 0),
+(2, 's0002', 'task-s0002', 2, 'P1001', '20230004', 'student2', 'Python3', 'n=int(input())\na=list(map(int,input().split()))\na.sort()\nprint(*a)', 1, 'Runtime Error', 50, 2048, 80, 0, 2, 2, 2, 0, 0, 0, 'judge-1', '192.168.1.2', 0),
+(3, 's0003', 'task-s0003', 1, 'P1000', '20230009', 'student3', 'Java', 'import java.util.*;\npublic class Main{public static void main(String[] args){Scanner sc=new Scanner(System.in);System.out.println(sc.nextInt()+sc.nextInt());}}', 0, NULL, 15, 2048, 100, 0, 1, 1, 1, 0, 0, 0, 'judge-2', '10.0.0.5', 0),
+(4, 's0004', 'task-s0004', 3, 'P1002', '20230010', 'student4', 'C', '#include <stdio.h>\nint main() { int n; scanf("%d",&n); printf("%d",fib(n)); }', 2, 'Compile Error: function fib not declared.', NULL, NULL, NULL, 0, 0, 0, 0, 0, 0, 0, 'judge-1', '10.0.0.6', 0),
+(5, 's0005', 'task-s0005', 4, 'P1003', '20230011', 'student5', 'C++17', '...', -10, NULL, NULL, NULL, NULL, 0, 10, 0, 0, 0, 0, 0, NULL, NULL, 0),
+(6, 's0006', 'task-s0006', 5, 'P1004', '20230012', 'student6', 'Python3', 'print(input()[::-1])', 0, NULL, 5, 512, 100, 0, 1, 1, 1, 0, 0, 0, 'judge-2', '192.168.1.3', 0),
+(7, 's0007', 'task-s0007', 2, 'P1001', '20230003', 'student1', 'C++17', '...', 3, 'Wrong Answer', 8, 1024, 50, 1, 2, 2, 2, 1, 0, 0, 'judge-1', '127.0.0.1', 0),
+(8, 's0008', 'task-s0008', 7, 'P1006', '20230003', 'student1', 'C++17', '#include <iostream>\nint main(){std::cout<<"1 2 3";}', -8, NULL, NULL, NULL, NULL, 0, 10, 2, 3, 0, 0, 0, 'judge-1', '127.0.0.1', 0),
+(9, 's0009', 'task-s0009', 1, 'P1000', '20230003', 'student1', 'C++17', '#include <iostream>\nint main(){return 0;}', -9, NULL, NULL, NULL, NULL, 0, 10, 0, 0, 0, 0, 0, 'judge-1', '127.0.0.1', 0);
 
 -- 评测样例详情
 INSERT INTO `judge_case` (`submit_id`, `case_id`, `status`, `time`, `memory`, `score`, `input_data`, `output_data`, `user_output`) VALUES

@@ -77,6 +77,12 @@ public class JudgeResultReportServiceImpl implements JudgeResultReportService {
         request.setEventType(eventType);
         validateEvent(request);
 
+        if (!isCurrentJudgeTask(judge, request)) {
+            log.info("Judge event ignored because task id mismatch, submissionId: {}, eventType: {}, currentTaskId: {}, incomingTaskId: {}",
+                    normalizedSubmissionId, eventType, judge.getJudgeTaskId(), request.getJudgeTaskId());
+            return;
+        }
+
         // 已进入终态的提交不再接收进度类回写，避免乱序重试事件污染最终结果。
         if (isTerminalStatus(judge.getStatus())) {
             log.info("Judge event ignored because submission is terminal, submissionId: {}, eventType: {}, currentStatus: {}",
@@ -166,6 +172,16 @@ public class JudgeResultReportServiceImpl implements JudgeResultReportService {
         } else {
             judgeCaseMapper.updateById(entity);
         }
+    }
+
+    private boolean isCurrentJudgeTask(Judge judge, JudgeResultEventRequest request) {
+        String currentTaskId = StrUtil.trimToNull(judge.getJudgeTaskId());
+        if (currentTaskId == null) {
+            return true;
+        }
+        String incomingTaskId = StrUtil.trimToNull(request.getJudgeTaskId());
+        request.setJudgeTaskId(incomingTaskId);
+        return currentTaskId.equals(incomingTaskId);
     }
 
     private Integer maxCaseTime(Long judgeId) {

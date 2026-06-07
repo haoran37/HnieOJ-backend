@@ -16,6 +16,8 @@ public class JudgeResultEventRequest {
 
     private String submissionId;
 
+    private String judgeTaskId;
+
     private Integer status;
 
     private String statusText;

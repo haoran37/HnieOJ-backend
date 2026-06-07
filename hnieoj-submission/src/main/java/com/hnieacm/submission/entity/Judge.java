@@ -22,6 +22,8 @@ public class Judge {
 
     private String submitId;
 
+    private String judgeTaskId;
+
     @TableField("problem_id")
     private Long problemId;
 

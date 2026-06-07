@@ -2,6 +2,8 @@ package com.hnieacm.judge.dto;
 
 import lombok.Data;
 
+import java.util.List;
+
 /**
  * @Author: HaoRan_Lyu
  * @Date: 2026/06/07
@@ -23,6 +25,8 @@ public class JudgeNodeHeartbeatRequest {
     private Integer cpuCore;
 
     private String version;
+
+    private List<String> supportedJudgeModes;
 
     private Long cacheUsedBytes;
 

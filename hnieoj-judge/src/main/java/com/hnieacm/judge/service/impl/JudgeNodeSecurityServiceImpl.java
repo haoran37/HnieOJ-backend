@@ -34,6 +34,7 @@ import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Base64;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -451,6 +452,7 @@ public class JudgeNodeSecurityServiceImpl implements JudgeNodeSecurityService {
         vo.setRunningTasks(token.getRunningTasks());
         vo.setCpuCore(token.getCpuCore());
         vo.setVersion(token.getVersion());
+        vo.setSupportedJudgeModes(splitSupportedJudgeModes(token.getSupportedJudgeModes()));
         vo.setCacheUsedBytes(token.getCacheUsedBytes());
         vo.setCacheProblemCount(token.getCacheProblemCount());
         vo.setDiskTotalBytes(token.getDiskTotalBytes());
@@ -464,6 +466,14 @@ public class JudgeNodeSecurityServiceImpl implements JudgeNodeSecurityService {
             return false;
         }
         return token.getLastHeartbeatTime().isAfter(LocalDateTime.now().minusSeconds(HEARTBEAT_ONLINE_TIMEOUT_SECONDS));
+    }
+
+    private List<String> splitSupportedJudgeModes(String supportedJudgeModes) {
+        String normalizedModes = StrUtil.blankToDefault(supportedJudgeModes, "default");
+        return Arrays.stream(normalizedModes.split(","))
+                .map(StrUtil::trimToNull)
+                .filter(item -> item != null)
+                .toList();
     }
 
     /**

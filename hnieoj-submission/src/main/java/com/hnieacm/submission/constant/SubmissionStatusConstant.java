@@ -60,6 +60,16 @@ public class SubmissionStatusConstant {
      */
     public static final int SYSTEM_ERROR = 6;
 
+    /**
+     * 判题器或交互器自身失败。
+     */
+    public static final int JUDGEMENT_FAILED = 7;
+
+    /**
+     * 交互协议无效。
+     */
+    public static final int INVALID_INTERACTION = 8;
+
     public static boolean isJudging(Integer status) {
         return status != null && (status == PENDING || status == COMPILING || status == RUNNING);
     }
@@ -79,6 +89,8 @@ public class SubmissionStatusConstant {
             case TIME_LIMIT_EXCEEDED -> "Time Limit Exceeded";
             case MEMORY_LIMIT_EXCEEDED -> "Memory Limit Exceeded";
             case SYSTEM_ERROR -> "System Error";
+            case JUDGEMENT_FAILED -> "Judgement Failed";
+            case INVALID_INTERACTION -> "Invalid Interaction";
             default -> "Unknown";
         };
     }

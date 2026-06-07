@@ -26,6 +26,13 @@ public class ProblemBasicDto {
     private Integer spjStackLimit;
     private Integer spjOutputLimit;
     private String spjProtocol;
+    private String interactorCode;
+    private String interactorLanguage;
+    private Integer interactorTimeLimit;
+    private Integer interactorMemoryLimit;
+    private Integer interactorStackLimit;
+    private Integer interactorOutputLimit;
+    private String interactorProtocol;
     private Integer ioScore;
     private Boolean isRemoveEndBlank;
     private Integer dataVersion;

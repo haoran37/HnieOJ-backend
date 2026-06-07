@@ -54,7 +54,15 @@ public class RabbitJudgeTaskMessagePublisher implements JudgeTaskMessagePublishe
     private static final int DEFAULT_SPJ_STACK_LIMIT = 128;
     private static final int DEFAULT_SPJ_OUTPUT_LIMIT = 16777216;
     private static final String DEFAULT_SPJ_PROTOCOL = "testlib";
+    private static final int DEFAULT_SCHEMA_VERSION = 2;
+    private static final int DEFAULT_INTERACTOR_TIME_LIMIT = 5000;
+    private static final int DEFAULT_INTERACTOR_MEMORY_LIMIT = 256;
+    private static final int DEFAULT_INTERACTOR_STACK_LIMIT = 128;
+    private static final int DEFAULT_INTERACTOR_OUTPUT_LIMIT = 16777216;
+    private static final String DEFAULT_INTERACTOR_PROTOCOL = "stdio";
+    private static final String DEFAULT_INTERACTION_WIRING = "user_stdout_to_interactor_stdin,interactor_stdout_to_user_stdin";
     private static final String SPJ_JUDGE_MODE = "spj";
+    private static final String INTERACTIVE_JUDGE_MODE = "interactive";
     private static final int DEFAULT_RETRY_BATCH_SIZE = 20;
     private static final int DEFAULT_MAX_RETRY_COUNT = 10;
     private static final long DEFAULT_RETRY_BACKOFF_SECONDS = 30L;
@@ -174,7 +182,7 @@ public class RabbitJudgeTaskMessagePublisher implements JudgeTaskMessagePublishe
         outbox.setJudgeTaskId(message.getJudgeTaskId());
         outbox.setSubmissionId(message.getSubmissionId());
         outbox.setExchangeName(properties.getExchange());
-        outbox.setRoutingKey(properties.getRoutingKey());
+        outbox.setRoutingKey(routingKey(message.getJudgeMode()));
         outbox.setStatus(JudgeTaskOutboxStatusConstant.PENDING);
         outbox.setRetryCount(0);
         outbox.setMaxRetryCount(maxRetryCount());
@@ -262,6 +270,7 @@ public class RabbitJudgeTaskMessagePublisher implements JudgeTaskMessagePublishe
         JudgeTaskMessage message = new JudgeTaskMessage();
         String messageId = UUID.randomUUID().toString().replace("-", "");
         message.setMessageId(messageId);
+        message.setSchemaVersion(DEFAULT_SCHEMA_VERSION);
         message.setJudgeTaskId(defaultString(judge.getJudgeTaskId(), messageId));
         message.setJudgeId(judge.getId());
         message.setSubmissionId(judge.getSubmitId());
@@ -277,6 +286,8 @@ public class RabbitJudgeTaskMessagePublisher implements JudgeTaskMessagePublishe
         message.setMemoryLimit(defaultInteger(problem == null ? null : problem.getMemoryLimit(), DEFAULT_MEMORY_LIMIT));
         message.setStackLimit(defaultInteger(problem == null ? null : problem.getStackLimit(), DEFAULT_STACK_LIMIT));
         message.setChecker(buildChecker(message.getJudgeMode(), problem));
+        message.setInteractor(buildInteractor(message.getJudgeMode(), problem));
+        message.setInteraction(buildInteraction(message.getJudgeMode(), problem));
         message.setIoScore(defaultInteger(problem == null ? null : problem.getIoScore(), DEFAULT_IO_SCORE));
         message.setIsRemoveEndBlank(problem == null || !Boolean.FALSE.equals(problem.getIsRemoveEndBlank()));
         message.setDataVersion(defaultInteger(problem == null ? null : problem.getDataVersion(), DEFAULT_DATA_VERSION));
@@ -298,7 +309,46 @@ public class RabbitJudgeTaskMessagePublisher implements JudgeTaskMessagePublishe
         checker.setStackLimit(defaultInteger(problem.getSpjStackLimit(), DEFAULT_SPJ_STACK_LIMIT));
         checker.setOutputLimit(defaultInteger(problem.getSpjOutputLimit(), DEFAULT_SPJ_OUTPUT_LIMIT));
         checker.setProtocol(defaultString(problem.getSpjProtocol(), DEFAULT_SPJ_PROTOCOL));
+        checker.setArgumentTemplate(List.of("${input}", "${expected}", "${userOutput}"));
         return checker;
+    }
+
+    private JudgeTaskMessage.JudgeAsset buildInteractor(String judgeMode, ProblemBasicDto problem) {
+        if (!INTERACTIVE_JUDGE_MODE.equalsIgnoreCase(defaultString(judgeMode, DEFAULT_JUDGE_MODE)) || problem == null) {
+            return null;
+        }
+        JudgeTaskMessage.JudgeAsset interactor = new JudgeTaskMessage.JudgeAsset();
+        interactor.setLanguage(problem.getInteractorLanguage());
+        interactor.setSource(problem.getInteractorCode());
+        interactor.setArtifactFileId(null);
+        interactor.setTimeLimit(defaultInteger(problem.getInteractorTimeLimit(), DEFAULT_INTERACTOR_TIME_LIMIT));
+        interactor.setMemoryLimit(defaultInteger(problem.getInteractorMemoryLimit(), DEFAULT_INTERACTOR_MEMORY_LIMIT));
+        interactor.setStackLimit(defaultInteger(problem.getInteractorStackLimit(), DEFAULT_INTERACTOR_STACK_LIMIT));
+        interactor.setOutputLimit(defaultInteger(problem.getInteractorOutputLimit(), DEFAULT_INTERACTOR_OUTPUT_LIMIT));
+        interactor.setProtocol(defaultString(problem.getInteractorProtocol(), DEFAULT_INTERACTOR_PROTOCOL));
+        return interactor;
+    }
+
+    private JudgeTaskMessage.InteractionConfig buildInteraction(String judgeMode, ProblemBasicDto problem) {
+        if (!INTERACTIVE_JUDGE_MODE.equalsIgnoreCase(defaultString(judgeMode, DEFAULT_JUDGE_MODE)) || problem == null) {
+            return null;
+        }
+        JudgeTaskMessage.InteractionConfig interaction = new JudgeTaskMessage.InteractionConfig();
+        interaction.setProtocol(defaultString(problem.getInteractorProtocol(), DEFAULT_INTERACTOR_PROTOCOL));
+        interaction.setWiring(DEFAULT_INTERACTION_WIRING);
+        interaction.setScoreMode(defaultInteger(problem.getType(), DEFAULT_PROBLEM_TYPE) == 1 ? "oi" : "acm");
+        return interaction;
+    }
+
+    private String routingKey(String judgeMode) {
+        String normalizedJudgeMode = defaultString(judgeMode, DEFAULT_JUDGE_MODE);
+        if (SPJ_JUDGE_MODE.equalsIgnoreCase(normalizedJudgeMode)) {
+            return defaultString(properties.getSpjRoutingKey(), properties.getRoutingKey());
+        }
+        if (INTERACTIVE_JUDGE_MODE.equalsIgnoreCase(normalizedJudgeMode)) {
+            return defaultString(properties.getInteractiveRoutingKey(), properties.getRoutingKey());
+        }
+        return properties.getRoutingKey();
     }
 
     private Integer defaultInteger(Integer value, Integer defaultValue) {

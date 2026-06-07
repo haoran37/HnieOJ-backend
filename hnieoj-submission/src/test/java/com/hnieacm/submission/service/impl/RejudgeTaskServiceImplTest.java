@@ -17,6 +17,7 @@ import com.hnieacm.submission.mapper.JudgeCaseMapper;
 import com.hnieacm.submission.mapper.JudgeMapper;
 import com.hnieacm.submission.mapper.RejudgeTaskMapper;
 import com.hnieacm.submission.properties.SubmissionProperties;
+import com.hnieacm.submission.service.JudgeNodeAccessService;
 import com.hnieacm.submission.service.JudgeTaskMessagePublisher;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -35,6 +36,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -61,6 +63,9 @@ class RejudgeTaskServiceImplTest {
     private ProblemInternalFeignClient problemInternalFeignClient;
 
     @Mock
+    private JudgeNodeAccessService judgeNodeAccessService;
+
+    @Mock
     private JudgeTaskMessagePublisher judgeTaskMessagePublisher;
 
     @Mock
@@ -79,7 +84,9 @@ class RejudgeTaskServiceImplTest {
         initTableInfo(JudgeCase.class);
         submissionProperties = new SubmissionProperties();
         service = new RejudgeTaskServiceImpl(rejudgeTaskMapper, judgeMapper, judgeCaseMapper,
-                problemInternalFeignClient, judgeTaskMessagePublisher, submissionProperties, transactionTemplate);
+                problemInternalFeignClient, judgeNodeAccessService, judgeTaskMessagePublisher,
+                submissionProperties, transactionTemplate);
+        lenient().when(judgeNodeAccessService.hasActiveNodeForMode("default")).thenReturn(true);
     }
 
     @Test

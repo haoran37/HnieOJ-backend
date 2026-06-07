@@ -29,6 +29,8 @@ hnieoj:
       exchange: ${HNIEOJ_JUDGE_MQ_EXCHANGE:hnieoj.judge.exchange}
       task-queue: ${HNIEOJ_JUDGE_MQ_TASK_QUEUE:hnieoj.judge.task}
       routing-key: ${HNIEOJ_JUDGE_MQ_ROUTING_KEY:judge.submission.created}
+      spj-routing-key: ${HNIEOJ_JUDGE_MQ_SPJ_ROUTING_KEY:judge.submission.spj}
+      interactive-routing-key: ${HNIEOJ_JUDGE_MQ_INTERACTIVE_ROUTING_KEY:judge.submission.interactive}
       dead-letter-exchange: ${HNIEOJ_JUDGE_MQ_DLX:hnieoj.judge.dlx}
       dead-letter-queue: ${HNIEOJ_JUDGE_MQ_DLQ:hnieoj.judge.task.dlq}
       dead-letter-routing-key: ${HNIEOJ_JUDGE_MQ_DLX_ROUTING_KEY:judge.submission.created.dlq}

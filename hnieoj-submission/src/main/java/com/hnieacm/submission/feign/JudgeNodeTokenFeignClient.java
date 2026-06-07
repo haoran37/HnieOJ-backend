@@ -4,6 +4,8 @@ import com.hnieacm.common.result.Result;
 import com.hnieacm.submission.dto.ValidateJudgeNodeTokenRequest;
 import com.hnieacm.submission.vo.JudgeNodeTokenValidationVo;
 import org.springframework.cloud.openfeign.FeignClient;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 
@@ -17,4 +19,7 @@ public interface JudgeNodeTokenFeignClient {
 
     @PostMapping("/internal/judge/tokens/validate")
     Result<JudgeNodeTokenValidationVo> validate(@RequestBody ValidateJudgeNodeTokenRequest request);
+
+    @GetMapping("/internal/judge/nodes/capabilities/{judgeMode}/available")
+    Result<Boolean> hasActiveNodeForMode(@PathVariable("judgeMode") String judgeMode);
 }

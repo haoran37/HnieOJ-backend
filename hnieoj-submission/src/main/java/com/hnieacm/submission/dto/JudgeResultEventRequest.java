@@ -34,6 +34,8 @@ public class JudgeResultEventRequest {
 
     private String message;
 
+    private String diagnosticMessage;
+
     private OffsetDateTime eventTime;
 
     @Data

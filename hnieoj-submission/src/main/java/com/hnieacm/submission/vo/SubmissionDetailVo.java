@@ -42,6 +42,8 @@ public class SubmissionDetailVo {
 
     private String errorMessage;
 
+    private String diagnosticMessage;
+
     private String judger;
 
     private String code;

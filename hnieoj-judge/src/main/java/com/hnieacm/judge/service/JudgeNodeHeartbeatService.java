@@ -10,4 +10,6 @@ import com.hnieacm.judge.dto.JudgeNodeHeartbeatRequest;
 public interface JudgeNodeHeartbeatService {
 
     void recordHeartbeat(String judgeToken, String authorizationHeader, JudgeNodeHeartbeatRequest request);
+
+    boolean hasActiveNodeForMode(String judgeMode);
 }

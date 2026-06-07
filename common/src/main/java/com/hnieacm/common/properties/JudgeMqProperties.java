@@ -17,6 +17,8 @@ public class JudgeMqProperties {
     private static final String DEFAULT_EXCHANGE = "hnieoj.judge.exchange";
     private static final String DEFAULT_TASK_QUEUE = "hnieoj.judge.task";
     private static final String DEFAULT_ROUTING_KEY = "judge.submission.created";
+    private static final String DEFAULT_SPJ_ROUTING_KEY = "judge.submission.spj";
+    private static final String DEFAULT_INTERACTIVE_ROUTING_KEY = "judge.submission.interactive";
     private static final String DEFAULT_DEAD_LETTER_EXCHANGE = "hnieoj.judge.dlx";
     private static final String DEFAULT_DEAD_LETTER_QUEUE = "hnieoj.judge.task.dlq";
     private static final String DEFAULT_DEAD_LETTER_ROUTING_KEY = "judge.submission.created.dlq";
@@ -26,6 +28,10 @@ public class JudgeMqProperties {
     private String taskQueue = DEFAULT_TASK_QUEUE;
 
     private String routingKey = DEFAULT_ROUTING_KEY;
+
+    private String spjRoutingKey = DEFAULT_SPJ_ROUTING_KEY;
+
+    private String interactiveRoutingKey = DEFAULT_INTERACTIVE_ROUTING_KEY;
 
     private String deadLetterExchange = DEFAULT_DEAD_LETTER_EXCHANGE;
 

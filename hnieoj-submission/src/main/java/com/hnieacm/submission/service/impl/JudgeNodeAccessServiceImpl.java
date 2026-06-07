@@ -40,6 +40,18 @@ public class JudgeNodeAccessServiceImpl implements JudgeNodeAccessService {
         }
     }
 
+    @Override
+    public boolean hasActiveNodeForMode(String judgeMode) {
+        String normalizedJudgeMode = StrUtil.blankToDefault(judgeMode, "default");
+        try {
+            Result<Boolean> result = judgeNodeTokenFeignClient.hasActiveNodeForMode(normalizedJudgeMode);
+            return result != null && result.getCode() == ResultCode.SUCCESS && Boolean.TRUE.equals(result.getData());
+        } catch (Exception e) {
+            log.warn("Query judge node capability failed, judgeMode: {}", normalizedJudgeMode, e);
+            return false;
+        }
+    }
+
     private String extractBearerToken(String authorizationHeader) {
         String normalizedHeader = StrUtil.trimToNull(authorizationHeader);
         if (normalizedHeader == null) {

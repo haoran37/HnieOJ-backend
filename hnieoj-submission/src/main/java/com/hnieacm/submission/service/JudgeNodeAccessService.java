@@ -8,4 +8,6 @@ package com.hnieacm.submission.service;
 public interface JudgeNodeAccessService {
 
     void checkAccess(String judgeToken, String authorizationHeader);
+
+    boolean hasActiveNodeForMode(String judgeMode);
 }

@@ -52,6 +52,16 @@ public class JudgeRabbitMqConfig {
     }
 
     @Bean
+    public Binding judgeSpjTaskBinding() {
+        return BindingBuilder.bind(judgeTaskQueue()).to(judgeTaskExchange()).with(properties.getSpjRoutingKey());
+    }
+
+    @Bean
+    public Binding judgeInteractiveTaskBinding() {
+        return BindingBuilder.bind(judgeTaskQueue()).to(judgeTaskExchange()).with(properties.getInteractiveRoutingKey());
+    }
+
+    @Bean
     public Binding judgeDeadLetterBinding() {
         return BindingBuilder.bind(judgeTaskDeadLetterQueue())
                 .to(judgeDeadLetterExchange())

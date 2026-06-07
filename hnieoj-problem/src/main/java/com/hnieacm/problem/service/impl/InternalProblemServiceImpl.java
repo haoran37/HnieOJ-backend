@@ -69,7 +69,10 @@ public class InternalProblemServiceImpl implements InternalProblemService {
                         Problem::getType, Problem::getJudgeMode, Problem::getTimeLimit, Problem::getMemoryLimit,
                         Problem::getStackLimit, Problem::getSpjCode, Problem::getSpjLanguage,
                         Problem::getSpjTimeLimit, Problem::getSpjMemoryLimit, Problem::getSpjStackLimit,
-                        Problem::getSpjOutputLimit, Problem::getSpjProtocol, Problem::getIoScore,
+                        Problem::getSpjOutputLimit, Problem::getSpjProtocol, Problem::getInteractorCode,
+                        Problem::getInteractorLanguage, Problem::getInteractorTimeLimit,
+                        Problem::getInteractorMemoryLimit, Problem::getInteractorStackLimit,
+                        Problem::getInteractorOutputLimit, Problem::getInteractorProtocol, Problem::getIoScore,
                         Problem::getIsRemoveEndBlank, Problem::getDataVersion)
                 .in(Problem::getId, normalizedIds));
         if (problems == null || problems.isEmpty()) {
@@ -108,6 +111,13 @@ public class InternalProblemServiceImpl implements InternalProblemService {
         dto.setSpjStackLimit(problem.getSpjStackLimit());
         dto.setSpjOutputLimit(problem.getSpjOutputLimit());
         dto.setSpjProtocol(problem.getSpjProtocol());
+        dto.setInteractorCode(problem.getInteractorCode());
+        dto.setInteractorLanguage(problem.getInteractorLanguage());
+        dto.setInteractorTimeLimit(problem.getInteractorTimeLimit());
+        dto.setInteractorMemoryLimit(problem.getInteractorMemoryLimit());
+        dto.setInteractorStackLimit(problem.getInteractorStackLimit());
+        dto.setInteractorOutputLimit(problem.getInteractorOutputLimit());
+        dto.setInteractorProtocol(problem.getInteractorProtocol());
         dto.setIoScore(problem.getIoScore());
         dto.setIsRemoveEndBlank(problem.getIsRemoveEndBlank());
         dto.setDataVersion(problem.getDataVersion());

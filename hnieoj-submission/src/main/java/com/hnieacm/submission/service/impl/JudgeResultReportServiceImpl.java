@@ -48,7 +48,9 @@ public class JudgeResultReportServiceImpl implements JudgeResultReportService {
             SubmissionStatusConstant.WRONG_ANSWER,
             SubmissionStatusConstant.TIME_LIMIT_EXCEEDED,
             SubmissionStatusConstant.MEMORY_LIMIT_EXCEEDED,
-            SubmissionStatusConstant.SYSTEM_ERROR
+            SubmissionStatusConstant.SYSTEM_ERROR,
+            SubmissionStatusConstant.JUDGEMENT_FAILED,
+            SubmissionStatusConstant.INVALID_INTERACTION
     );
 
     private final JudgeMapper judgeMapper;
@@ -122,21 +124,23 @@ public class JudgeResultReportServiceImpl implements JudgeResultReportService {
     }
 
     private void handleJudgeFinished(Judge judge, JudgeResultEventRequest request) {
-        updateJudge(judge, request, request.getScore(), null);
+        updateJudge(judge, request, request.getScore(), null, StrUtil.trimToNull(request.getDiagnosticMessage()));
     }
 
     private void handleJudgeFailed(Judge judge, JudgeResultEventRequest request) {
         if (request.getStatus() == null) {
             request.setStatus(SubmissionStatusConstant.SYSTEM_ERROR);
         }
-        updateJudge(judge, request, request.getScore(), StrUtil.trimToNull(request.getMessage()));
+        updateJudge(judge, request, request.getScore(), StrUtil.trimToNull(request.getMessage()),
+                StrUtil.trimToNull(request.getDiagnosticMessage()));
     }
 
     private void updateJudgeProgress(Judge judge, JudgeResultEventRequest request) {
-        updateJudge(judge, request, null, null);
+        updateJudge(judge, request, null, null, null);
     }
 
-    private void updateJudge(Judge judge, JudgeResultEventRequest request, Integer score, String errorMessage) {
+    private void updateJudge(Judge judge, JudgeResultEventRequest request, Integer score, String errorMessage,
+                             String diagnosticMessage) {
         LambdaUpdateWrapper<Judge> wrapper = new LambdaUpdateWrapper<Judge>()
                 .eq(Judge::getId, judge.getId())
                 .lt(Judge::getStatus, SubmissionStatusConstant.ACCEPTED);
@@ -155,6 +159,9 @@ public class JudgeResultReportServiceImpl implements JudgeResultReportService {
         }
         if (errorMessage != null) {
             wrapper.set(Judge::getErrorMessage, errorMessage);
+        }
+        if (diagnosticMessage != null) {
+            wrapper.set(Judge::getDiagnosticMessage, diagnosticMessage);
         }
         int updated = judgeMapper.update(null, wrapper);
         if (updated == 0) {

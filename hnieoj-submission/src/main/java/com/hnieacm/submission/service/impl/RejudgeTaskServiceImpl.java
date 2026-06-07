@@ -22,6 +22,7 @@ import com.hnieacm.submission.mapper.JudgeCaseMapper;
 import com.hnieacm.submission.mapper.JudgeMapper;
 import com.hnieacm.submission.mapper.RejudgeTaskMapper;
 import com.hnieacm.submission.properties.SubmissionProperties;
+import com.hnieacm.submission.service.JudgeNodeAccessService;
 import com.hnieacm.submission.service.JudgeTaskMessagePublisher;
 import com.hnieacm.submission.service.RejudgeTaskService;
 import com.hnieacm.submission.vo.RejudgeTaskVo;
@@ -72,6 +73,7 @@ public class RejudgeTaskServiceImpl implements RejudgeTaskService {
     private final JudgeMapper judgeMapper;
     private final JudgeCaseMapper judgeCaseMapper;
     private final ProblemInternalFeignClient problemInternalFeignClient;
+    private final JudgeNodeAccessService judgeNodeAccessService;
     private final JudgeTaskMessagePublisher judgeTaskMessagePublisher;
     private final SubmissionProperties submissionProperties;
     private final TransactionTemplate transactionTemplate;
@@ -259,6 +261,7 @@ public class RejudgeTaskServiceImpl implements RejudgeTaskService {
                     .set(Judge::getJudgeTaskId, judgeTaskId)
                     .set(Judge::getStatus, SubmissionStatusConstant.PENDING)
                     .set(Judge::getErrorMessage, null)
+                    .set(Judge::getDiagnosticMessage, null)
                     .set(Judge::getTime, null)
                     .set(Judge::getMemory, null)
                     .set(Judge::getScore, null)
@@ -315,6 +318,9 @@ public class RejudgeTaskServiceImpl implements RejudgeTaskService {
             throw new BizException(ResultCode.BAD_REQUEST, "当前判题节点暂不支持该题目的判题模式: " + judgeMode);
         }
         ensureJudgeModeContract(problem, judgeMode);
+        if (!judgeNodeAccessService.hasActiveNodeForMode(judgeMode)) {
+            throw new BizException(ResultCode.BAD_REQUEST, "当前没有可用判题节点支持该判题模式: " + judgeMode);
+        }
     }
 
     private void ensureJudgeModeContract(ProblemBasicDto problem, String judgeMode) {
@@ -328,7 +334,10 @@ public class RejudgeTaskServiceImpl implements RejudgeTaskService {
             return;
         }
         if (INTERACTIVE_JUDGE_MODE.equalsIgnoreCase(judgeMode)) {
-            throw new BizException(ResultCode.BAD_REQUEST, "交互题判题合约尚未开放");
+            if (StrUtil.isBlank(problem.getInteractorCode()) || StrUtil.isBlank(problem.getInteractorLanguage())) {
+                throw new BizException(ResultCode.BAD_REQUEST, "交互题必须配置 interactor 源码和语言");
+            }
+            return;
         }
         throw new BizException(ResultCode.BAD_REQUEST, "不支持的判题模式: " + judgeMode);
     }

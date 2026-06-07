@@ -42,6 +42,8 @@ public class Judge {
 
     private String errorMessage;
 
+    private String diagnosticMessage;
+
     private Integer time;
 
     private Integer memory;

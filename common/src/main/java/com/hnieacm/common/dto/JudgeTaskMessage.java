@@ -4,6 +4,7 @@ import lombok.Data;
 
 import java.io.Serial;
 import java.io.Serializable;
+import java.util.List;
 
 /**
  * @Author: HaoRan_Lyu
@@ -17,6 +18,8 @@ public class JudgeTaskMessage implements Serializable {
     private static final long serialVersionUID = 1L;
 
     private String messageId;
+
+    private Integer schemaVersion;
 
     private String judgeTaskId;
 
@@ -45,6 +48,8 @@ public class JudgeTaskMessage implements Serializable {
     private JudgeAsset checker;
 
     private JudgeAsset interactor;
+
+    private InteractionConfig interaction;
 
     private Integer problemType;
 
@@ -81,5 +86,20 @@ public class JudgeTaskMessage implements Serializable {
         private Integer outputLimit;
 
         private String protocol;
+
+        private List<String> argumentTemplate;
+    }
+
+    @Data
+    public static class InteractionConfig implements Serializable {
+
+        @Serial
+        private static final long serialVersionUID = 1L;
+
+        private String protocol;
+
+        private String wiring;
+
+        private String scoreMode;
     }
 }

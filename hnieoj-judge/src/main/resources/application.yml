@@ -16,3 +16,4 @@ hnieoj:
   judge:
     security:
       jwt-secret: ${HNIEOJ_JUDGE_JWT_SECRET:replace_me}
+      node-active-timeout-seconds: ${HNIEOJ_JUDGE_NODE_ACTIVE_TIMEOUT_SECONDS:90}

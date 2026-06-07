@@ -43,6 +43,7 @@ class RabbitJudgeTaskMessagePublisherTest {
         ArgumentCaptor<JudgeTaskOutbox> outboxCaptor = ArgumentCaptor.forClass(JudgeTaskOutbox.class);
         verify(outboxMapper).insert(outboxCaptor.capture());
         JudgeTaskMessage message = objectMapper.readValue(outboxCaptor.getValue().getPayload(), JudgeTaskMessage.class);
+        assertThat(message.getSchemaVersion()).isEqualTo(2);
         assertThat(message.getJudgeMode()).isEqualTo("spj");
         assertThat(message.getChecker()).isNotNull();
         assertThat(message.getChecker().getLanguage()).isEqualTo("cpp17");
@@ -52,6 +53,9 @@ class RabbitJudgeTaskMessagePublisherTest {
         assertThat(message.getChecker().getStackLimit()).isEqualTo(256);
         assertThat(message.getChecker().getOutputLimit()).isEqualTo(1048576);
         assertThat(message.getChecker().getProtocol()).isEqualTo("testlib");
+        assertThat(message.getChecker().getArgumentTemplate())
+                .containsExactly("${input}", "${expected}", "${userOutput}");
+        assertThat(outboxCaptor.getValue().getRoutingKey()).isEqualTo("judge.submission.spj");
     }
 
     private Judge buildJudge() {

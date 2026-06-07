@@ -23,4 +23,6 @@ public class JudgeSecurityProperties {
     private long authCodeTtlSeconds = 1800;
 
     private int authCodeMaxExchange = 1;
+
+    private long nodeActiveTimeoutSeconds = 90;
 }

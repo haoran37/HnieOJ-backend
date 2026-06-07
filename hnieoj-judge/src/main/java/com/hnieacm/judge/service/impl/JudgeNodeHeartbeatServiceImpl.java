@@ -11,6 +11,7 @@ import com.hnieacm.judge.dto.JudgeNodeHeartbeatRequest;
 import com.hnieacm.judge.dto.ValidateJudgeNodeTokenRequest;
 import com.hnieacm.judge.entity.JudgeNodeToken;
 import com.hnieacm.judge.mapper.JudgeNodeTokenMapper;
+import com.hnieacm.judge.properties.JudgeSecurityProperties;
 import com.hnieacm.judge.service.JudgeNodeHeartbeatService;
 import com.hnieacm.judge.service.JudgeNodeSecurityService;
 import com.hnieacm.judge.vo.JudgeNodeTokenValidationVo;
@@ -20,6 +21,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.Arrays;
+import java.util.List;
 
 /**
  * @Author: HaoRan_Lyu
@@ -32,6 +35,8 @@ import java.time.LocalDateTime;
 public class JudgeNodeHeartbeatServiceImpl implements JudgeNodeHeartbeatService {
 
     private static final String BEARER_PREFIX = "Bearer ";
+    private static final String DEFAULT_JUDGE_MODE = "default";
+    private static final String MODE_SEPARATOR = ",";
     private static final int FORMAL_TOKEN_ID_HASH_LENGTH = 32;
     private static final int MAX_RUNNING_TASKS = 100000;
     private static final int MAX_CONCURRENCY = 10000;
@@ -41,6 +46,7 @@ public class JudgeNodeHeartbeatServiceImpl implements JudgeNodeHeartbeatService 
 
     private final JudgeNodeSecurityService judgeNodeSecurityService;
     private final JudgeNodeTokenMapper judgeNodeTokenMapper;
+    private final JudgeSecurityProperties judgeSecurityProperties;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -61,6 +67,17 @@ public class JudgeNodeHeartbeatServiceImpl implements JudgeNodeHeartbeatService 
         recordTempHeartbeat(validation, request);
     }
 
+    @Override
+    public boolean hasActiveNodeForMode(String judgeMode) {
+        String normalizedJudgeMode = StrUtil.blankToDefault(judgeMode, DEFAULT_JUDGE_MODE);
+        LocalDateTime activeAfter = LocalDateTime.now().minusSeconds(activeTimeoutSeconds());
+        List<JudgeNodeToken> tokens = judgeNodeTokenMapper.selectList(new LambdaQueryWrapper<JudgeNodeToken>()
+                .eq(JudgeNodeToken::getStatus, JudgeNodeConstant.TOKEN_ACTIVE)
+                .gt(JudgeNodeToken::getExpireTime, LocalDateTime.now())
+                .ge(JudgeNodeToken::getLastHeartbeatTime, activeAfter));
+        return tokens.stream().anyMatch(token -> supportsMode(token.getSupportedJudgeModes(), normalizedJudgeMode));
+    }
+
     private JudgeNodeTokenValidationVo validateAccess(String judgeToken, String authorizationHeader) {
         ValidateJudgeNodeTokenRequest validateRequest = new ValidateJudgeNodeTokenRequest();
         validateRequest.setJudgeToken(StrUtil.trimToNull(judgeToken));
@@ -73,6 +90,7 @@ public class JudgeNodeHeartbeatServiceImpl implements JudgeNodeHeartbeatService 
         request.setNodeName(StrUtil.trimToNull(request.getNodeName()));
         request.setNodeType(StrUtil.trimToNull(request.getNodeType()));
         request.setVersion(StrUtil.trimToNull(request.getVersion()));
+        request.setSupportedJudgeModes(normalizeSupportedJudgeModes(request.getSupportedJudgeModes()));
         if (request.getNodeId() == null) {
             request.setNodeId(request.getNodeName());
         }
@@ -145,6 +163,7 @@ public class JudgeNodeHeartbeatServiceImpl implements JudgeNodeHeartbeatService 
                 .set(JudgeNodeToken::getRunningTasks, request.getRunningTasks())
                 .set(JudgeNodeToken::getCpuCore, request.getCpuCore())
                 .set(JudgeNodeToken::getVersion, request.getVersion())
+                .set(JudgeNodeToken::getSupportedJudgeModes, joinSupportedJudgeModes(request.getSupportedJudgeModes()))
                 .set(JudgeNodeToken::getCacheUsedBytes, request.getCacheUsedBytes())
                 .set(JudgeNodeToken::getCacheProblemCount, request.getCacheProblemCount())
                 .set(JudgeNodeToken::getDiskTotalBytes, request.getDiskTotalBytes())
@@ -161,6 +180,7 @@ public class JudgeNodeHeartbeatServiceImpl implements JudgeNodeHeartbeatService 
                 .set(JudgeNodeToken::getRunningTasks, request.getRunningTasks())
                 .set(JudgeNodeToken::getCpuCore, request.getCpuCore())
                 .set(JudgeNodeToken::getVersion, request.getVersion())
+                .set(JudgeNodeToken::getSupportedJudgeModes, joinSupportedJudgeModes(request.getSupportedJudgeModes()))
                 .set(JudgeNodeToken::getCacheUsedBytes, request.getCacheUsedBytes())
                 .set(JudgeNodeToken::getCacheProblemCount, request.getCacheProblemCount())
                 .set(JudgeNodeToken::getDiskTotalBytes, request.getDiskTotalBytes())
@@ -173,6 +193,7 @@ public class JudgeNodeHeartbeatServiceImpl implements JudgeNodeHeartbeatService 
         token.setRunningTasks(request.getRunningTasks());
         token.setCpuCore(request.getCpuCore());
         token.setVersion(request.getVersion());
+        token.setSupportedJudgeModes(joinSupportedJudgeModes(request.getSupportedJudgeModes()));
         token.setCacheUsedBytes(request.getCacheUsedBytes());
         token.setCacheProblemCount(request.getCacheProblemCount());
         token.setDiskTotalBytes(request.getDiskTotalBytes());
@@ -189,6 +210,35 @@ public class JudgeNodeHeartbeatServiceImpl implements JudgeNodeHeartbeatService 
             return StrUtil.trimToNull(normalized.substring(BEARER_PREFIX.length()));
         }
         return normalized;
+    }
+
+    private List<String> normalizeSupportedJudgeModes(List<String> supportedJudgeModes) {
+        if (supportedJudgeModes == null || supportedJudgeModes.isEmpty()) {
+            return List.of(DEFAULT_JUDGE_MODE);
+        }
+        List<String> normalizedModes = supportedJudgeModes.stream()
+                .map(item -> StrUtil.blankToDefault(item, DEFAULT_JUDGE_MODE))
+                .map(String::toLowerCase)
+                .distinct()
+                .toList();
+        return normalizedModes.isEmpty() ? List.of(DEFAULT_JUDGE_MODE) : normalizedModes;
+    }
+
+    private String joinSupportedJudgeModes(List<String> supportedJudgeModes) {
+        return String.join(MODE_SEPARATOR, normalizeSupportedJudgeModes(supportedJudgeModes));
+    }
+
+    private boolean supportsMode(String supportedJudgeModes, String judgeMode) {
+        String normalizedModes = StrUtil.blankToDefault(supportedJudgeModes, DEFAULT_JUDGE_MODE);
+        return Arrays.stream(normalizedModes.split(MODE_SEPARATOR))
+                .map(StrUtil::trimToNull)
+                .filter(item -> item != null)
+                .anyMatch(item -> item.equalsIgnoreCase(judgeMode));
+    }
+
+    private long activeTimeoutSeconds() {
+        long value = judgeSecurityProperties.getNodeActiveTimeoutSeconds();
+        return value <= 0 ? 90L : value;
     }
 
     private void validateRange(Integer value, String fieldName, int max) {

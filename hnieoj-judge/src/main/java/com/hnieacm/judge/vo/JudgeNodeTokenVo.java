@@ -3,6 +3,7 @@ package com.hnieacm.judge.vo;
 import lombok.Data;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 /**
  * @Author: HaoRan_Lyu
@@ -37,6 +38,8 @@ public class JudgeNodeTokenVo {
     private Integer cpuCore;
 
     private String version;
+
+    private List<String> supportedJudgeModes;
 
     private Long cacheUsedBytes;
 

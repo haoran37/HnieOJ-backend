@@ -18,6 +18,8 @@ hnieoj:
       temp-token-ttl-seconds: ${HNIEOJ_JUDGE_TEMP_TOKEN_TTL_SECONDS:7200}
       auth-code-ttl-seconds: ${HNIEOJ_JUDGE_AUTH_CODE_TTL_SECONDS:1800}
       auth-code-max-exchange: ${HNIEOJ_JUDGE_AUTH_CODE_MAX_EXCHANGE:1}
+      # 判题节点超过该时间未心跳时视为不可调度，单位秒。
+      node-active-timeout-seconds: ${HNIEOJ_JUDGE_NODE_ACTIVE_TIMEOUT_SECONDS:90}
     formal-token:
       cipher-algorithm: RSA/ECB/OAEPWithSHA-256AndMGF1Padding
       public-key: ${HNIEOJ_JUDGE_FORMAL_TOKEN_PUBLIC_KEY:}

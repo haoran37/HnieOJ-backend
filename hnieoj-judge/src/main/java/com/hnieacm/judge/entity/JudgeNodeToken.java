@@ -45,6 +45,8 @@ public class JudgeNodeToken {
 
     private String version;
 
+    private String supportedJudgeModes;
+
     private Long cacheUsedBytes;
 
     private Integer cacheProblemCount;

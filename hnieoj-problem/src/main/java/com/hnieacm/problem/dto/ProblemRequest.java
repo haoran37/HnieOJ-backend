@@ -78,6 +78,20 @@ public class ProblemRequest {
 
     private String spjProtocol;
 
+    private String interactorCode;
+
+    private String interactorLanguage;
+
+    private Integer interactorTimeLimit;
+
+    private Integer interactorMemoryLimit;
+
+    private Integer interactorStackLimit;
+
+    private Integer interactorOutputLimit;
+
+    private String interactorProtocol;
+
     private Boolean isRemoveEndBlank;
 
     private Boolean openCaseResult;

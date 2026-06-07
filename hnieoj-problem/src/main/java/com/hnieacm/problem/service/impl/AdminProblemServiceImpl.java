@@ -290,6 +290,13 @@ public class AdminProblemServiceImpl implements AdminProblemService {
         entity.setSpjStackLimit(pr.getSpjStackLimit());
         entity.setSpjOutputLimit(pr.getSpjOutputLimit());
         entity.setSpjProtocol(pr.getSpjProtocol());
+        entity.setInteractorCode(pr.getInteractorCode());
+        entity.setInteractorLanguage(pr.getInteractorLanguage());
+        entity.setInteractorTimeLimit(pr.getInteractorTimeLimit());
+        entity.setInteractorMemoryLimit(pr.getInteractorMemoryLimit());
+        entity.setInteractorStackLimit(pr.getInteractorStackLimit());
+        entity.setInteractorOutputLimit(pr.getInteractorOutputLimit());
+        entity.setInteractorProtocol(pr.getInteractorProtocol());
         entity.setIsRemoveEndBlank(pr.getIsRemoveEndBlank());
         entity.setOpenCaseResult(pr.getOpenCaseResult());
 

@@ -79,6 +79,21 @@ public class RabbitJudgeTaskMessagePublisher implements JudgeTaskMessagePublishe
         publishOutbox(outbox.getId());
     }
 
+    @Override
+    public void retryOutbox(Long outboxId) {
+        if (outboxId == null) {
+            return;
+        }
+        outboxMapper.update(null, new LambdaUpdateWrapper<JudgeTaskOutbox>()
+                .eq(JudgeTaskOutbox::getId, outboxId)
+                .ne(JudgeTaskOutbox::getStatus, JudgeTaskOutboxStatusConstant.SENT)
+                .set(JudgeTaskOutbox::getStatus, JudgeTaskOutboxStatusConstant.FAILED)
+                .set(JudgeTaskOutbox::getRetryCount, 0)
+                .set(JudgeTaskOutbox::getNextRetryTime, LocalDateTime.now())
+                .set(JudgeTaskOutbox::getLastError, null));
+        publishOutbox(outboxId);
+    }
+
     @Scheduled(fixedDelayString = "${hnieoj.submission.judge-outbox.retry-interval-ms:10000}")
     public void retryPendingOutbox() {
         List<JudgeTaskOutbox> candidates = queryRetryCandidates();

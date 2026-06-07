@@ -11,4 +11,6 @@ import com.hnieacm.submission.dto.ProblemBasicDto;
 public interface JudgeTaskMessagePublisher {
 
     void publishAfterCommit(Judge judge, ProblemBasicDto problem);
+
+    void retryOutbox(Long outboxId);
 }

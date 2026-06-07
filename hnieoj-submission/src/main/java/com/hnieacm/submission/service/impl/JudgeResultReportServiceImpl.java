@@ -18,6 +18,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Set;
 
 /**
  * @Author: HaoRan_Lyu
@@ -35,6 +36,18 @@ public class JudgeResultReportServiceImpl implements JudgeResultReportService {
     private static final String EVENT_JUDGE_FAILED = "JUDGE_FAILED";
     private static final String PROGRESS_TOPIC_PREFIX = "/topic/submissions/";
     private static final String PROGRESS_TOPIC_SUFFIX = "/progress";
+    private static final Set<Integer> VALID_STATUS_SET = Set.of(
+            SubmissionStatusConstant.PENDING,
+            SubmissionStatusConstant.COMPILING,
+            SubmissionStatusConstant.RUNNING,
+            SubmissionStatusConstant.ACCEPTED,
+            SubmissionStatusConstant.RUNTIME_ERROR,
+            SubmissionStatusConstant.COMPILE_ERROR,
+            SubmissionStatusConstant.WRONG_ANSWER,
+            SubmissionStatusConstant.TIME_LIMIT_EXCEEDED,
+            SubmissionStatusConstant.MEMORY_LIMIT_EXCEEDED,
+            SubmissionStatusConstant.SYSTEM_ERROR
+    );
 
     private final JudgeMapper judgeMapper;
     private final JudgeCaseMapper judgeCaseMapper;
@@ -60,6 +73,15 @@ public class JudgeResultReportServiceImpl implements JudgeResultReportService {
         String eventType = StrUtil.trimToNull(request.getEventType());
         if (eventType == null) {
             throw new BizException(ResultCode.BAD_REQUEST, "eventType 不能为空");
+        }
+        request.setEventType(eventType);
+        validateEvent(request);
+
+        // 已进入终态的提交不再接收进度类回写，避免乱序重试事件污染最终结果。
+        if (isTerminalStatus(judge.getStatus())) {
+            log.info("Judge event ignored because submission is terminal, submissionId: {}, eventType: {}, currentStatus: {}",
+                    normalizedSubmissionId, eventType, judge.getStatus());
+            return;
         }
 
         switch (eventType) {
@@ -97,6 +119,9 @@ public class JudgeResultReportServiceImpl implements JudgeResultReportService {
     }
 
     private void handleJudgeFailed(Judge judge, JudgeResultEventRequest request) {
+        if (request.getStatus() == null) {
+            request.setStatus(SubmissionStatusConstant.SYSTEM_ERROR);
+        }
         updateJudge(judge, request, request.getScore(), StrUtil.trimToNull(request.getMessage()));
     }
 
@@ -107,10 +132,10 @@ public class JudgeResultReportServiceImpl implements JudgeResultReportService {
     private void updateJudge(Judge judge, JudgeResultEventRequest request, Integer score, String errorMessage) {
         Judge update = new Judge();
         update.setId(judge.getId());
-        update.setStatus(request.getStatus() == null ? judge.getStatus() : request.getStatus());
-        update.setTotalCase(defaultZero(request.getTotalCase()));
-        update.setJudgedCase(defaultZero(request.getJudgedCase()));
-        update.setCurrentCase(defaultZero(request.getCurrentCase()));
+        update.setStatus(nextStatus(judge.getStatus(), request.getStatus()));
+        update.setTotalCase(nextProgress(judge.getTotalCase(), request.getTotalCase()));
+        update.setJudgedCase(nextProgress(judge.getJudgedCase(), request.getJudgedCase()));
+        update.setCurrentCase(nextProgress(judge.getCurrentCase(), request.getCurrentCase()));
         update.setTime(maxCaseTime(judge.getId()));
         update.setMemory(maxCaseMemory(judge.getId()));
         if (score != null) {
@@ -118,9 +143,6 @@ public class JudgeResultReportServiceImpl implements JudgeResultReportService {
         }
         if (errorMessage != null) {
             update.setErrorMessage(errorMessage);
-        }
-        if (EVENT_JUDGE_FAILED.equals(request.getEventType()) && update.getStatus() == null) {
-            update.setStatus(SubmissionStatusConstant.SYSTEM_ERROR);
         }
         judgeMapper.updateById(update);
     }
@@ -172,6 +194,121 @@ public class JudgeResultReportServiceImpl implements JudgeResultReportService {
     private List<JudgeCase> listCases(Long judgeId) {
         return judgeCaseMapper.selectList(new LambdaQueryWrapper<JudgeCase>()
                 .eq(JudgeCase::getSubmitId, judgeId));
+    }
+
+    private void validateEvent(JudgeResultEventRequest request) {
+        validateStatus(request.getStatus(), "status");
+        validateProgress(request.getTotalCase(), "totalCase");
+        validateProgress(request.getJudgedCase(), "judgedCase");
+        validateProgress(request.getCurrentCase(), "currentCase");
+        if (request.getTotalCase() != null && request.getTotalCase() > 0) {
+            if (request.getJudgedCase() != null && request.getJudgedCase() > request.getTotalCase()) {
+                throw new BizException(ResultCode.BAD_REQUEST, "judgedCase 不能大于 totalCase");
+            }
+            if (request.getCurrentCase() != null && request.getCurrentCase() > request.getTotalCase()) {
+                throw new BizException(ResultCode.BAD_REQUEST, "currentCase 不能大于 totalCase");
+            }
+        }
+        switch (request.getEventType()) {
+            case EVENT_STATUS_CHANGED -> validateNonTerminalStatus(request.getStatus(), "status");
+            case EVENT_CASE_FINISHED -> {
+                if (request.getStatus() != null
+                        && !Integer.valueOf(SubmissionStatusConstant.RUNNING).equals(request.getStatus())) {
+                    throw new BizException(ResultCode.BAD_REQUEST, "测试点事件主状态必须为 Running");
+                }
+                validateCaseResult(request.getCaseResult());
+            }
+            case EVENT_JUDGE_FINISHED -> validateRequiredTerminalStatus(request.getStatus(), "status");
+            case EVENT_JUDGE_FAILED -> validateTerminalStatus(request.getStatus(), "status");
+            default -> throw new BizException(ResultCode.BAD_REQUEST, "不支持的判题事件类型");
+        }
+    }
+
+    private void validateCaseResult(JudgeResultEventRequest.CaseResult caseResult) {
+        if (caseResult == null) {
+            throw new BizException(ResultCode.BAD_REQUEST, "caseResult 不能为空");
+        }
+        validateStatus(caseResult.getStatus(), "caseResult.status");
+        validateRequiredTerminalStatus(caseResult.getStatus(), "caseResult.status");
+        validateNonNegative(caseResult.getTime(), "caseResult.time");
+        validateNonNegative(caseResult.getMemory(), "caseResult.memory");
+        validateProgress(caseResult.getScore(), "caseResult.score");
+    }
+
+    private void validateStatus(Integer status, String fieldName) {
+        if (status != null && !VALID_STATUS_SET.contains(status)) {
+            throw new BizException(ResultCode.BAD_REQUEST, fieldName + " 不合法");
+        }
+    }
+
+    private void validateRequiredTerminalStatus(Integer status, String fieldName) {
+        if (status == null) {
+            throw new BizException(ResultCode.BAD_REQUEST, fieldName + " 不能为空");
+        }
+        validateTerminalStatus(status, fieldName);
+    }
+
+    private void validateTerminalStatus(Integer status, String fieldName) {
+        if (status != null && !isTerminalStatus(status)) {
+            throw new BizException(ResultCode.BAD_REQUEST, fieldName + " 必须为终态");
+        }
+    }
+
+    private void validateNonTerminalStatus(Integer status, String fieldName) {
+        if (status != null && isTerminalStatus(status)) {
+            throw new BizException(ResultCode.BAD_REQUEST, fieldName + " 不能为终态");
+        }
+    }
+
+    private void validateProgress(Integer value, String fieldName) {
+        if (value != null && value < 0) {
+            throw new BizException(ResultCode.BAD_REQUEST, fieldName + " 不能小于 0");
+        }
+    }
+
+    private void validateNonNegative(Long value, String fieldName) {
+        if (value != null && value < 0) {
+            throw new BizException(ResultCode.BAD_REQUEST, fieldName + " 不能小于 0");
+        }
+    }
+
+    private Integer nextStatus(Integer currentStatus, Integer incomingStatus) {
+        if (incomingStatus == null) {
+            return currentStatus;
+        }
+        if (isTerminalStatus(incomingStatus)) {
+            return incomingStatus;
+        }
+        if (currentStatus == null) {
+            return incomingStatus;
+        }
+        return statusRank(incomingStatus) >= statusRank(currentStatus) ? incomingStatus : currentStatus;
+    }
+
+    private Integer nextProgress(Integer currentValue, Integer incomingValue) {
+        if (incomingValue == null) {
+            return currentValue;
+        }
+        if (currentValue == null) {
+            return incomingValue;
+        }
+        return Math.max(currentValue, incomingValue);
+    }
+
+    private boolean isTerminalStatus(Integer status) {
+        return status != null && status >= SubmissionStatusConstant.ACCEPTED;
+    }
+
+    private int statusRank(Integer status) {
+        if (status == null) {
+            return 0;
+        }
+        return switch (status) {
+            case SubmissionStatusConstant.PENDING -> 1;
+            case SubmissionStatusConstant.COMPILING -> 2;
+            case SubmissionStatusConstant.RUNNING -> 3;
+            default -> isTerminalStatus(status) ? 4 : 0;
+        };
     }
 
     private Integer defaultZero(Integer value) {

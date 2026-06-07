@@ -60,6 +60,10 @@ public class SubmissionStatusConstant {
      */
     public static final int SYSTEM_ERROR = 6;
 
+    public static boolean isJudging(Integer status) {
+        return status != null && (status == PENDING || status == COMPILING || status == RUNNING);
+    }
+
     public static String toText(Integer status) {
         if (status == null) {
             return "Unknown";

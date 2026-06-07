@@ -161,6 +161,7 @@ public class SubmissionServiceImpl implements SubmissionService {
         }
 
         Judge judge = queryJudge(normalizedSubmissionId);
+        ensureSubmissionRejudgeAllowed(judge);
         ProblemBasicDto problem = queryProblemBasic(judge.getProblemCode());
         ensureProblemHasTestdata(problem);
 
@@ -168,6 +169,8 @@ public class SubmissionServiceImpl implements SubmissionService {
         // 重判必须生成新的任务 ID，避免旧判题任务的延迟回调污染新一轮结果。
         judgeMapper.update(null, new LambdaUpdateWrapper<Judge>()
                 .eq(Judge::getId, judge.getId())
+                .notIn(Judge::getStatus, SubmissionStatusConstant.PENDING,
+                        SubmissionStatusConstant.COMPILING, SubmissionStatusConstant.RUNNING)
                 .set(Judge::getJudgeTaskId, judgeTaskId)
                 .set(Judge::getStatus, SubmissionStatusConstant.PENDING)
                 .set(Judge::getErrorMessage, null)
@@ -179,6 +182,10 @@ public class SubmissionServiceImpl implements SubmissionService {
                 .set(Judge::getCurrentCase, 0)
                 .set(Judge::getJudger, null)
                 .set(Judge::getIsManual, true));
+        Judge updatedJudge = judgeMapper.selectById(judge.getId());
+        if (updatedJudge == null || !judgeTaskId.equals(updatedJudge.getJudgeTaskId())) {
+            throw new BizException(ResultCode.BAD_REQUEST, "提交正在判题中，暂不能重判");
+        }
         judgeCaseMapper.delete(new LambdaQueryWrapper<JudgeCase>()
                 .eq(JudgeCase::getSubmitId, judge.getId()));
 
@@ -406,6 +413,12 @@ public class SubmissionServiceImpl implements SubmissionService {
         }
         if (!Boolean.TRUE.equals(problem.getHasTestdata()) || defaultZero(problem.getTestdataCaseCount()) <= 0) {
             throw new BizException(ResultCode.BAD_REQUEST, "题目测试数据未配置，暂不能重判");
+        }
+    }
+
+    private void ensureSubmissionRejudgeAllowed(Judge judge) {
+        if (SubmissionStatusConstant.isJudging(judge.getStatus())) {
+            throw new BizException(ResultCode.BAD_REQUEST, "提交正在判题中，暂不能重判");
         }
     }
 

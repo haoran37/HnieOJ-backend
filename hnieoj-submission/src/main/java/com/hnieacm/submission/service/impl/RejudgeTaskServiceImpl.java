@@ -210,6 +210,11 @@ public class RejudgeTaskServiceImpl implements RejudgeTaskService {
             try {
                 rejudge(judge, problem);
                 processed++;
+            } catch (BizException e) {
+                failed++;
+                lastError = e.getMessage();
+                log.warn("Rejudge submission skipped, taskId: {}, submissionId: {}, reason: {}",
+                        task.getId(), judge.getSubmitId(), e.getMessage());
             } catch (Exception e) {
                 failed++;
                 lastError = e.getMessage();
@@ -223,7 +228,9 @@ public class RejudgeTaskServiceImpl implements RejudgeTaskService {
                                                              LocalDateTime rangeStart, LocalDateTime rangeEnd,
                                                              Long lastJudgeId) {
         LambdaQueryWrapper<Judge> wrapper = new LambdaQueryWrapper<Judge>()
-                .eq(Judge::getProblemId, problemId);
+                .eq(Judge::getProblemId, problemId)
+                .notIn(Judge::getStatus, SubmissionStatusConstant.PENDING,
+                        SubmissionStatusConstant.COMPILING, SubmissionStatusConstant.RUNNING);
         if (contestId != null) {
             wrapper.eq(Judge::getCid, contestId);
         }
@@ -242,8 +249,10 @@ public class RejudgeTaskServiceImpl implements RejudgeTaskService {
     private void rejudge(Judge judge, ProblemBasicDto problem) {
         transactionTemplate.executeWithoutResult(status -> {
             String judgeTaskId = UUID.randomUUID().toString().replace("-", "");
-            judgeMapper.update(null, new LambdaUpdateWrapper<Judge>()
+            int updated = judgeMapper.update(null, new LambdaUpdateWrapper<Judge>()
                     .eq(Judge::getId, judge.getId())
+                    .notIn(Judge::getStatus, SubmissionStatusConstant.PENDING,
+                            SubmissionStatusConstant.COMPILING, SubmissionStatusConstant.RUNNING)
                     .set(Judge::getJudgeTaskId, judgeTaskId)
                     .set(Judge::getStatus, SubmissionStatusConstant.PENDING)
                     .set(Judge::getErrorMessage, null)
@@ -255,6 +264,9 @@ public class RejudgeTaskServiceImpl implements RejudgeTaskService {
                     .set(Judge::getCurrentCase, 0)
                     .set(Judge::getJudger, null)
                     .set(Judge::getIsManual, true));
+            if (updated <= 0) {
+                throw new BizException(ResultCode.BAD_REQUEST, "提交正在判题中，暂不能重判");
+            }
             judgeCaseMapper.delete(new LambdaQueryWrapper<JudgeCase>()
                     .eq(JudgeCase::getSubmitId, judge.getId()));
             judge.setJudgeTaskId(judgeTaskId);

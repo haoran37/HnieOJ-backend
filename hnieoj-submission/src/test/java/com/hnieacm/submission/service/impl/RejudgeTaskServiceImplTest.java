@@ -7,6 +7,7 @@ import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.baomidou.mybatisplus.core.MybatisConfiguration;
 import com.hnieacm.common.result.Result;
 import com.hnieacm.submission.constant.RejudgeTaskStatusConstant;
+import com.hnieacm.submission.constant.SubmissionStatusConstant;
 import com.hnieacm.submission.dto.ProblemBasicDto;
 import com.hnieacm.submission.entity.Judge;
 import com.hnieacm.submission.entity.JudgeCase;
@@ -102,6 +103,7 @@ class RejudgeTaskServiceImplTest {
         when(rejudgeTaskMapper.selectById(task.getId())).thenReturn(task);
         when(problemInternalFeignClient.getProblemBasic(task.getProblemCode())).thenReturn(Result.success(problem));
         when(judgeMapper.selectList(any(Wrapper.class))).thenReturn(List.of(judge));
+        when(judgeMapper.update(isNull(), any(LambdaUpdateWrapper.class))).thenReturn(1);
         doAnswer(invocation -> {
             Consumer<TransactionStatus> action = invocation.getArgument(0);
             action.accept(transactionStatus);
@@ -116,6 +118,28 @@ class RejudgeTaskServiceImplTest {
         verify(judgeTaskMessagePublisher).publishAfterCommit(judgeCaptor.capture(), any(ProblemBasicDto.class));
         assertThat(judgeCaptor.getValue().getJudgeTaskId()).isNotBlank();
         assertThat(judgeCaptor.getValue().getCode()).isEqualTo("int main() { return 0; }");
+    }
+
+    @Test
+    void shouldNotPublishWhenSubmissionBecomesJudging() {
+        RejudgeTask task = buildTask(RejudgeTaskStatusConstant.PENDING);
+        Judge judge = buildJudge();
+        ProblemBasicDto problem = buildProblem();
+        when(rejudgeTaskMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(task);
+        when(rejudgeTaskMapper.update(isNull(), any(LambdaUpdateWrapper.class))).thenReturn(1);
+        when(rejudgeTaskMapper.selectById(task.getId())).thenReturn(task);
+        when(problemInternalFeignClient.getProblemBasic(task.getProblemCode())).thenReturn(Result.success(problem));
+        when(judgeMapper.selectList(any(Wrapper.class))).thenReturn(List.of(judge));
+        when(judgeMapper.update(isNull(), any(LambdaUpdateWrapper.class))).thenReturn(0);
+        doAnswer(invocation -> {
+            Consumer<TransactionStatus> action = invocation.getArgument(0);
+            action.accept(transactionStatus);
+            return null;
+        }).when(transactionTemplate).executeWithoutResult(any());
+
+        service.processPendingTasks();
+
+        verifyNoInteractions(judgeCaseMapper, judgeTaskMessagePublisher);
     }
 
     private RejudgeTask buildTask(String status) {
@@ -137,6 +161,7 @@ class RejudgeTaskServiceImplTest {
         judge.setUid("20230001");
         judge.setLanguage("cpp");
         judge.setCode("int main() { return 0; }");
+        judge.setStatus(SubmissionStatusConstant.ACCEPTED);
         return judge;
     }
 

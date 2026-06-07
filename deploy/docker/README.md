@@ -215,13 +215,15 @@ reporter:
   mode: "http"
 ```
 
-正式节点长期 Token 不在配置文件中填写。后端管理端调用：
+正式节点长期 Token 不在配置文件中填写。`hnieoj-judge` 启动后如果数据库中没有 active 正式 Token，会自动生成 Token、保存哈希、使用公钥加密并发布到 Nacos。
+
+后续需要主动轮换时，管理员调用：
 
 ```http
 POST /api/admin/judge/nodes/formal-token/rotate
 ```
 
-该接口会随机生成正式 Token、保存 SHA-256 摘要、使用公钥加密并发布到 Nacos。go-judge 节点会从 Nacos 读取密文并用本地私钥解密。
+该接口会随机生成新的正式 Token、保存 SHA-256 摘要、使用公钥加密并发布到 Nacos。go-judge 节点会从 Nacos 读取密文并用本地私钥解密。
 
 查看 go-judge：
 

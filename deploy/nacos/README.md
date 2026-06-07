@@ -19,7 +19,7 @@ deploy/nacos/
 2. 先导入 `DEFAULT_GROUP` 下所有 `*.yaml`（Data ID 与文件名一致）。
 3. 在 `HNIEOJ_SECRET_GROUP` 新建 `hnieoj-secrets.yaml`，内容参考 `hnieoj-secrets.example.yaml`。该文件只允许保留环境变量占位，不要填写真实密码或 Token。
 4. 在 `HNIEOJ_SECRET_GROUP` 新建 `hnieoj-judge-formal-token.yaml`，内容可先参考 `hnieoj-judge-formal-token.example.yaml` 保持为空。
-5. 真实敏感值只保存在服务器 `.env` 或进程环境变量中，不写入 Nacos。正式判题节点长期 Token 的密文由后端轮换接口自动发布到 `hnieoj-judge-formal-token.yaml`。
+5. 真实敏感值只保存在服务器 `.env` 或进程环境变量中，不写入 Nacos。正式判题节点长期 Token 的密文由后端启动初始化或轮换接口自动发布到 `hnieoj-judge-formal-token.yaml`。
 
 ## 安全约束
 

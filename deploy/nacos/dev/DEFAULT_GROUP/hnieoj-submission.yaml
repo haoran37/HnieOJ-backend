@@ -36,6 +36,7 @@ hnieoj:
   submission:
     # 单次提交代码最大字节数，按 UTF-8 编码计算。
     max-code-bytes: ${HNIEOJ_SUBMISSION_MAX_CODE_BYTES:65536}
+    supported-judge-modes: ${HNIEOJ_SUBMISSION_SUPPORTED_JUDGE_MODES:default}
     judge-outbox:
       # 判题任务 outbox 重试扫描间隔，单位毫秒。
       retry-interval-ms: ${HNIEOJ_JUDGE_OUTBOX_RETRY_INTERVAL_MS:10000}

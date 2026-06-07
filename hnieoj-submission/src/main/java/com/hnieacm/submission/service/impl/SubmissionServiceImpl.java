@@ -58,6 +58,7 @@ public class SubmissionServiceImpl implements SubmissionService {
     private static final int DEFAULT_PAGE = 1;
     private static final int DEFAULT_PAGE_SIZE = 20;
     private static final int MAX_PAGE_SIZE = 100;
+    private static final String DEFAULT_JUDGE_MODE = "default";
 
     private final JudgeMapper judgeMapper;
     private final JudgeCaseMapper judgeCaseMapper;
@@ -405,6 +406,7 @@ public class SubmissionServiceImpl implements SubmissionService {
         if (!Boolean.TRUE.equals(problem.getHasTestdata()) || defaultZero(problem.getTestdataCaseCount()) <= 0) {
             throw new BizException(ResultCode.BAD_REQUEST, "题目测试数据未配置，暂不能提交");
         }
+        ensureJudgeModeSupported(problem);
     }
 
     private void ensureProblemHasTestdata(ProblemBasicDto problem) {
@@ -413,6 +415,21 @@ public class SubmissionServiceImpl implements SubmissionService {
         }
         if (!Boolean.TRUE.equals(problem.getHasTestdata()) || defaultZero(problem.getTestdataCaseCount()) <= 0) {
             throw new BizException(ResultCode.BAD_REQUEST, "题目测试数据未配置，暂不能重判");
+        }
+        ensureJudgeModeSupported(problem);
+    }
+
+    private void ensureJudgeModeSupported(ProblemBasicDto problem) {
+        String judgeMode = StrUtil.blankToDefault(problem.getJudgeMode(), DEFAULT_JUDGE_MODE);
+        List<String> supportedModes = submissionProperties.getSupportedJudgeModes();
+        if (supportedModes == null || supportedModes.isEmpty()) {
+            supportedModes = List.of(DEFAULT_JUDGE_MODE);
+        }
+        boolean supported = supportedModes.stream()
+                .map(item -> StrUtil.blankToDefault(item, DEFAULT_JUDGE_MODE))
+                .anyMatch(item -> item.equalsIgnoreCase(judgeMode));
+        if (!supported) {
+            throw new BizException(ResultCode.BAD_REQUEST, "当前判题节点暂不支持该题目的判题模式: " + judgeMode);
         }
     }
 

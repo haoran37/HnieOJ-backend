@@ -142,6 +142,21 @@ class RejudgeTaskServiceImplTest {
         verifyNoInteractions(judgeCaseMapper, judgeTaskMessagePublisher);
     }
 
+    @Test
+    void shouldMarkTaskFailedWhenJudgeModeUnsupported() {
+        RejudgeTask task = buildTask(RejudgeTaskStatusConstant.PENDING);
+        ProblemBasicDto problem = buildProblem();
+        problem.setJudgeMode("spj");
+        when(rejudgeTaskMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(task);
+        when(rejudgeTaskMapper.update(isNull(), any(LambdaUpdateWrapper.class))).thenReturn(1);
+        when(rejudgeTaskMapper.selectById(task.getId())).thenReturn(task);
+        when(problemInternalFeignClient.getProblemBasic(task.getProblemCode())).thenReturn(Result.success(problem));
+
+        service.processPendingTasks();
+
+        verifyNoInteractions(judgeMapper, judgeCaseMapper, judgeTaskMessagePublisher);
+    }
+
     private RejudgeTask buildTask(String status) {
         RejudgeTask task = new RejudgeTask();
         task.setId(1L);
@@ -169,6 +184,7 @@ class RejudgeTaskServiceImplTest {
         ProblemBasicDto problem = new ProblemBasicDto();
         problem.setId(2L);
         problem.setProblemCode("P1001");
+        problem.setJudgeMode("default");
         problem.setHasTestdata(Boolean.TRUE);
         problem.setTestdataCaseCount(1);
         return problem;

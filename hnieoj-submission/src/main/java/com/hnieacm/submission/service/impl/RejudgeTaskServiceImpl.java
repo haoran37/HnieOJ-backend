@@ -58,6 +58,7 @@ public class RejudgeTaskServiceImpl implements RejudgeTaskService {
     private static final long DEFAULT_LEASE_SECONDS = 300L;
     private static final int WORKER_ID_UUID_LENGTH = 8;
     private static final int MAX_WORKER_ID_LENGTH = 128;
+    private static final String DEFAULT_JUDGE_MODE = "default";
     private static final Set<String> STATUS_SET = Set.of(
             RejudgeTaskStatusConstant.PENDING,
             RejudgeTaskStatusConstant.PROCESSING,
@@ -295,6 +296,21 @@ public class RejudgeTaskServiceImpl implements RejudgeTaskService {
     private void ensureProblemHasTestdata(ProblemBasicDto problem) {
         if (!Boolean.TRUE.equals(problem.getHasTestdata()) || defaultZero(problem.getTestdataCaseCount()) <= 0) {
             throw new BizException(ResultCode.BAD_REQUEST, "题目测试数据未配置，暂不能重判");
+        }
+        ensureJudgeModeSupported(problem);
+    }
+
+    private void ensureJudgeModeSupported(ProblemBasicDto problem) {
+        String judgeMode = StrUtil.blankToDefault(problem.getJudgeMode(), DEFAULT_JUDGE_MODE);
+        List<String> supportedModes = submissionProperties.getSupportedJudgeModes();
+        if (supportedModes == null || supportedModes.isEmpty()) {
+            supportedModes = List.of(DEFAULT_JUDGE_MODE);
+        }
+        boolean supported = supportedModes.stream()
+                .map(item -> StrUtil.blankToDefault(item, DEFAULT_JUDGE_MODE))
+                .anyMatch(item -> item.equalsIgnoreCase(judgeMode));
+        if (!supported) {
+            throw new BizException(ResultCode.BAD_REQUEST, "当前判题节点暂不支持该题目的判题模式: " + judgeMode);
         }
     }
 

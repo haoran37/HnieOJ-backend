@@ -5,6 +5,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.cloud.context.config.annotation.RefreshScope;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
+
 /**
  * @Author: HaoRan_Lyu
  * @Date: 2026/06/07
@@ -20,6 +22,8 @@ public class SubmissionProperties {
      * 单次提交代码最大字节数，按 UTF-8 编码计算。
      */
     private Integer maxCodeBytes = 65536;
+
+    private List<String> supportedJudgeModes = List.of("default");
 
     private JudgeOutbox judgeOutbox = new JudgeOutbox();
 

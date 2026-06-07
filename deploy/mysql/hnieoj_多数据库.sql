@@ -472,11 +472,14 @@ CREATE TABLE `rejudge_task` (
   `failed_count` int(11) NOT NULL DEFAULT '0',
   `last_judge_id` bigint(20) NOT NULL DEFAULT '0',
   `last_error` text,
+  `locked_by` varchar(128) DEFAULT NULL COMMENT '当前处理该任务的服务实例',
+  `lock_until` datetime DEFAULT NULL COMMENT '任务租约过期时间',
   `admin_id` varchar(50) NOT NULL,
   `gmt_create` datetime DEFAULT CURRENT_TIMESTAMP,
   `gmt_modified` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   KEY `idx_status_id` (`status`, `id`),
+  KEY `idx_status_lock` (`status`, `lock_until`),
   KEY `idx_problem_id` (`problem_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='后台重判任务记录';
 

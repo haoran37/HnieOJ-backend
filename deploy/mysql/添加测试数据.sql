@@ -159,10 +159,10 @@ INSERT INTO `judge_case` (`submit_id`, `case_id`, `status`, `time`, `memory`, `s
 (7, '1', 3, 8, 1024, 50, '5\n3 1 4 2 5', '1 2 3 4 5', '1 3 2 4 5');
 
 -- 重判任务表
-INSERT INTO `rejudge_task` (`id`, `problem_id`, `problem_code`, `contest_id`, `range_start`, `range_end`, `status`, `total_count`, `processed_count`, `failed_count`, `last_judge_id`, `last_error`, `admin_id`) VALUES
-(1, 1, 'P1000', NULL, '2026-02-01 00:00:00', '2026-02-20 23:59:59', 'finished', 10, 10, 0, 10, NULL, '20230001'),
-(2, 2, 'P1001', NULL, NULL, NULL, 'pending', 20, 0, 0, 0, NULL, '20230001'),
-(3, 3, 'P1002', NULL, NULL, NULL, 'processing', 5, 2, 0, 2, NULL, '20230002');
+INSERT INTO `rejudge_task` (`id`, `problem_id`, `problem_code`, `contest_id`, `range_start`, `range_end`, `status`, `total_count`, `processed_count`, `failed_count`, `last_judge_id`, `last_error`, `locked_by`, `lock_until`, `admin_id`) VALUES
+(1, 1, 'P1000', NULL, '2026-02-01 00:00:00', '2026-02-20 23:59:59', 'finished', 10, 10, 0, 10, NULL, NULL, NULL, '20230001'),
+(2, 2, 'P1001', NULL, NULL, NULL, 'pending', 20, 0, 0, 0, NULL, NULL, NULL, '20230001'),
+(3, 3, 'P1002', NULL, NULL, NULL, 'processing', 5, 2, 0, 2, NULL, NULL, NULL, '20230002');
 
 -- 远程账号池
 INSERT INTO `remote_judge_account` (`id`, `oj`, `username`, `password`, `status`, `max_concurrency`) VALUES

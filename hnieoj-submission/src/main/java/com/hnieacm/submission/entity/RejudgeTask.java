@@ -52,6 +52,12 @@ public class RejudgeTask {
     @TableField("last_error")
     private String lastError;
 
+    @TableField("locked_by")
+    private String lockedBy;
+
+    @TableField("lock_until")
+    private LocalDateTime lockUntil;
+
     @TableField("admin_id")
     private String adminId;
 

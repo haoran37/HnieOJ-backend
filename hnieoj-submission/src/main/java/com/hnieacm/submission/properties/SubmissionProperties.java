@@ -97,5 +97,10 @@ public class SubmissionProperties {
          * 单个任务每轮最多处理的提交数量。
          */
         private Integer batchSize = 50;
+
+        /**
+         * 调度租约时长，单位秒；超过该时间未释放时允许其他实例接管。
+         */
+        private Long leaseSeconds = 300L;
     }
 }

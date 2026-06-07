@@ -36,6 +36,10 @@ public class RejudgeTaskVo {
 
     private String lastError;
 
+    private String lockedBy;
+
+    private LocalDateTime lockUntil;
+
     private String adminId;
 
     private LocalDateTime gmtCreate;

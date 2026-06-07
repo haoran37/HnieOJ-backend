@@ -30,7 +30,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
+import java.lang.management.ManagementFactory;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
@@ -51,6 +55,9 @@ public class RejudgeTaskServiceImpl implements RejudgeTaskService {
     private static final int DEFAULT_PAGE_SIZE = 20;
     private static final int MAX_PAGE_SIZE = 100;
     private static final int DEFAULT_BATCH_SIZE = 50;
+    private static final long DEFAULT_LEASE_SECONDS = 300L;
+    private static final int WORKER_ID_UUID_LENGTH = 8;
+    private static final int MAX_WORKER_ID_LENGTH = 128;
     private static final Set<String> STATUS_SET = Set.of(
             RejudgeTaskStatusConstant.PENDING,
             RejudgeTaskStatusConstant.PROCESSING,
@@ -64,6 +71,8 @@ public class RejudgeTaskServiceImpl implements RejudgeTaskService {
     private final ProblemInternalFeignClient problemInternalFeignClient;
     private final JudgeTaskMessagePublisher judgeTaskMessagePublisher;
     private final SubmissionProperties submissionProperties;
+    private final TransactionTemplate transactionTemplate;
+    private final String workerId = buildWorkerId();
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -126,24 +135,55 @@ public class RejudgeTaskServiceImpl implements RejudgeTaskService {
 
     @Scheduled(fixedDelayString = "${hnieoj.submission.rejudge-task.scan-interval-ms:10000}")
     public void processPendingTasks() {
+        LocalDateTime now = LocalDateTime.now();
         RejudgeTask task = rejudgeTaskMapper.selectOne(new LambdaQueryWrapper<RejudgeTask>()
-                .in(RejudgeTask::getStatus, RejudgeTaskStatusConstant.PENDING, RejudgeTaskStatusConstant.PROCESSING)
+                .and(wrapper -> wrapper
+                        .eq(RejudgeTask::getStatus, RejudgeTaskStatusConstant.PENDING)
+                        .or(item -> item.eq(RejudgeTask::getStatus, RejudgeTaskStatusConstant.PROCESSING)
+                                .and(lock -> lock.isNull(RejudgeTask::getLockUntil)
+                                        .or()
+                                        .le(RejudgeTask::getLockUntil, now))))
                 .orderByAsc(RejudgeTask::getId)
                 .last("limit 1"));
         if (task == null) {
             return;
         }
-        processTask(task);
+        RejudgeTask claimedTask = claimTask(task, now);
+        if (claimedTask == null) {
+            return;
+        }
+        processTask(claimedTask);
+    }
+
+    private RejudgeTask claimTask(RejudgeTask task, LocalDateTime now) {
+        LocalDateTime lockUntil = now.plusSeconds(leaseSeconds());
+        LambdaUpdateWrapper<RejudgeTask> wrapper = new LambdaUpdateWrapper<RejudgeTask>()
+                .eq(RejudgeTask::getId, task.getId())
+                .set(RejudgeTask::getStatus, RejudgeTaskStatusConstant.PROCESSING)
+                .set(RejudgeTask::getLockedBy, workerId)
+                .set(RejudgeTask::getLockUntil, lockUntil);
+        if (RejudgeTaskStatusConstant.PENDING.equals(task.getStatus())) {
+            wrapper.eq(RejudgeTask::getStatus, RejudgeTaskStatusConstant.PENDING);
+        } else {
+            wrapper.eq(RejudgeTask::getStatus, RejudgeTaskStatusConstant.PROCESSING)
+                    .and(lock -> lock.isNull(RejudgeTask::getLockUntil)
+                            .or()
+                            .le(RejudgeTask::getLockUntil, now));
+        }
+        int updated = rejudgeTaskMapper.update(null, wrapper);
+        if (updated <= 0) {
+            log.info("Rejudge task lease skipped, taskId: {}, workerId: {}", task.getId(), workerId);
+            return null;
+        }
+        RejudgeTask claimedTask = rejudgeTaskMapper.selectById(task.getId());
+        if (claimedTask == null) {
+            log.warn("Rejudge task lease claimed but task disappeared, taskId: {}, workerId: {}",
+                    task.getId(), workerId);
+        }
+        return claimedTask;
     }
 
     private void processTask(RejudgeTask task) {
-        if (RejudgeTaskStatusConstant.PENDING.equals(task.getStatus())) {
-            rejudgeTaskMapper.update(null, new LambdaUpdateWrapper<RejudgeTask>()
-                    .eq(RejudgeTask::getId, task.getId())
-                    .eq(RejudgeTask::getStatus, RejudgeTaskStatusConstant.PENDING)
-                    .set(RejudgeTask::getStatus, RejudgeTaskStatusConstant.PROCESSING));
-            task.setStatus(RejudgeTaskStatusConstant.PROCESSING);
-        }
         ProblemBasicDto problem;
         try {
             problem = queryProblemBasic(task.getProblemCode());
@@ -200,28 +240,30 @@ public class RejudgeTaskServiceImpl implements RejudgeTaskService {
     }
 
     private void rejudge(Judge judge, ProblemBasicDto problem) {
-        String judgeTaskId = UUID.randomUUID().toString().replace("-", "");
-        judgeMapper.update(null, new LambdaUpdateWrapper<Judge>()
-                .eq(Judge::getId, judge.getId())
-                .set(Judge::getJudgeTaskId, judgeTaskId)
-                .set(Judge::getStatus, SubmissionStatusConstant.PENDING)
-                .set(Judge::getErrorMessage, null)
-                .set(Judge::getTime, null)
-                .set(Judge::getMemory, null)
-                .set(Judge::getScore, null)
-                .set(Judge::getTotalCase, 0)
-                .set(Judge::getJudgedCase, 0)
-                .set(Judge::getCurrentCase, 0)
-                .set(Judge::getJudger, null)
-                .set(Judge::getIsManual, true));
-        judgeCaseMapper.delete(new LambdaQueryWrapper<JudgeCase>()
-                .eq(JudgeCase::getSubmitId, judge.getId()));
-        judge.setJudgeTaskId(judgeTaskId);
-        judge.setStatus(SubmissionStatusConstant.PENDING);
-        judge.setTotalCase(0);
-        judge.setJudgedCase(0);
-        judge.setCurrentCase(0);
-        judgeTaskMessagePublisher.publishAfterCommit(judge, problem);
+        transactionTemplate.executeWithoutResult(status -> {
+            String judgeTaskId = UUID.randomUUID().toString().replace("-", "");
+            judgeMapper.update(null, new LambdaUpdateWrapper<Judge>()
+                    .eq(Judge::getId, judge.getId())
+                    .set(Judge::getJudgeTaskId, judgeTaskId)
+                    .set(Judge::getStatus, SubmissionStatusConstant.PENDING)
+                    .set(Judge::getErrorMessage, null)
+                    .set(Judge::getTime, null)
+                    .set(Judge::getMemory, null)
+                    .set(Judge::getScore, null)
+                    .set(Judge::getTotalCase, 0)
+                    .set(Judge::getJudgedCase, 0)
+                    .set(Judge::getCurrentCase, 0)
+                    .set(Judge::getJudger, null)
+                    .set(Judge::getIsManual, true));
+            judgeCaseMapper.delete(new LambdaQueryWrapper<JudgeCase>()
+                    .eq(JudgeCase::getSubmitId, judge.getId()));
+            judge.setJudgeTaskId(judgeTaskId);
+            judge.setStatus(SubmissionStatusConstant.PENDING);
+            judge.setTotalCase(0);
+            judge.setJudgedCase(0);
+            judge.setCurrentCase(0);
+            judgeTaskMessagePublisher.publishAfterCommit(judge, problem);
+        });
     }
 
     private ProblemBasicDto queryProblemBasic(String problemCode) {
@@ -245,25 +287,43 @@ public class RejudgeTaskServiceImpl implements RejudgeTaskService {
     }
 
     private void advanceTask(Long taskId, Long lastJudgeId, int processed, int failed, String lastError) {
-        rejudgeTaskMapper.update(null, new LambdaUpdateWrapper<RejudgeTask>()
+        int updated = rejudgeTaskMapper.update(null, new LambdaUpdateWrapper<RejudgeTask>()
                 .eq(RejudgeTask::getId, taskId)
+                .eq(RejudgeTask::getLockedBy, workerId)
                 .set(RejudgeTask::getLastJudgeId, lastJudgeId)
                 .setSql("processed_count = processed_count + " + processed)
                 .setSql("failed_count = failed_count + " + failed)
-                .set(RejudgeTask::getLastError, StrUtil.trimToNull(lastError)));
+                .set(RejudgeTask::getLastError, StrUtil.trimToNull(lastError))
+                .set(RejudgeTask::getLockedBy, null)
+                .set(RejudgeTask::getLockUntil, null));
+        if (updated <= 0) {
+            log.warn("Advance rejudge task skipped because lease changed, taskId: {}, workerId: {}", taskId, workerId);
+        }
     }
 
     private void markTaskFinished(Long taskId) {
-        rejudgeTaskMapper.update(null, new LambdaUpdateWrapper<RejudgeTask>()
+        int updated = rejudgeTaskMapper.update(null, new LambdaUpdateWrapper<RejudgeTask>()
                 .eq(RejudgeTask::getId, taskId)
-                .set(RejudgeTask::getStatus, RejudgeTaskStatusConstant.FINISHED));
+                .eq(RejudgeTask::getLockedBy, workerId)
+                .set(RejudgeTask::getStatus, RejudgeTaskStatusConstant.FINISHED)
+                .set(RejudgeTask::getLockedBy, null)
+                .set(RejudgeTask::getLockUntil, null));
+        if (updated <= 0) {
+            log.warn("Finish rejudge task skipped because lease changed, taskId: {}, workerId: {}", taskId, workerId);
+        }
     }
 
     private void markTaskFailed(Long taskId, String errorMessage) {
-        rejudgeTaskMapper.update(null, new LambdaUpdateWrapper<RejudgeTask>()
+        int updated = rejudgeTaskMapper.update(null, new LambdaUpdateWrapper<RejudgeTask>()
                 .eq(RejudgeTask::getId, taskId)
+                .eq(RejudgeTask::getLockedBy, workerId)
                 .set(RejudgeTask::getStatus, RejudgeTaskStatusConstant.FAILED)
-                .set(RejudgeTask::getLastError, StrUtil.trimToNull(errorMessage)));
+                .set(RejudgeTask::getLastError, StrUtil.trimToNull(errorMessage))
+                .set(RejudgeTask::getLockedBy, null)
+                .set(RejudgeTask::getLockUntil, null));
+        if (updated <= 0) {
+            log.warn("Fail rejudge task skipped because lease changed, taskId: {}, workerId: {}", taskId, workerId);
+        }
     }
 
     private RejudgeTaskVo toVo(RejudgeTask task) {
@@ -280,6 +340,8 @@ public class RejudgeTaskServiceImpl implements RejudgeTaskService {
         vo.setFailedCount(defaultZero(task.getFailedCount()));
         vo.setLastJudgeId(task.getLastJudgeId());
         vo.setLastError(task.getLastError());
+        vo.setLockedBy(task.getLockedBy());
+        vo.setLockUntil(task.getLockUntil());
         vo.setAdminId(task.getAdminId());
         vo.setGmtCreate(task.getGmtCreate());
         vo.setGmtModified(task.getGmtModified());
@@ -323,6 +385,24 @@ public class RejudgeTaskServiceImpl implements RejudgeTaskService {
     private int batchSize() {
         Integer value = submissionProperties.getRejudgeTask().getBatchSize();
         return value == null || value <= 0 ? DEFAULT_BATCH_SIZE : value;
+    }
+
+    private long leaseSeconds() {
+        Long value = submissionProperties.getRejudgeTask().getLeaseSeconds();
+        return value == null || value <= 0 ? DEFAULT_LEASE_SECONDS : value;
+    }
+
+    private String buildWorkerId() {
+        String hostName;
+        try {
+            hostName = InetAddress.getLocalHost().getHostName();
+        } catch (UnknownHostException e) {
+            hostName = "unknown-host";
+        }
+        String processName = ManagementFactory.getRuntimeMXBean().getName();
+        String uuid = UUID.randomUUID().toString().replace("-", "").substring(0, WORKER_ID_UUID_LENGTH);
+        String value = hostName + ":" + processName + ":" + uuid;
+        return value.length() <= MAX_WORKER_ID_LENGTH ? value : value.substring(0, MAX_WORKER_ID_LENGTH);
     }
 
     private Integer defaultZero(Integer value) {

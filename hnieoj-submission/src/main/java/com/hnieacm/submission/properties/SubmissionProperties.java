@@ -25,6 +25,8 @@ public class SubmissionProperties {
 
     private JudgeTimeout judgeTimeout = new JudgeTimeout();
 
+    private RejudgeTask rejudgeTask = new RejudgeTask();
+
     @Data
     public static class JudgeOutbox {
 
@@ -81,5 +83,19 @@ public class SubmissionProperties {
          * Compiling/Running 状态超时时间，单位秒。
          */
         private Long activeTimeoutSeconds = 1800L;
+    }
+
+    @Data
+    public static class RejudgeTask {
+
+        /**
+         * 批量重判任务扫描间隔，单位毫秒。
+         */
+        private Long scanIntervalMs = 10000L;
+
+        /**
+         * 单个任务每轮最多处理的提交数量。
+         */
+        private Integer batchSize = 50;
     }
 }

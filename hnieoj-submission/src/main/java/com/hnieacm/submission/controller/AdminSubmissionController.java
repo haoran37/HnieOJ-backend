@@ -5,10 +5,14 @@ import cn.dev33.satoken.annotation.SaCheckPermission;
 import com.hnieacm.common.constant.PermissionConstant;
 import com.hnieacm.common.dto.PageVo;
 import com.hnieacm.common.result.Result;
+import com.hnieacm.submission.dto.CreateRejudgeTaskRequest;
 import com.hnieacm.submission.dto.JudgeTaskOutboxQueryRequest;
+import com.hnieacm.submission.dto.RejudgeTaskQueryRequest;
 import com.hnieacm.submission.service.JudgeTaskOutboxService;
+import com.hnieacm.submission.service.RejudgeTaskService;
 import com.hnieacm.submission.service.SubmissionService;
 import com.hnieacm.submission.vo.JudgeTaskOutboxVo;
+import com.hnieacm.submission.vo.RejudgeTaskVo;
 import com.hnieacm.submission.vo.SubmitCodeVo;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -18,6 +22,7 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -36,6 +41,7 @@ public class AdminSubmissionController {
 
     private final SubmissionService submissionService;
     private final JudgeTaskOutboxService judgeTaskOutboxService;
+    private final RejudgeTaskService rejudgeTaskService;
 
     @Operation(summary = "重判单个提交")
     @SaCheckPermission(PermissionConstant.PROBLEM_UPDATE)
@@ -57,5 +63,19 @@ public class AdminSubmissionController {
     public Result<Void> retryJudgeOutbox(@PathVariable Long id) {
         judgeTaskOutboxService.retry(id);
         return Result.success("重试任务已提交", null);
+    }
+
+    @Operation(summary = "创建批量重判任务")
+    @SaCheckPermission(PermissionConstant.PROBLEM_UPDATE)
+    @PostMapping("/rejudge-tasks")
+    public Result<RejudgeTaskVo> createRejudgeTask(@Valid @RequestBody CreateRejudgeTaskRequest request) {
+        return Result.success("重判任务已创建", rejudgeTaskService.create(request));
+    }
+
+    @Operation(summary = "查询批量重判任务")
+    @SaCheckPermission(PermissionConstant.PROBLEM_UPDATE)
+    @GetMapping("/rejudge-tasks")
+    public Result<PageVo<RejudgeTaskVo>> listRejudgeTasks(@Valid RejudgeTaskQueryRequest request) {
+        return Result.success(rejudgeTaskService.list(request));
     }
 }

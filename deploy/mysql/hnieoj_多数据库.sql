@@ -462,14 +462,22 @@ DROP TABLE IF EXISTS `rejudge_task`;
 CREATE TABLE `rejudge_task` (
   `id` bigint(20) NOT NULL AUTO_INCREMENT,
   `problem_id` bigint(20) NOT NULL,
+  `problem_code` varchar(50) NOT NULL COMMENT '题目展示ID',
+  `contest_id` bigint(20) DEFAULT NULL COMMENT '比赛ID，NULL 表示不限',
   `range_start` datetime DEFAULT NULL,
   `range_end` datetime DEFAULT NULL,
-  `status` varchar(20) DEFAULT 'pending' COMMENT 'pending, processing, finished',
-  `total_count` int(11) DEFAULT '0',
-  `processed_count` int(11) DEFAULT '0',
+  `status` varchar(20) NOT NULL DEFAULT 'pending' COMMENT 'pending, processing, finished, failed',
+  `total_count` int(11) NOT NULL DEFAULT '0',
+  `processed_count` int(11) NOT NULL DEFAULT '0',
+  `failed_count` int(11) NOT NULL DEFAULT '0',
+  `last_judge_id` bigint(20) NOT NULL DEFAULT '0',
+  `last_error` text,
   `admin_id` varchar(50) NOT NULL,
   `gmt_create` datetime DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (`id`)
+  `gmt_modified` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_status_id` (`status`, `id`),
+  KEY `idx_problem_id` (`problem_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='后台重判任务记录';
 
 -- 远程账号池

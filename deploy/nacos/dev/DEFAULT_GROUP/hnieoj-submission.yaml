@@ -54,6 +54,11 @@ hnieoj:
       pending-timeout-seconds: ${HNIEOJ_JUDGE_PENDING_TIMEOUT_SECONDS:1800}
       # Compiling/Running 状态超时时间，单位秒。
       active-timeout-seconds: ${HNIEOJ_JUDGE_ACTIVE_TIMEOUT_SECONDS:1800}
+    rejudge-task:
+      # 批量重判任务扫描间隔，单位毫秒。
+      scan-interval-ms: ${HNIEOJ_REJUDGE_TASK_SCAN_INTERVAL_MS:10000}
+      # 单个任务每轮最多处理的提交数量。
+      batch-size: ${HNIEOJ_REJUDGE_TASK_BATCH_SIZE:50}
     websocket:
       allowed-origins:
         - "http://localhost:3000"

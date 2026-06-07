@@ -42,3 +42,6 @@ hnieoj:
       batch-size: ${HNIEOJ_JUDGE_TIMEOUT_BATCH_SIZE:100}
       pending-timeout-seconds: ${HNIEOJ_JUDGE_PENDING_TIMEOUT_SECONDS:1800}
       active-timeout-seconds: ${HNIEOJ_JUDGE_ACTIVE_TIMEOUT_SECONDS:1800}
+    rejudge-task:
+      scan-interval-ms: ${HNIEOJ_REJUDGE_TASK_SCAN_INTERVAL_MS:10000}
+      batch-size: ${HNIEOJ_REJUDGE_TASK_BATCH_SIZE:50}

@@ -17,14 +17,16 @@ deploy/nacos/
 
 1. 登录 Nacos（namespace: `dev`）。
 2. 先导入 `DEFAULT_GROUP` 下所有 `*.yaml`（Data ID 与文件名一致）。
-3. 在 `HNIEOJ_SECRET_GROUP` 新建 `hnieoj-secrets.yaml`，内容参考 `hnieoj-secrets.example.yaml`，填写真实值。
+3. 在 `HNIEOJ_SECRET_GROUP` 新建 `hnieoj-secrets.yaml`，内容参考 `hnieoj-secrets.example.yaml`。该文件只允许保留环境变量占位，不要填写真实密码或 Token。
 4. 在 `HNIEOJ_SECRET_GROUP` 新建 `hnieoj-judge-formal-token.yaml`，内容可先参考 `hnieoj-judge-formal-token.example.yaml` 保持为空。
-5. 真实密钥只保存在 Nacos 或环境变量，不提交到 Git。正式判题节点长期 Token 的密文由后端轮换接口自动发布到 `hnieoj-judge-formal-token.yaml`。
+5. 真实敏感值只保存在服务器 `.env` 或进程环境变量中，不写入 Nacos。正式判题节点长期 Token 的密文由后端轮换接口自动发布到 `hnieoj-judge-formal-token.yaml`。
 
 ## 安全约束
 
 - 禁止将真实 `hnieoj-secrets.yaml` 提交到仓库。
 - 如需新增配置，优先补充示例模板与字段说明。
+- `hnieoj-secrets.yaml` 只作为环境变量占位桥接，不保存真实 MySQL/Redis/RabbitMQ 密码、内部服务 Token 或 JWT Secret。
+- `HNIEOJ_JUDGE_JWT_SECRET` 由 `hnieoj-judge` 容器环境变量直接注入，不再通过 Nacos Secret 分发。
 - 后端只持有正式节点公钥和 Token 哈希，不持有正式节点私钥。
 - 正式节点私钥只通过 `/etc/hnieoj/judge-security/judge_formal_private.pem` 文件挂载给 go-judge。
 - `hnieoj-judge-formal-token.yaml` 只保存 `{rsa}` 密文、版本号和更新时间，不保存明文 Token。

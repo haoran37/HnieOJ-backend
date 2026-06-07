@@ -12,4 +12,6 @@ public interface FormalJudgeTokenService {
     boolean matches(String rawToken);
 
     JudgeFormalTokenVo rotate();
+
+    JudgeFormalTokenVo initializeIfNecessary();
 }

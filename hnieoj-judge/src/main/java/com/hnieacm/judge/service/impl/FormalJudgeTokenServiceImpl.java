@@ -92,13 +92,29 @@ public class FormalJudgeTokenServiceImpl implements FormalJudgeTokenService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public JudgeFormalTokenVo rotate() {
+        return rotateInternal(StpUtil.getLoginIdAsString(), true);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public JudgeFormalTokenVo initializeIfNecessary() {
+        JudgeFormalToken activeToken = findActiveToken();
+        if (activeToken != null) {
+            return toVo(activeToken);
+        }
+        return rotateInternal("system", false);
+    }
+
+    private JudgeFormalTokenVo rotateInternal(String operator, boolean rotateExisting) {
         String rawToken = generateToken();
         int nextVersion = resolveNextVersion();
         String encryptedToken = encryptToken(rawToken);
 
-        formalTokenMapper.update(null, new LambdaUpdateWrapper<JudgeFormalToken>()
-                .eq(JudgeFormalToken::getStatus, JudgeNodeConstant.FORMAL_TOKEN_ACTIVE)
-                .set(JudgeFormalToken::getStatus, JudgeNodeConstant.FORMAL_TOKEN_ROTATED));
+        if (rotateExisting) {
+            formalTokenMapper.update(null, new LambdaUpdateWrapper<JudgeFormalToken>()
+                    .eq(JudgeFormalToken::getStatus, JudgeNodeConstant.FORMAL_TOKEN_ACTIVE)
+                    .set(JudgeFormalToken::getStatus, JudgeNodeConstant.FORMAL_TOKEN_ROTATED));
+        }
 
         JudgeFormalToken tokenRecord = new JudgeFormalToken();
         tokenRecord.setVersion(nextVersion);
@@ -106,12 +122,19 @@ public class FormalJudgeTokenServiceImpl implements FormalJudgeTokenService {
         tokenRecord.setHashAlgorithm(HASH_ALGORITHM);
         tokenRecord.setEncryptedToken(encryptedToken);
         tokenRecord.setStatus(JudgeNodeConstant.FORMAL_TOKEN_ACTIVE);
-        tokenRecord.setRotatedBy(StpUtil.getLoginIdAsString());
+        tokenRecord.setRotatedBy(operator);
         formalTokenMapper.insert(tokenRecord);
 
         publishEncryptedToken(encryptedToken, nextVersion);
         log.info("Formal judge token rotated, version: {}", nextVersion);
         return toVo(tokenRecord);
+    }
+
+    private JudgeFormalToken findActiveToken() {
+        return formalTokenMapper.selectOne(new LambdaQueryWrapper<JudgeFormalToken>()
+                .eq(JudgeFormalToken::getStatus, JudgeNodeConstant.FORMAL_TOKEN_ACTIVE)
+                .orderByDesc(JudgeFormalToken::getVersion)
+                .last("limit 1"));
     }
 
     private int resolveNextVersion() {

@@ -19,6 +19,12 @@ services:
   hnieoj-judge-node:
     image: ${GOJUDGE_IMAGE:-hnieoj/go-judge:dev}
     restart: unless-stopped
+    environment:
+      HNIEOJ_FORMAL_PRIVATE_KEY_PATH: ${HNIEOJ_JUDGE_FORMAL_TOKEN_PRIVATE_KEY_PATH:-/etc/hnieoj/judge-security/judge_formal_private.pem}
+      HNIEOJ_NACOS_SERVER_ADDR: ${NACOS_SERVER_ADDR:-106.54.177.244:8848}
+      HNIEOJ_NACOS_NAMESPACE: ${NACOS_NAMESPACE:-dev}
+      HNIEOJ_FORMAL_TOKEN_NACOS_GROUP: ${HNIEOJ_JUDGE_FORMAL_TOKEN_NACOS_GROUP:-HNIEOJ_SECRET_GROUP}
+      HNIEOJ_FORMAL_TOKEN_NACOS_DATA_ID: ${HNIEOJ_JUDGE_FORMAL_TOKEN_NACOS_DATA_ID:-hnieoj-judge-formal-token.yaml}
     command:
       - /usr/local/bin/hnieoj-judge-node
       - -config

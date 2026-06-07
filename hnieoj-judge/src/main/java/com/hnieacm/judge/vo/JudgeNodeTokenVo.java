@@ -38,5 +38,13 @@ public class JudgeNodeTokenVo {
 
     private String version;
 
+    private Long cacheUsedBytes;
+
+    private Integer cacheProblemCount;
+
+    private Long diskTotalBytes;
+
+    private Long diskFreeBytes;
+
     private LocalDateTime gmtCreate;
 }

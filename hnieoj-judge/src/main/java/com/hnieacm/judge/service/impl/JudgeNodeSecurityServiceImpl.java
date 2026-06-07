@@ -451,6 +451,10 @@ public class JudgeNodeSecurityServiceImpl implements JudgeNodeSecurityService {
         vo.setRunningTasks(token.getRunningTasks());
         vo.setCpuCore(token.getCpuCore());
         vo.setVersion(token.getVersion());
+        vo.setCacheUsedBytes(token.getCacheUsedBytes());
+        vo.setCacheProblemCount(token.getCacheProblemCount());
+        vo.setDiskTotalBytes(token.getDiskTotalBytes());
+        vo.setDiskFreeBytes(token.getDiskFreeBytes());
         vo.setGmtCreate(token.getGmtCreate());
         return vo;
     }

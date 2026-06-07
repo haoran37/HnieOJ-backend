@@ -23,4 +23,12 @@ public class JudgeNodeHeartbeatRequest {
     private Integer cpuCore;
 
     private String version;
+
+    private Long cacheUsedBytes;
+
+    private Integer cacheProblemCount;
+
+    private Long diskTotalBytes;
+
+    private Long diskFreeBytes;
 }

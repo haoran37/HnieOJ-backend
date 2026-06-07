@@ -36,6 +36,8 @@ public class JudgeNodeHeartbeatServiceImpl implements JudgeNodeHeartbeatService 
     private static final int MAX_RUNNING_TASKS = 100000;
     private static final int MAX_CONCURRENCY = 10000;
     private static final int MAX_CPU_CORE = 4096;
+    private static final int MAX_CACHE_PROBLEM_COUNT = 1000000;
+    private static final long MAX_STORAGE_BYTES = 1L << 60;
 
     private final JudgeNodeSecurityService judgeNodeSecurityService;
     private final JudgeNodeTokenMapper judgeNodeTokenMapper;
@@ -84,6 +86,14 @@ public class JudgeNodeHeartbeatServiceImpl implements JudgeNodeHeartbeatService 
         validateRange(request.getMaxConcurrency(), "maxConcurrency", MAX_CONCURRENCY);
         validateRange(request.getRunningTasks(), "runningTasks", MAX_RUNNING_TASKS);
         validateRange(request.getCpuCore(), "cpuCore", MAX_CPU_CORE);
+        validateRange(request.getCacheUsedBytes(), "cacheUsedBytes", MAX_STORAGE_BYTES);
+        validateRange(request.getCacheProblemCount(), "cacheProblemCount", MAX_CACHE_PROBLEM_COUNT);
+        validateRange(request.getDiskTotalBytes(), "diskTotalBytes", MAX_STORAGE_BYTES);
+        validateRange(request.getDiskFreeBytes(), "diskFreeBytes", MAX_STORAGE_BYTES);
+        if (request.getDiskTotalBytes() != null && request.getDiskFreeBytes() != null
+                && request.getDiskFreeBytes() > request.getDiskTotalBytes()) {
+            throw new BizException(ResultCode.BAD_REQUEST, "diskFreeBytes 不能大于 diskTotalBytes");
+        }
     }
 
     private void recordFormalHeartbeat(JudgeNodeHeartbeatRequest request) {
@@ -135,6 +145,10 @@ public class JudgeNodeHeartbeatServiceImpl implements JudgeNodeHeartbeatService 
                 .set(JudgeNodeToken::getRunningTasks, request.getRunningTasks())
                 .set(JudgeNodeToken::getCpuCore, request.getCpuCore())
                 .set(JudgeNodeToken::getVersion, request.getVersion())
+                .set(JudgeNodeToken::getCacheUsedBytes, request.getCacheUsedBytes())
+                .set(JudgeNodeToken::getCacheProblemCount, request.getCacheProblemCount())
+                .set(JudgeNodeToken::getDiskTotalBytes, request.getDiskTotalBytes())
+                .set(JudgeNodeToken::getDiskFreeBytes, request.getDiskFreeBytes())
                 .set(JudgeNodeToken::getLastHeartbeatTime, LocalDateTime.now()));
     }
 
@@ -147,6 +161,10 @@ public class JudgeNodeHeartbeatServiceImpl implements JudgeNodeHeartbeatService 
                 .set(JudgeNodeToken::getRunningTasks, request.getRunningTasks())
                 .set(JudgeNodeToken::getCpuCore, request.getCpuCore())
                 .set(JudgeNodeToken::getVersion, request.getVersion())
+                .set(JudgeNodeToken::getCacheUsedBytes, request.getCacheUsedBytes())
+                .set(JudgeNodeToken::getCacheProblemCount, request.getCacheProblemCount())
+                .set(JudgeNodeToken::getDiskTotalBytes, request.getDiskTotalBytes())
+                .set(JudgeNodeToken::getDiskFreeBytes, request.getDiskFreeBytes())
                 .set(JudgeNodeToken::getLastHeartbeatTime, LocalDateTime.now()));
     }
 
@@ -155,6 +173,10 @@ public class JudgeNodeHeartbeatServiceImpl implements JudgeNodeHeartbeatService 
         token.setRunningTasks(request.getRunningTasks());
         token.setCpuCore(request.getCpuCore());
         token.setVersion(request.getVersion());
+        token.setCacheUsedBytes(request.getCacheUsedBytes());
+        token.setCacheProblemCount(request.getCacheProblemCount());
+        token.setDiskTotalBytes(request.getDiskTotalBytes());
+        token.setDiskFreeBytes(request.getDiskFreeBytes());
         token.setLastHeartbeatTime(LocalDateTime.now());
     }
 
@@ -176,6 +198,12 @@ public class JudgeNodeHeartbeatServiceImpl implements JudgeNodeHeartbeatService 
     }
 
     private void validateRange(Long value, String fieldName, int max) {
+        if (value != null && (value < 0 || value > max)) {
+            throw new BizException(ResultCode.BAD_REQUEST, fieldName + " 不合法");
+        }
+    }
+
+    private void validateRange(Long value, String fieldName, long max) {
         if (value != null && (value < 0 || value > max)) {
             throw new BizException(ResultCode.BAD_REQUEST, fieldName + " 不合法");
         }

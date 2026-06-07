@@ -28,3 +28,5 @@ hnieoj:
       dead-letter-exchange: ${HNIEOJ_JUDGE_MQ_DLX:hnieoj.judge.dlx}
       dead-letter-queue: ${HNIEOJ_JUDGE_MQ_DLQ:hnieoj.judge.task.dlq}
       dead-letter-routing-key: ${HNIEOJ_JUDGE_MQ_DLX_ROUTING_KEY:judge.submission.created.dlq}
+  submission:
+    max-code-bytes: ${HNIEOJ_SUBMISSION_MAX_CODE_BYTES:65536}

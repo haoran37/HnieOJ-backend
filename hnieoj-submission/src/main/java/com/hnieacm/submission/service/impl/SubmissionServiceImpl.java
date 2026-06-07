@@ -24,6 +24,7 @@ import com.hnieacm.submission.feign.ProblemInternalFeignClient;
 import com.hnieacm.submission.feign.UserProfileFeignClient;
 import com.hnieacm.submission.mapper.JudgeCaseMapper;
 import com.hnieacm.submission.mapper.JudgeMapper;
+import com.hnieacm.submission.properties.SubmissionProperties;
 import com.hnieacm.submission.service.JudgeTaskMessagePublisher;
 import com.hnieacm.submission.service.SubmissionService;
 import com.hnieacm.submission.vo.SubmissionCaseVo;
@@ -63,6 +64,7 @@ public class SubmissionServiceImpl implements SubmissionService {
     private final ProblemInternalFeignClient problemInternalFeignClient;
     private final UserProfileFeignClient userProfileFeignClient;
     private final JudgeTaskMessagePublisher judgeTaskMessagePublisher;
+    private final SubmissionProperties submissionProperties;
 
     /**
      * @MethodName submit
@@ -91,11 +93,15 @@ public class SubmissionServiceImpl implements SubmissionService {
         }
 
         String code = StrUtil.trimToNull(request.getCode());
+        if (code != null) {
+            validateCodeSize(code);
+        }
         if (StrUtil.isBlank(code) && (file == null || file.isEmpty())) {
             throw new BizException(ResultCode.BAD_REQUEST, "code和file不能同时为空");
         }
 
         if (StrUtil.isBlank(code) && file != null && !file.isEmpty()) {
+            validateCodeFileSize(file);
             try {
                 code = new String(file.getBytes(), StandardCharsets.UTF_8);
             } catch (Exception e) {
@@ -105,6 +111,7 @@ public class SubmissionServiceImpl implements SubmissionService {
             if (StrUtil.isBlank(code)) {
                 throw new BizException(ResultCode.BAD_REQUEST, "代码文件内容不能为空");
             }
+            validateCodeSize(code);
         }
 
         String uid = StpUtil.getLoginIdAsString();
@@ -462,6 +469,29 @@ public class SubmissionServiceImpl implements SubmissionService {
 
     private Integer defaultZero(Integer value) {
         return value == null ? 0 : value;
+    }
+
+    private void validateCodeFileSize(MultipartFile file) {
+        long maxCodeBytes = maxCodeBytes();
+        if (file.getSize() > maxCodeBytes) {
+            throw new BizException(ResultCode.BAD_REQUEST, "代码文件不能超过 " + maxCodeBytes + " 字节");
+        }
+    }
+
+    private void validateCodeSize(String code) {
+        long maxCodeBytes = maxCodeBytes();
+        int codeBytes = code.getBytes(StandardCharsets.UTF_8).length;
+        if (codeBytes > maxCodeBytes) {
+            throw new BizException(ResultCode.BAD_REQUEST, "代码长度不能超过 " + maxCodeBytes + " 字节");
+        }
+    }
+
+    private long maxCodeBytes() {
+        Integer maxCodeBytes = submissionProperties.getMaxCodeBytes();
+        if (maxCodeBytes == null || maxCodeBytes <= 0) {
+            return 65536L;
+        }
+        return maxCodeBytes.longValue();
     }
 
     private int caseOrder(JudgeCase judgeCase) {

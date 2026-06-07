@@ -2,6 +2,7 @@ package com.hnieacm.submission.service.impl;
 
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.hnieacm.common.exception.BizException;
 import com.hnieacm.common.result.ResultCode;
 import com.hnieacm.submission.constant.SubmissionStatusConstant;
@@ -120,8 +121,7 @@ public class JudgeResultReportServiceImpl implements JudgeResultReportService {
     }
 
     private void handleJudgeFinished(Judge judge, JudgeResultEventRequest request) {
-        Integer score = request.getScore() == null ? sumScore(judge.getId()) : request.getScore();
-        updateJudge(judge, request, score, null);
+        updateJudge(judge, request, request.getScore(), null);
     }
 
     private void handleJudgeFailed(Judge judge, JudgeResultEventRequest request) {
@@ -136,21 +136,30 @@ public class JudgeResultReportServiceImpl implements JudgeResultReportService {
     }
 
     private void updateJudge(Judge judge, JudgeResultEventRequest request, Integer score, String errorMessage) {
-        Judge update = new Judge();
-        update.setId(judge.getId());
-        update.setStatus(nextStatus(judge.getStatus(), request.getStatus()));
-        update.setTotalCase(nextProgress(judge.getTotalCase(), request.getTotalCase()));
-        update.setJudgedCase(nextProgress(judge.getJudgedCase(), request.getJudgedCase()));
-        update.setCurrentCase(nextProgress(judge.getCurrentCase(), request.getCurrentCase()));
-        update.setTime(maxCaseTime(judge.getId()));
-        update.setMemory(maxCaseMemory(judge.getId()));
+        LambdaUpdateWrapper<Judge> wrapper = new LambdaUpdateWrapper<Judge>()
+                .eq(Judge::getId, judge.getId())
+                .lt(Judge::getStatus, SubmissionStatusConstant.ACCEPTED);
+        String judgeTaskId = StrUtil.trimToNull(judge.getJudgeTaskId());
+        if (judgeTaskId != null) {
+            wrapper.eq(Judge::getJudgeTaskId, judgeTaskId);
+        }
+        appendStatusUpdate(wrapper, request.getStatus());
+        appendProgressUpdate(wrapper, "total_case", request.getTotalCase());
+        appendProgressUpdate(wrapper, "judged_case", request.getJudgedCase());
+        appendProgressUpdate(wrapper, "current_case", request.getCurrentCase());
+        wrapper.set(Judge::getTime, maxCaseTime(judge.getId()));
+        wrapper.set(Judge::getMemory, maxCaseMemory(judge.getId()));
         if (score != null) {
-            update.setScore(score);
+            wrapper.set(Judge::getScore, score);
         }
         if (errorMessage != null) {
-            update.setErrorMessage(errorMessage);
+            wrapper.set(Judge::getErrorMessage, errorMessage);
         }
-        judgeMapper.updateById(update);
+        int updated = judgeMapper.update(null, wrapper);
+        if (updated == 0) {
+            log.info("Judge event update skipped, submissionId: {}, eventType: {}, judgeTaskId: {}",
+                    judge.getSubmitId(), request.getEventType(), judge.getJudgeTaskId());
+        }
     }
 
     private void upsertJudgeCase(Judge judge, JudgeResultEventRequest.CaseResult result) {
@@ -200,13 +209,6 @@ public class JudgeResultReportServiceImpl implements JudgeResultReportService {
                 .orElse(null);
     }
 
-    private Integer sumScore(Long judgeId) {
-        return listCases(judgeId).stream()
-                .map(JudgeCase::getScore)
-                .filter(item -> item != null)
-                .reduce(0, Integer::sum);
-    }
-
     private List<JudgeCase> listCases(Long judgeId) {
         return judgeCaseMapper.selectList(new LambdaQueryWrapper<JudgeCase>()
                 .eq(JudgeCase::getSubmitId, judgeId));
@@ -217,6 +219,7 @@ public class JudgeResultReportServiceImpl implements JudgeResultReportService {
         validateProgress(request.getTotalCase(), "totalCase");
         validateProgress(request.getJudgedCase(), "judgedCase");
         validateProgress(request.getCurrentCase(), "currentCase");
+        validateProgress(request.getScore(), "score");
         if (request.getTotalCase() != null && request.getTotalCase() > 0) {
             if (request.getJudgedCase() != null && request.getJudgedCase() > request.getTotalCase()) {
                 throw new BizException(ResultCode.BAD_REQUEST, "judgedCase 不能大于 totalCase");
@@ -234,7 +237,12 @@ public class JudgeResultReportServiceImpl implements JudgeResultReportService {
                 }
                 validateCaseResult(request.getCaseResult());
             }
-            case EVENT_JUDGE_FINISHED -> validateRequiredTerminalStatus(request.getStatus(), "status");
+            case EVENT_JUDGE_FINISHED -> {
+                validateRequiredTerminalStatus(request.getStatus(), "status");
+                if (request.getScore() == null) {
+                    throw new BizException(ResultCode.BAD_REQUEST, "score 不能为空");
+                }
+            }
             case EVENT_JUDGE_FAILED -> validateTerminalStatus(request.getStatus(), "status");
             default -> throw new BizException(ResultCode.BAD_REQUEST, "不支持的判题事件类型");
         }
@@ -288,47 +296,31 @@ public class JudgeResultReportServiceImpl implements JudgeResultReportService {
         }
     }
 
-    private Integer nextStatus(Integer currentStatus, Integer incomingStatus) {
-        if (incomingStatus == null) {
-            return currentStatus;
-        }
-        if (isTerminalStatus(incomingStatus)) {
-            return incomingStatus;
-        }
-        if (currentStatus == null) {
-            return incomingStatus;
-        }
-        return statusRank(incomingStatus) >= statusRank(currentStatus) ? incomingStatus : currentStatus;
-    }
-
-    private Integer nextProgress(Integer currentValue, Integer incomingValue) {
-        if (incomingValue == null) {
-            return currentValue;
-        }
-        if (currentValue == null) {
-            return incomingValue;
-        }
-        return Math.max(currentValue, incomingValue);
-    }
-
     private boolean isTerminalStatus(Integer status) {
         return status != null && status >= SubmissionStatusConstant.ACCEPTED;
     }
 
-    private int statusRank(Integer status) {
-        if (status == null) {
-            return 0;
-        }
-        return switch (status) {
-            case SubmissionStatusConstant.PENDING -> 1;
-            case SubmissionStatusConstant.COMPILING -> 2;
-            case SubmissionStatusConstant.RUNNING -> 3;
-            default -> isTerminalStatus(status) ? 4 : 0;
-        };
-    }
-
     private Integer defaultZero(Integer value) {
         return value == null ? 0 : value;
+    }
+
+    private void appendStatusUpdate(LambdaUpdateWrapper<Judge> wrapper, Integer status) {
+        if (status == null) {
+            return;
+        }
+        if (isTerminalStatus(status)) {
+            wrapper.set(Judge::getStatus, status);
+            return;
+        }
+        wrapper.setSql("status = GREATEST(COALESCE(status, "
+                + SubmissionStatusConstant.PENDING + "), " + status + ")");
+    }
+
+    private void appendProgressUpdate(LambdaUpdateWrapper<Judge> wrapper, String columnName, Integer value) {
+        if (value == null) {
+            return;
+        }
+        wrapper.setSql(columnName + " = GREATEST(COALESCE(" + columnName + ", 0), " + value + ")");
     }
 
     private Integer toInteger(Long value) {

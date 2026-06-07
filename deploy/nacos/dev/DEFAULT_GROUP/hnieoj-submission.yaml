@@ -30,6 +30,8 @@ hnieoj:
       dead-letter-queue: ${HNIEOJ_JUDGE_MQ_DLQ:hnieoj.judge.task.dlq}
       dead-letter-routing-key: ${HNIEOJ_JUDGE_MQ_DLX_ROUTING_KEY:judge.submission.created.dlq}
   submission:
+    # 单次提交代码最大字节数，按 UTF-8 编码计算。
+    max-code-bytes: ${HNIEOJ_SUBMISSION_MAX_CODE_BYTES:65536}
     websocket:
       allowed-origins:
         - "http://localhost:3000"

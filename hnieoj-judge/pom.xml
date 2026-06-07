@@ -81,13 +81,6 @@
             <scope>runtime</scope>
         </dependency>
 
-        <!-- ==================== 消息队列 (RabbitMQ) ==================== -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-amqp</artifactId>
-        </dependency>
-
-
         <!-- ==================== Spring Boot 监控 (Actuator) ==================== -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

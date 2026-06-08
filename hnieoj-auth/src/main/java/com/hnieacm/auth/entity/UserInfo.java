@@ -23,7 +23,9 @@ public class UserInfo {
     private String username;
     
     private String password;
-    
+
+    private Boolean passwordResetRequired;
+
     private String email;
     
     private String phone;

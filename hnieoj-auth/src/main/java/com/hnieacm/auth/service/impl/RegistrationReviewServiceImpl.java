@@ -96,6 +96,7 @@ public class RegistrationReviewServiceImpl implements RegistrationReviewService 
         userInfo.setUid(uid);
         userInfo.setUsername(apply.getUsername());
         userInfo.setPassword(apply.getPassword());
+        userInfo.setPasswordResetRequired(false);
         userInfo.setEmail(apply.getEmail());
         userInfo.setCollegeId(apply.getCollegeId());
         userInfo.setClassId(apply.getClassId());

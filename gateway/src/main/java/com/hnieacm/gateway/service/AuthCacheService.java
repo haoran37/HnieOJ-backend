@@ -6,6 +6,7 @@ import com.hnieacm.common.constant.AuthCacheConstant;
 import com.hnieacm.gateway.properties.AuthCacheTtlProperties;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import jakarta.annotation.PreDestroy;
 import org.springframework.cloud.context.config.annotation.RefreshScope;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
@@ -13,6 +14,13 @@ import org.springframework.stereotype.Service;
 import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * @Author: HaoRan_Lyu
@@ -27,8 +35,12 @@ import java.util.List;
 @RequiredArgsConstructor
 public class AuthCacheService {
 
+    private static final long CACHE_ACCESS_TIMEOUT_MS = 200;
+
     private final StringRedisTemplate stringRedisTemplate;
     private final ObjectMapper objectMapper;
+    private final ExecutorService cacheExecutor = Executors.newFixedThreadPool(4);
+    private final Map<String, LocalCacheValue> localFallbackCache = new ConcurrentHashMap<>();
 
     // roles/permissions 缓存 TTL
     private final AuthCacheTtlProperties authCacheTtlProperties;
@@ -44,16 +56,32 @@ public class AuthCacheService {
      * @Date 2026/02/13
      */
     public List<String> getList(String cacheKey, String uid, String dataType) {
+        Future<CacheReadResult> future = cacheExecutor.submit(() -> getListDirect(cacheKey, uid, dataType));
+        try {
+            CacheReadResult result = future.get(CACHE_ACCESS_TIMEOUT_MS, TimeUnit.MILLISECONDS);
+            if (result.hit()) {
+                refreshLocalFallback(cacheKey, result.data());
+                return result.data();
+            }
+            return getLocalFallback(cacheKey, uid, dataType);
+        } catch (Exception e) {
+            future.cancel(true);
+            log.warn("Read auth cache timeout or failed, type: {}, uid: {}", dataType, uid, e);
+            return getLocalFallback(cacheKey, uid, dataType);
+        }
+    }
+
+    private CacheReadResult getListDirect(String cacheKey, String uid, String dataType) {
         try {
             String json = stringRedisTemplate.opsForValue().get(cacheKey);
             if (json == null || json.isBlank()) {
-                return Collections.emptyList();
+                return new CacheReadResult(false, Collections.emptyList());
             }
 
             List<String> data = objectMapper.readValue(json, new TypeReference<>() {
             });
             if (data == null) {
-                return Collections.emptyList();
+                data = Collections.emptyList();
             }
 
             if (!data.isEmpty()) {
@@ -61,11 +89,16 @@ public class AuthCacheService {
             }
 
             log.debug("Auth cache hit, type: {}, uid: {}, size: {}", dataType, uid, data.size());
-            return data;
+            return new CacheReadResult(true, data);
         } catch (Exception e) {
             log.warn("Read auth cache failed, type: {}, uid: {}", dataType, uid, e);
-            return Collections.emptyList();
+            return new CacheReadResult(false, Collections.emptyList());
         }
+    }
+
+    @PreDestroy
+    public void shutdown() {
+        cacheExecutor.shutdownNow();
     }
 
     /**
@@ -101,16 +134,59 @@ public class AuthCacheService {
      */
     private Duration resolveTtl(String dataType) {
         if (AuthCacheConstant.ROLE_CACHE_TYPE.equals(dataType)) {
-            return authCacheTtlProperties.getRoles();
+            return withJitter(authCacheTtlProperties.getRoles());
         }
         if (AuthCacheConstant.PERMISSION_CACHE_TYPE.equals(dataType)) {
-            return authCacheTtlProperties.getPermissions();
+            return withJitter(authCacheTtlProperties.getPermissions());
         }
         throw new IllegalArgumentException("Unsupported auth cache data type: " + dataType);
     }
 
     private Duration resolveEmptyTtl() {
         Duration emptyTtl = authCacheTtlProperties.getEmpty();
-        return emptyTtl == null ? Duration.ofMinutes(5) : emptyTtl;
+        return withJitter(emptyTtl == null ? Duration.ofMinutes(5) : emptyTtl);
+    }
+
+    private Duration withJitter(Duration baseTtl) {
+        Duration jitter = authCacheTtlProperties.getJitter();
+        if (jitter == null || jitter.isZero() || jitter.isNegative()) {
+            return baseTtl;
+        }
+        long jitterMillis = jitter.toMillis();
+        if (jitterMillis <= 0) {
+            return baseTtl;
+        }
+        return baseTtl.plusMillis(ThreadLocalRandom.current().nextLong(jitterMillis + 1));
+    }
+
+    private void refreshLocalFallback(String cacheKey, List<String> data) {
+        Duration ttl = authCacheTtlProperties.getLocalFallback();
+        if (ttl == null || ttl.isZero() || ttl.isNegative()) {
+            localFallbackCache.remove(cacheKey);
+            return;
+        }
+        localFallbackCache.put(cacheKey, new LocalCacheValue(
+                data == null ? Collections.emptyList() : List.copyOf(data),
+                System.currentTimeMillis() + ttl.toMillis()
+        ));
+    }
+
+    private List<String> getLocalFallback(String cacheKey, String uid, String dataType) {
+        LocalCacheValue value = localFallbackCache.get(cacheKey);
+        if (value == null) {
+            return Collections.emptyList();
+        }
+        if (value.expireAtMillis() < System.currentTimeMillis()) {
+            localFallbackCache.remove(cacheKey);
+            return Collections.emptyList();
+        }
+        log.warn("Use local auth cache fallback, type: {}, uid: {}", dataType, uid);
+        return value.data();
+    }
+
+    private record CacheReadResult(boolean hit, List<String> data) {
+    }
+
+    private record LocalCacheValue(List<String> data, long expireAtMillis) {
     }
 }

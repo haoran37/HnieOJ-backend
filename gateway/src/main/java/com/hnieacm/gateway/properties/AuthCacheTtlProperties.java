@@ -32,5 +32,14 @@ public class AuthCacheTtlProperties {
      * TTL for empty cache (avoid long negative caching).
      */
     private Duration empty = Duration.ofMinutes(5);
-}
 
+    /**
+     * Random extra TTL range to avoid cache avalanche.
+     */
+    private Duration jitter = Duration.ofMinutes(10);
+
+    /**
+     * Local fallback TTL for short Redis outages.
+     */
+    private Duration localFallback = Duration.ofMinutes(2);
+}

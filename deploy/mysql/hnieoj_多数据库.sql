@@ -59,6 +59,7 @@ CREATE TABLE `user_info` (
   `uid` varchar(50) NOT NULL COMMENT '学号/工号/用户id',
   `username` varchar(100) NOT NULL COMMENT '用户名',
   `password` varchar(255) NOT NULL COMMENT '加密密码',
+  `password_reset_required` tinyint(1) NOT NULL DEFAULT '0' COMMENT '是否需要重置密码',
   `email` varchar(255) DEFAULT NULL,
   `phone` varchar(20) DEFAULT NULL,
   `avatar` varchar(500) DEFAULT NULL COMMENT '头像URL',

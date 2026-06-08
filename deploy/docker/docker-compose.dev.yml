@@ -3,6 +3,7 @@ name: hnieoj-dev
 x-common-environment: &common-environment
   TZ: ${TZ:-Asia/Shanghai}
   SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
+  ACTUATOR_EXPOSURE_INCLUDE: ${ACTUATOR_EXPOSURE_INCLUDE:-health}
   NACOS_SERVER_ADDR: ${NACOS_SERVER_ADDR:?NACOS_SERVER_ADDR is required}
   NACOS_NAMESPACE: ${NACOS_NAMESPACE:?NACOS_NAMESPACE is required}
   MYSQL_HOST: ${MYSQL_HOST:?MYSQL_HOST is required}

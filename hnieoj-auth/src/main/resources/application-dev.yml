@@ -7,3 +7,4 @@ hnieoj:
       roles: 24h
       permissions: 12h
       empty: 5m
+      jitter: 10m

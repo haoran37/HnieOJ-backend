@@ -24,6 +24,8 @@ public class UserInfo {
 
     private String password;
 
+    private Boolean passwordResetRequired;
+
     private String email;
 
     private String phone;
@@ -59,4 +61,3 @@ public class UserInfo {
 
     private LocalDateTime gmtModified;
 }
-

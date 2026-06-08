@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * @Author: HaoRan_Lyu
@@ -88,11 +89,23 @@ public class UserAuthCacheServiceImpl implements UserAuthCacheService {
         if (ttl == null || ttl.isNegative() || ttl.isZero()) {
             throw new IllegalArgumentException("Auth cache ttl must be positive");
         }
-        return ttl;
+        return withJitter(ttl);
     }
 
     private Duration resolveEmptyTtl() {
         Duration emptyTtl = authCacheTtlProperties.getEmpty();
-        return emptyTtl == null ? Duration.ofMinutes(5) : emptyTtl;
+        return withJitter(emptyTtl == null ? Duration.ofMinutes(5) : emptyTtl);
+    }
+
+    private Duration withJitter(Duration baseTtl) {
+        Duration jitter = authCacheTtlProperties.getJitter();
+        if (jitter == null || jitter.isZero() || jitter.isNegative()) {
+            return baseTtl;
+        }
+        long jitterMillis = jitter.toMillis();
+        if (jitterMillis <= 0) {
+            return baseTtl;
+        }
+        return baseTtl.plusMillis(ThreadLocalRandom.current().nextLong(jitterMillis + 1));
     }
 }

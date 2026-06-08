@@ -27,5 +27,6 @@ public class LoginVo {
         private String uid;
         private String username;
         private List<String> roles;
+        private Boolean passwordResetRequired;
     }
 }

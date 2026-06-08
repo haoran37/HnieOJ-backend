@@ -14,7 +14,11 @@
       "name": "hnieoj.auth-cache.ttl.empty",
       "type": "java.time.Duration",
       "description": "TTL for empty auth cache (avoid long negative caching)."
+    },
+    {
+      "name": "hnieoj.auth-cache.ttl.jitter",
+      "type": "java.time.Duration",
+      "description": "Random extra TTL range to avoid auth cache avalanche."
     }
   ]
 }
-

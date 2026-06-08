@@ -110,9 +110,11 @@ public class UserManageServiceImpl implements UserManageService {
 
         String plainPassword = request.getPassword();
         String initialPassword = null;
+        boolean passwordResetRequired = false;
         if (StrUtil.isBlank(plainPassword)) {
             initialPassword = generatePassword();
             plainPassword = initialPassword;
+            passwordResetRequired = true;
         }
         validatePasswordLength(plainPassword);
 
@@ -121,6 +123,7 @@ public class UserManageServiceImpl implements UserManageService {
         user.setUid(uid);
         user.setUsername(request.getUsername());
         user.setPassword(BCrypt.hashpw(plainPassword));
+        user.setPasswordResetRequired(passwordResetRequired);
         user.setEmail(request.getEmail());
         user.setPhone(request.getPhone());
         user.setAvatar(request.getAvatar());
@@ -255,6 +258,7 @@ public class UserManageServiceImpl implements UserManageService {
         UserInfo user = userInfoManager.getUserByUid(uid);
 
         user.setPassword(BCrypt.hashpw(request.getPassword()));
+        user.setPasswordResetRequired(false);
         userInfoMapper.updateById(user);
 
         // 重置密码后强制下线

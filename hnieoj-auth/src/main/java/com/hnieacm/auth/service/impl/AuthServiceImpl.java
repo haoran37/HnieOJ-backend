@@ -95,7 +95,8 @@ public class AuthServiceImpl implements AuthService {
         LoginVo.UserInfoVo userInfo = new LoginVo.UserInfoVo(
                 user.getUid(),
                 user.getUsername(),
-                roles
+                roles,
+                Boolean.TRUE.equals(user.getPasswordResetRequired())
         );
         return new LoginVo(token, userInfo);
     }

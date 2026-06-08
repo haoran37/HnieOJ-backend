@@ -12,9 +12,11 @@ import com.hnieacm.submission.dto.ProblemBasicDto;
 import com.hnieacm.submission.entity.Judge;
 import com.hnieacm.submission.entity.JudgeCase;
 import com.hnieacm.submission.entity.RejudgeTask;
+import com.hnieacm.submission.entity.RejudgeTaskDetail;
 import com.hnieacm.submission.feign.ProblemInternalFeignClient;
 import com.hnieacm.submission.mapper.JudgeCaseMapper;
 import com.hnieacm.submission.mapper.JudgeMapper;
+import com.hnieacm.submission.mapper.RejudgeTaskDetailMapper;
 import com.hnieacm.submission.mapper.RejudgeTaskMapper;
 import com.hnieacm.submission.properties.SubmissionProperties;
 import com.hnieacm.submission.service.JudgeNodeAccessService;
@@ -54,6 +56,9 @@ class RejudgeTaskServiceImplTest {
     private RejudgeTaskMapper rejudgeTaskMapper;
 
     @Mock
+    private RejudgeTaskDetailMapper rejudgeTaskDetailMapper;
+
+    @Mock
     private JudgeMapper judgeMapper;
 
     @Mock
@@ -80,10 +85,11 @@ class RejudgeTaskServiceImplTest {
     @BeforeEach
     void setUp() {
         initTableInfo(RejudgeTask.class);
+        initTableInfo(RejudgeTaskDetail.class);
         initTableInfo(Judge.class);
         initTableInfo(JudgeCase.class);
         submissionProperties = new SubmissionProperties();
-        service = new RejudgeTaskServiceImpl(rejudgeTaskMapper, judgeMapper, judgeCaseMapper,
+        service = new RejudgeTaskServiceImpl(rejudgeTaskMapper, rejudgeTaskDetailMapper, judgeMapper, judgeCaseMapper,
                 problemInternalFeignClient, judgeNodeAccessService, judgeTaskMessagePublisher,
                 submissionProperties, transactionTemplate);
         lenient().when(judgeNodeAccessService.hasActiveNodeForMode("default")).thenReturn(true);
@@ -109,6 +115,7 @@ class RejudgeTaskServiceImplTest {
         when(rejudgeTaskMapper.update(isNull(), any(LambdaUpdateWrapper.class))).thenReturn(1);
         when(rejudgeTaskMapper.selectById(task.getId())).thenReturn(task);
         when(problemInternalFeignClient.getProblemBasic(task.getProblemCode())).thenReturn(Result.success(problem));
+        when(rejudgeTaskDetailMapper.selectList(any(Wrapper.class))).thenReturn(List.of(buildDetail(judge)));
         when(judgeMapper.selectList(any(Wrapper.class))).thenReturn(List.of(judge));
         when(judgeMapper.update(isNull(), any(LambdaUpdateWrapper.class))).thenReturn(1);
         doAnswer(invocation -> {
@@ -136,6 +143,7 @@ class RejudgeTaskServiceImplTest {
         when(rejudgeTaskMapper.update(isNull(), any(LambdaUpdateWrapper.class))).thenReturn(1);
         when(rejudgeTaskMapper.selectById(task.getId())).thenReturn(task);
         when(problemInternalFeignClient.getProblemBasic(task.getProblemCode())).thenReturn(Result.success(problem));
+        when(rejudgeTaskDetailMapper.selectList(any(Wrapper.class))).thenReturn(List.of(buildDetail(judge)));
         when(judgeMapper.selectList(any(Wrapper.class))).thenReturn(List.of(judge));
         when(judgeMapper.update(isNull(), any(LambdaUpdateWrapper.class))).thenReturn(0);
         doAnswer(invocation -> {
@@ -185,6 +193,20 @@ class RejudgeTaskServiceImplTest {
         judge.setCode("int main() { return 0; }");
         judge.setStatus(SubmissionStatusConstant.ACCEPTED);
         return judge;
+    }
+
+    private RejudgeTaskDetail buildDetail(Judge judge) {
+        RejudgeTaskDetail detail = new RejudgeTaskDetail();
+        detail.setId(1L);
+        detail.setTaskId(1L);
+        detail.setJudgeId(judge.getId());
+        detail.setSubmitId(judge.getSubmitId());
+        detail.setProblemId(judge.getProblemId());
+        detail.setProblemCode(judge.getProblemCode());
+        detail.setUid(judge.getUid());
+        detail.setLanguage(judge.getLanguage());
+        detail.setOriginalStatus(judge.getStatus());
+        return detail;
     }
 
     private ProblemBasicDto buildProblem() {

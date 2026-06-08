@@ -353,4 +353,14 @@ INSERT INTO `file` (`id`, `uid`, `name`, `suffix`, `path`, `type`) VALUES
 (5, '20230001', 'announcement_cover.jpg', 'jpg', '/upload/announce/1.jpg', 'announce'),
 (6, '20230009', 'acm_certificate.jpg', 'jpg', '/upload/proof/20230009_acm.jpg', 'proof');
 
+USE `hnieoj_judge_db`;
+
+-- 重判任务明细，记录重判前状态
+INSERT INTO `rejudge_task_detail` (`id`, `task_id`, `judge_id`, `submit_id`, `problem_id`, `problem_code`, `uid`, `username`, `language`, `original_status`, `original_score`, `original_time`, `original_memory`, `judge_task_id`, `final_status`, `final_score`, `final_time`, `final_memory`, `finished_time`, `submit_time`) VALUES
+(1, 1, 1, 's0001', 1, 'P1000', '20230003', 'student1', 'C++17', 0, 100, 10, 1024, 'task-s0001', 0, 100, 10, 1024, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(2, 1, 3, 's0003', 1, 'P1000', '20230009', 'student3', 'Java', 0, 100, 15, 2048, 'task-s0003', 0, 100, 15, 2048, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(3, 2, 2, 's0002', 2, 'P1001', '20230004', 'student2', 'Python3', 1, 80, 50, 2048, NULL, NULL, NULL, NULL, NULL, NULL, CURRENT_TIMESTAMP),
+(4, 2, 7, 's0007', 2, 'P1001', '20230003', 'student1', 'C++17', 3, 50, 8, 1024, NULL, NULL, NULL, NULL, NULL, NULL, CURRENT_TIMESTAMP),
+(5, 3, 4, 's0004', 3, 'P1002', '20230010', 'student4', 'C', 2, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, CURRENT_TIMESTAMP);
+
 SET FOREIGN_KEY_CHECKS = 1;

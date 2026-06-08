@@ -439,6 +439,7 @@ public class JudgeNodeSecurityServiceImpl implements JudgeNodeSecurityService {
      */
     private JudgeNodeTokenVo toTokenVo(JudgeNodeToken token) {
         JudgeNodeTokenVo vo = new JudgeNodeTokenVo();
+        vo.setId(token.getId());
         vo.setTokenId(token.getTokenId());
         vo.setNodeId(token.getNodeId());
         vo.setNodeName(token.getNodeName());

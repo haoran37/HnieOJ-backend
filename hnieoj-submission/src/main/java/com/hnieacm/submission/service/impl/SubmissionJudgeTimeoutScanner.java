@@ -8,8 +8,10 @@ import com.hnieacm.submission.constant.SubmissionStatusConstant;
 import com.hnieacm.submission.dto.JudgeResultEventRequest;
 import com.hnieacm.submission.entity.Judge;
 import com.hnieacm.submission.entity.JudgeTaskOutbox;
+import com.hnieacm.submission.entity.RejudgeTaskDetail;
 import com.hnieacm.submission.mapper.JudgeMapper;
 import com.hnieacm.submission.mapper.JudgeTaskOutboxMapper;
+import com.hnieacm.submission.mapper.RejudgeTaskDetailMapper;
 import com.hnieacm.submission.properties.SubmissionProperties;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -41,6 +43,7 @@ public class SubmissionJudgeTimeoutScanner {
 
     private final JudgeMapper judgeMapper;
     private final JudgeTaskOutboxMapper outboxMapper;
+    private final RejudgeTaskDetailMapper rejudgeTaskDetailMapper;
     private final SubmissionProperties submissionProperties;
     private final SimpMessagingTemplate messagingTemplate;
 
@@ -89,7 +92,23 @@ public class SubmissionJudgeTimeoutScanner {
         }
         log.warn("Submission marked as system error by timeout scanner, submissionId: {}, judgeTaskId: {}, message: {}",
                 judge.getSubmitId(), judge.getJudgeTaskId(), message);
+        freezeRejudgeTaskDetailByTimeout(judge);
         pushTimeoutEvent(judge, message);
+    }
+
+    private void freezeRejudgeTaskDetailByTimeout(Judge judge) {
+        String judgeTaskId = StrUtil.trimToNull(judge.getJudgeTaskId());
+        if (judgeTaskId == null) {
+            return;
+        }
+        rejudgeTaskDetailMapper.update(null, new LambdaUpdateWrapper<RejudgeTaskDetail>()
+                .eq(RejudgeTaskDetail::getJudgeId, judge.getId())
+                .eq(RejudgeTaskDetail::getJudgeTaskId, judgeTaskId)
+                .set(RejudgeTaskDetail::getFinalStatus, SubmissionStatusConstant.SYSTEM_ERROR)
+                .set(RejudgeTaskDetail::getFinalScore, 0)
+                .set(RejudgeTaskDetail::getFinalTime, judge.getTime())
+                .set(RejudgeTaskDetail::getFinalMemory, judge.getMemory())
+                .set(RejudgeTaskDetail::getFinishedTime, LocalDateTime.now()));
     }
 
     private boolean hasActiveOutbox(String judgeTaskId) {

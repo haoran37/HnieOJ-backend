@@ -7,8 +7,10 @@ import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.hnieacm.submission.constant.SubmissionStatusConstant;
 import com.hnieacm.submission.entity.Judge;
 import com.hnieacm.submission.entity.JudgeTaskOutbox;
+import com.hnieacm.submission.entity.RejudgeTaskDetail;
 import com.hnieacm.submission.mapper.JudgeMapper;
 import com.hnieacm.submission.mapper.JudgeTaskOutboxMapper;
+import com.hnieacm.submission.mapper.RejudgeTaskDetailMapper;
 import com.hnieacm.submission.properties.SubmissionProperties;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
 import org.junit.jupiter.api.BeforeEach;
@@ -43,6 +45,9 @@ class SubmissionJudgeTimeoutScannerTest {
     private JudgeTaskOutboxMapper outboxMapper;
 
     @Mock
+    private RejudgeTaskDetailMapper rejudgeTaskDetailMapper;
+
+    @Mock
     private SimpMessagingTemplate messagingTemplate;
 
     private SubmissionJudgeTimeoutScanner scanner;
@@ -51,8 +56,9 @@ class SubmissionJudgeTimeoutScannerTest {
     void setUp() {
         initTableInfo(Judge.class);
         initTableInfo(JudgeTaskOutbox.class);
+        initTableInfo(RejudgeTaskDetail.class);
         scanner = new SubmissionJudgeTimeoutScanner(
-                judgeMapper, outboxMapper, new SubmissionProperties(), messagingTemplate);
+                judgeMapper, outboxMapper, rejudgeTaskDetailMapper, new SubmissionProperties(), messagingTemplate);
     }
 
     @Test

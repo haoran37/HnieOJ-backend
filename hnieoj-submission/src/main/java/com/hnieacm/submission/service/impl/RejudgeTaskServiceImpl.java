@@ -17,14 +17,17 @@ import com.hnieacm.submission.dto.RejudgeTaskQueryRequest;
 import com.hnieacm.submission.entity.Judge;
 import com.hnieacm.submission.entity.JudgeCase;
 import com.hnieacm.submission.entity.RejudgeTask;
+import com.hnieacm.submission.entity.RejudgeTaskDetail;
 import com.hnieacm.submission.feign.ProblemInternalFeignClient;
 import com.hnieacm.submission.mapper.JudgeCaseMapper;
 import com.hnieacm.submission.mapper.JudgeMapper;
+import com.hnieacm.submission.mapper.RejudgeTaskDetailMapper;
 import com.hnieacm.submission.mapper.RejudgeTaskMapper;
 import com.hnieacm.submission.properties.SubmissionProperties;
 import com.hnieacm.submission.service.JudgeNodeAccessService;
 import com.hnieacm.submission.service.JudgeTaskMessagePublisher;
 import com.hnieacm.submission.service.RejudgeTaskService;
+import com.hnieacm.submission.vo.RejudgeTaskDetailVo;
 import com.hnieacm.submission.vo.RejudgeTaskVo;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -71,6 +74,7 @@ public class RejudgeTaskServiceImpl implements RejudgeTaskService {
     );
 
     private final RejudgeTaskMapper rejudgeTaskMapper;
+    private final RejudgeTaskDetailMapper rejudgeTaskDetailMapper;
     private final JudgeMapper judgeMapper;
     private final JudgeCaseMapper judgeCaseMapper;
     private final ProblemInternalFeignClient problemInternalFeignClient;
@@ -97,8 +101,10 @@ public class RejudgeTaskServiceImpl implements RejudgeTaskService {
         ProblemBasicDto problem = queryProblemBasic(problemCode);
         ensureProblemHasTestdata(problem);
 
-        long totalCount = judgeMapper.selectCount(buildJudgeRangeWrapper(problem.getId(), request.getContestId(),
-                request.getRangeStart(), request.getRangeEnd(), null));
+        List<Judge> targetJudges = judgeMapper.selectList(buildJudgeRangeWrapper(problem.getId(), request.getContestId(),
+                request.getRangeStart(), request.getRangeEnd(), null)
+                .orderByAsc(Judge::getId));
+        long totalCount = targetJudges.size();
         RejudgeTask task = new RejudgeTask();
         task.setProblemId(problem.getId());
         task.setProblemCode(problem.getProblemCode());
@@ -112,6 +118,7 @@ public class RejudgeTaskServiceImpl implements RejudgeTaskService {
         task.setLastJudgeId(0L);
         task.setAdminId(StpUtil.getLoginIdAsString());
         rejudgeTaskMapper.insert(task);
+        saveTaskDetails(task, targetJudges);
         return toVo(task);
     }
 
@@ -137,6 +144,29 @@ public class RejudgeTaskServiceImpl implements RejudgeTaskService {
             return new PageVo<>(Collections.emptyList(), pageResult.getTotal());
         }
         return new PageVo<>(pageResult.getRecords().stream().map(this::toVo).toList(), pageResult.getTotal());
+    }
+
+    @Override
+    public List<RejudgeTaskDetailVo> details(Long taskId) {
+        if (taskId == null || taskId <= 0) {
+            throw new BizException(ResultCode.BAD_REQUEST, "taskId must be positive");
+        }
+        RejudgeTask task = rejudgeTaskMapper.selectById(taskId);
+        if (task == null) {
+            throw new BizException(ResultCode.NOT_FOUND, "Rejudge task not found");
+        }
+        List<RejudgeTaskDetail> details = rejudgeTaskDetailMapper.selectList(
+                new LambdaQueryWrapper<RejudgeTaskDetail>()
+                        .eq(RejudgeTaskDetail::getTaskId, taskId)
+                        .orderByAsc(RejudgeTaskDetail::getJudgeId)
+                        .orderByAsc(RejudgeTaskDetail::getId));
+        if (details.isEmpty()) {
+            return Collections.emptyList();
+        }
+        List<Long> judgeIds = details.stream().map(RejudgeTaskDetail::getJudgeId).toList();
+        List<Judge> judges = judgeMapper.selectList(new LambdaQueryWrapper<Judge>()
+                .in(Judge::getId, judgeIds));
+        return details.stream().map(detail -> toDetailVo(detail, findJudge(judges, detail.getJudgeId()))).toList();
     }
 
     @Scheduled(fixedDelayString = "${hnieoj.submission.rejudge-task.scan-interval-ms:10000}")
@@ -199,27 +229,47 @@ public class RejudgeTaskServiceImpl implements RejudgeTaskService {
             return;
         }
 
-        List<Judge> judges = judgeMapper.selectList(buildJudgeRangeWrapper(task.getProblemId(), task.getContestId(),
-                task.getRangeStart(), task.getRangeEnd(), task.getLastJudgeId())
+        List<RejudgeTaskDetail> details = rejudgeTaskDetailMapper.selectList(
+                new LambdaQueryWrapper<RejudgeTaskDetail>()
+                        .eq(RejudgeTaskDetail::getTaskId, task.getId())
+                        .gt(task.getLastJudgeId() != null && task.getLastJudgeId() > 0,
+                                RejudgeTaskDetail::getJudgeId, task.getLastJudgeId())
+                        .orderByAsc(RejudgeTaskDetail::getJudgeId)
+                        .orderByAsc(RejudgeTaskDetail::getId)
+                        .last("limit " + batchSize()));
+        if (details.isEmpty()) {
+            markTaskFinished(task.getId());
+            return;
+        }
+        List<Long> judgeIds = details.stream().map(RejudgeTaskDetail::getJudgeId).toList();
+        List<Judge> judges = judgeMapper.selectList(new LambdaQueryWrapper<Judge>()
+                .in(Judge::getId, judgeIds)
                 .orderByAsc(Judge::getId)
                 .last("limit " + batchSize()));
         if (judges.isEmpty()) {
-            markTaskFinished(task.getId());
+            advanceTask(task.getId(), details.get(details.size() - 1).getJudgeId(), 0, details.size(),
+                    "Submission records not found");
             return;
         }
         long lastJudgeId = task.getLastJudgeId() == null ? 0L : task.getLastJudgeId();
         int processed = 0;
         int failed = 0;
         String lastError = null;
-        for (Judge judge : judges) {
+        for (RejudgeTaskDetail detail : details) {
             if (processed % leaseRenewEvery() == 0 && !renewTaskLease(task.getId())) {
                 log.warn("Rejudge task processing stopped because lease renew failed, taskId: {}, workerId: {}",
                         task.getId(), workerId);
                 return;
             }
-            lastJudgeId = judge.getId();
+            lastJudgeId = detail.getJudgeId();
+            Judge judge = findJudge(judges, detail.getJudgeId());
+            if (judge == null) {
+                failed++;
+                lastError = "Submission record not found";
+                continue;
+            }
             try {
-                rejudge(judge, problem);
+                rejudge(judge, problem, task.getId());
                 processed++;
             } catch (BizException e) {
                 failed++;
@@ -243,10 +293,18 @@ public class RejudgeTaskServiceImpl implements RejudgeTaskService {
     private LambdaQueryWrapper<Judge> buildJudgeRangeWrapper(Long problemId, Long contestId,
                                                              LocalDateTime rangeStart, LocalDateTime rangeEnd,
                                                              Long lastJudgeId) {
-        LambdaQueryWrapper<Judge> wrapper = new LambdaQueryWrapper<Judge>()
-                .eq(Judge::getProblemId, problemId)
+        LambdaQueryWrapper<Judge> wrapper = buildJudgeTaskScopeWrapper(problemId, contestId, rangeStart, rangeEnd,
+                lastJudgeId)
                 .notIn(Judge::getStatus, SubmissionStatusConstant.PENDING,
                         SubmissionStatusConstant.COMPILING, SubmissionStatusConstant.RUNNING);
+        return wrapper;
+    }
+
+    private LambdaQueryWrapper<Judge> buildJudgeTaskScopeWrapper(Long problemId, Long contestId,
+                                                                 LocalDateTime rangeStart, LocalDateTime rangeEnd,
+                                                                 Long lastJudgeId) {
+        LambdaQueryWrapper<Judge> wrapper = new LambdaQueryWrapper<Judge>()
+                .eq(Judge::getProblemId, problemId);
         if (contestId != null) {
             wrapper.eq(Judge::getCid, contestId);
         }
@@ -262,7 +320,7 @@ public class RejudgeTaskServiceImpl implements RejudgeTaskService {
         return wrapper;
     }
 
-    private void rejudge(Judge judge, ProblemBasicDto problem) {
+    private void rejudge(Judge judge, ProblemBasicDto problem, Long taskId) {
         transactionTemplate.executeWithoutResult(status -> {
             String judgeTaskId = UUID.randomUUID().toString().replace("-", "");
             int updated = judgeMapper.update(null, new LambdaUpdateWrapper<Judge>()
@@ -291,6 +349,7 @@ public class RejudgeTaskServiceImpl implements RejudgeTaskService {
             judge.setTotalCase(0);
             judge.setJudgedCase(0);
             judge.setCurrentCase(0);
+            bindTaskDetailToJudgeTask(taskId, judge.getId(), judgeTaskId);
             judgeTaskMessagePublisher.publishAfterCommit(judge, problem);
         });
     }
@@ -428,6 +487,92 @@ public class RejudgeTaskServiceImpl implements RejudgeTaskService {
         vo.setAdminId(task.getAdminId());
         vo.setGmtCreate(task.getGmtCreate());
         vo.setGmtModified(task.getGmtModified());
+        return vo;
+    }
+
+    private void saveTaskDetails(RejudgeTask task, List<Judge> judges) {
+        if (judges == null || judges.isEmpty()) {
+            return;
+        }
+        for (Judge judge : judges) {
+            RejudgeTaskDetail detail = new RejudgeTaskDetail();
+            detail.setTaskId(task.getId());
+            detail.setJudgeId(judge.getId());
+            detail.setSubmitId(judge.getSubmitId());
+            detail.setProblemId(judge.getProblemId());
+            detail.setProblemCode(judge.getProblemCode());
+            detail.setUid(judge.getUid());
+            detail.setUsername(judge.getUsername());
+            detail.setLanguage(judge.getLanguage());
+            detail.setOriginalStatus(judge.getStatus());
+            detail.setOriginalScore(judge.getScore());
+            detail.setOriginalTime(judge.getTime());
+            detail.setOriginalMemory(judge.getMemory());
+            detail.setSubmitTime(judge.getGmtCreate());
+            rejudgeTaskDetailMapper.insert(detail);
+        }
+    }
+
+    private void bindTaskDetailToJudgeTask(Long taskId, Long judgeId, String judgeTaskId) {
+        if (taskId == null || judgeId == null || StrUtil.isBlank(judgeTaskId)) {
+            return;
+        }
+        rejudgeTaskDetailMapper.update(null, new LambdaUpdateWrapper<RejudgeTaskDetail>()
+                .eq(RejudgeTaskDetail::getTaskId, taskId)
+                .eq(RejudgeTaskDetail::getJudgeId, judgeId)
+                .set(RejudgeTaskDetail::getJudgeTaskId, judgeTaskId)
+                .set(RejudgeTaskDetail::getFinalStatus, null)
+                .set(RejudgeTaskDetail::getFinalScore, null)
+                .set(RejudgeTaskDetail::getFinalTime, null)
+                .set(RejudgeTaskDetail::getFinalMemory, null)
+                .set(RejudgeTaskDetail::getFinishedTime, null));
+    }
+
+    private Judge findJudge(List<Judge> judges, Long judgeId) {
+        if (judges == null || judgeId == null) {
+            return null;
+        }
+        return judges.stream()
+                .filter(judge -> judgeId.equals(judge.getId()))
+                .findFirst()
+                .orElse(null);
+    }
+
+    private RejudgeTaskDetailVo toDetailVo(RejudgeTaskDetail detail, Judge judge) {
+        Integer currentStatus = detail.getFinalStatus() == null
+                ? (judge == null ? null : judge.getStatus())
+                : detail.getFinalStatus();
+        Integer currentScore = detail.getFinalScore() == null
+                ? (judge == null ? null : judge.getScore())
+                : detail.getFinalScore();
+        Integer currentTime = detail.getFinalTime() == null
+                ? (judge == null ? null : judge.getTime())
+                : detail.getFinalTime();
+        Integer currentMemory = detail.getFinalMemory() == null
+                ? (judge == null ? null : judge.getMemory())
+                : detail.getFinalMemory();
+        RejudgeTaskDetailVo vo = new RejudgeTaskDetailVo();
+        vo.setRunId(detail.getSubmitId());
+        vo.setSubmissionId(detail.getSubmitId());
+        vo.setUid(detail.getUid());
+        vo.setUsername(detail.getUsername());
+        vo.setOriginalStatus(SubmissionStatusConstant.toText(detail.getOriginalStatus()));
+        vo.setCurrentStatus(SubmissionStatusConstant.toText(currentStatus));
+        vo.setStatus(currentStatus);
+        vo.setOriginalStatusCode(detail.getOriginalStatus());
+        vo.setCurrentStatusCode(currentStatus);
+        vo.setLanguage(detail.getLanguage());
+        vo.setScore(currentScore);
+        vo.setOriginalScore(detail.getOriginalScore());
+        vo.setCurrentScore(currentScore);
+        vo.setTime(currentTime);
+        vo.setOriginalTime(detail.getOriginalTime());
+        vo.setCurrentTime(currentTime);
+        vo.setMemory(currentMemory);
+        vo.setOriginalMemory(detail.getOriginalMemory());
+        vo.setCurrentMemory(currentMemory);
+        vo.setSubmitTime(detail.getSubmitTime());
+        vo.setFinishedTime(detail.getFinishedTime());
         return vo;
     }
 

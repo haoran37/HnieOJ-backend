@@ -9,8 +9,10 @@ import com.hnieacm.submission.constant.SubmissionStatusConstant;
 import com.hnieacm.submission.dto.JudgeResultEventRequest;
 import com.hnieacm.submission.entity.Judge;
 import com.hnieacm.submission.entity.JudgeCase;
+import com.hnieacm.submission.entity.RejudgeTaskDetail;
 import com.hnieacm.submission.mapper.JudgeCaseMapper;
 import com.hnieacm.submission.mapper.JudgeMapper;
+import com.hnieacm.submission.mapper.RejudgeTaskDetailMapper;
 import com.hnieacm.submission.service.JudgeResultReportService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -19,6 +21,7 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Set;
 
@@ -55,6 +58,7 @@ public class JudgeResultReportServiceImpl implements JudgeResultReportService {
 
     private final JudgeMapper judgeMapper;
     private final JudgeCaseMapper judgeCaseMapper;
+    private final RejudgeTaskDetailMapper rejudgeTaskDetailMapper;
     private final SimpMessagingTemplate messagingTemplate;
 
     @Override
@@ -166,7 +170,30 @@ public class JudgeResultReportServiceImpl implements JudgeResultReportService {
         if (updated == 0) {
             log.info("Judge event update skipped, submissionId: {}, eventType: {}, judgeTaskId: {}",
                     judge.getSubmitId(), request.getEventType(), judge.getJudgeTaskId());
+            return;
         }
+        if (isTerminalStatus(request.getStatus())) {
+            freezeRejudgeTaskDetail(judge.getId(), judge.getJudgeTaskId());
+        }
+    }
+
+    private void freezeRejudgeTaskDetail(Long judgeId, String judgeTaskId) {
+        String normalizedJudgeTaskId = StrUtil.trimToNull(judgeTaskId);
+        if (judgeId == null || normalizedJudgeTaskId == null) {
+            return;
+        }
+        Judge latest = judgeMapper.selectById(judgeId);
+        if (latest == null) {
+            return;
+        }
+        rejudgeTaskDetailMapper.update(null, new LambdaUpdateWrapper<RejudgeTaskDetail>()
+                .eq(RejudgeTaskDetail::getJudgeId, judgeId)
+                .eq(RejudgeTaskDetail::getJudgeTaskId, normalizedJudgeTaskId)
+                .set(RejudgeTaskDetail::getFinalStatus, latest.getStatus())
+                .set(RejudgeTaskDetail::getFinalScore, latest.getScore())
+                .set(RejudgeTaskDetail::getFinalTime, latest.getTime())
+                .set(RejudgeTaskDetail::getFinalMemory, latest.getMemory())
+                .set(RejudgeTaskDetail::getFinishedTime, LocalDateTime.now()));
     }
 
     private void upsertJudgeCase(Judge judge, JudgeResultEventRequest.CaseResult result) {

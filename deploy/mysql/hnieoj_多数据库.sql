@@ -498,6 +498,38 @@ CREATE TABLE `rejudge_task` (
   KEY `idx_problem_id` (`problem_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='后台重判任务记录';
 
+-- 重判任务明细表
+DROP TABLE IF EXISTS `rejudge_task_detail`;
+CREATE TABLE `rejudge_task_detail` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `task_id` bigint(20) NOT NULL COMMENT '重判任务ID',
+  `judge_id` bigint(20) NOT NULL COMMENT 'judge 表主键',
+  `submit_id` varchar(64) NOT NULL COMMENT '提交展示ID',
+  `problem_id` bigint(20) NOT NULL,
+  `problem_code` varchar(50) NOT NULL COMMENT '题目展示ID',
+  `uid` varchar(50) NOT NULL,
+  `username` varchar(100) DEFAULT NULL,
+  `language` varchar(50) NOT NULL,
+  `original_status` int(11) NOT NULL COMMENT '重判前状态',
+  `original_score` int(11) DEFAULT NULL COMMENT '重判前分数',
+  `original_time` int(11) DEFAULT NULL COMMENT '重判前最大耗时 ms',
+  `original_memory` int(11) DEFAULT NULL COMMENT '重判前最大内存 KB',
+  `judge_task_id` varchar(64) DEFAULT NULL COMMENT '本次重判投递的 judgeTaskId',
+  `final_status` int(11) DEFAULT NULL COMMENT '本次重判后的最终状态',
+  `final_score` int(11) DEFAULT NULL COMMENT '本次重判后的最终分数',
+  `final_time` int(11) DEFAULT NULL COMMENT '本次重判后的最大耗时 ms',
+  `final_memory` int(11) DEFAULT NULL COMMENT '本次重判后的最大内存 KB',
+  `finished_time` datetime DEFAULT NULL COMMENT '本次重判完成时间',
+  `submit_time` datetime DEFAULT NULL COMMENT '原提交时间',
+  `gmt_create` datetime DEFAULT CURRENT_TIMESTAMP,
+  `gmt_modified` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_task_judge` (`task_id`, `judge_id`),
+  KEY `idx_task_id` (`task_id`),
+  KEY `idx_judge_id` (`judge_id`),
+  KEY `idx_judge_task_id` (`judge_task_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='后台重判任务明细';
+
 -- 远程账号池
 DROP TABLE IF EXISTS `remote_judge_account`;
 CREATE TABLE `remote_judge_account` (

@@ -13,6 +13,8 @@ import java.util.List;
 @Data
 public class JudgeNodeTokenVo {
 
+    private Long id;
+
     private String tokenId;
 
     private String nodeId;

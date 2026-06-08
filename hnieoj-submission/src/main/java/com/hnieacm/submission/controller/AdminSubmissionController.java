@@ -8,9 +8,11 @@ import com.hnieacm.common.result.Result;
 import com.hnieacm.submission.dto.CreateRejudgeTaskRequest;
 import com.hnieacm.submission.dto.JudgeTaskOutboxQueryRequest;
 import com.hnieacm.submission.dto.RejudgeTaskQueryRequest;
+import com.hnieacm.submission.service.JudgeOpsService;
 import com.hnieacm.submission.service.JudgeTaskOutboxService;
 import com.hnieacm.submission.service.RejudgeTaskService;
 import com.hnieacm.submission.service.SubmissionService;
+import com.hnieacm.submission.vo.JudgeOpsSummaryVo;
 import com.hnieacm.submission.vo.JudgeTaskOutboxVo;
 import com.hnieacm.submission.vo.RejudgeTaskVo;
 import com.hnieacm.submission.vo.SubmitCodeVo;
@@ -42,6 +44,14 @@ public class AdminSubmissionController {
     private final SubmissionService submissionService;
     private final JudgeTaskOutboxService judgeTaskOutboxService;
     private final RejudgeTaskService rejudgeTaskService;
+    private final JudgeOpsService judgeOpsService;
+
+    @Operation(summary = "查询判题链路运维摘要")
+    @SaCheckPermission(PermissionConstant.PROBLEM_UPDATE)
+    @GetMapping("/judge-ops/summary")
+    public Result<JudgeOpsSummaryVo> judgeOpsSummary() {
+        return Result.success(judgeOpsService.summary());
+    }
 
     @Operation(summary = "重判单个提交")
     @SaCheckPermission(PermissionConstant.PROBLEM_UPDATE)

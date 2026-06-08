@@ -12,3 +12,9 @@ spring:
       host: ${REDIS_HOST:127.0.0.1}
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD:}
+
+hnieoj:
+  problem:
+    judge-asset:
+      max-checker-bytes: ${HNIEOJ_PROBLEM_MAX_CHECKER_BYTES:262144}
+      max-interactor-bytes: ${HNIEOJ_PROBLEM_MAX_INTERACTOR_BYTES:262144}

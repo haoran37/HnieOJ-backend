@@ -37,6 +37,7 @@ public class SubmissionJudgeTimeoutScanner {
     private static final int DEFAULT_BATCH_SIZE = 100;
     private static final long DEFAULT_PENDING_TIMEOUT_SECONDS = 1800L;
     private static final long DEFAULT_ACTIVE_TIMEOUT_SECONDS = 1800L;
+    private static final long DEFAULT_SENT_PENDING_WARN_SECONDS = 3600L;
 
     private final JudgeMapper judgeMapper;
     private final JudgeTaskOutboxMapper outboxMapper;
@@ -66,6 +67,11 @@ public class SubmissionJudgeTimeoutScanner {
     }
 
     private void handleTimeoutJudge(Judge judge, Integer expectedStatus, String message) {
+        if (expectedStatus != null && expectedStatus == SubmissionStatusConstant.PENDING
+                && hasSentOutbox(judge.getJudgeTaskId())) {
+            warnSentPendingIfNeeded(judge);
+            return;
+        }
         if (hasActiveOutbox(judge.getJudgeTaskId())) {
             log.info("Submission timeout skipped because outbox is still active, submissionId: {}, judgeTaskId: {}",
                     judge.getSubmitId(), judge.getJudgeTaskId());
@@ -101,6 +107,32 @@ public class SubmissionJudgeTimeoutScanner {
         return count != null && count > 0;
     }
 
+    private boolean hasSentOutbox(String judgeTaskId) {
+        String normalizedJudgeTaskId = StrUtil.trimToNull(judgeTaskId);
+        if (normalizedJudgeTaskId == null) {
+            return false;
+        }
+        Long count = outboxMapper.selectCount(new LambdaQueryWrapper<JudgeTaskOutbox>()
+                .eq(JudgeTaskOutbox::getJudgeTaskId, normalizedJudgeTaskId)
+                .eq(JudgeTaskOutbox::getStatus, JudgeTaskOutboxStatusConstant.SENT));
+        return count != null && count > 0;
+    }
+
+    private void warnSentPendingIfNeeded(Judge judge) {
+        LocalDateTime cutoffTime = LocalDateTime.now().minusSeconds(sentPendingWarnSeconds());
+        Long count = outboxMapper.selectCount(new LambdaQueryWrapper<JudgeTaskOutbox>()
+                .eq(JudgeTaskOutbox::getJudgeTaskId, judge.getJudgeTaskId())
+                .eq(JudgeTaskOutbox::getStatus, JudgeTaskOutboxStatusConstant.SENT)
+                .le(JudgeTaskOutbox::getSentTime, cutoffTime));
+        if (count == null || count <= 0) {
+            log.info("Submission timeout skipped because task has been sent, submissionId: {}, judgeTaskId: {}",
+                    judge.getSubmitId(), judge.getJudgeTaskId());
+            return;
+        }
+        log.warn("Submission pending after RabbitMQ sent, submissionId: {}, judgeTaskId: {}, warnSeconds: {}",
+                judge.getSubmitId(), judge.getJudgeTaskId(), sentPendingWarnSeconds());
+    }
+
     private void pushTimeoutEvent(Judge judge, String message) {
         JudgeResultEventRequest event = new JudgeResultEventRequest();
         event.setEventType(EVENT_JUDGE_FAILED);
@@ -130,6 +162,11 @@ public class SubmissionJudgeTimeoutScanner {
     private long activeTimeoutSeconds() {
         Long value = submissionProperties.getJudgeTimeout().getActiveTimeoutSeconds();
         return value == null || value <= 0 ? DEFAULT_ACTIVE_TIMEOUT_SECONDS : value;
+    }
+
+    private long sentPendingWarnSeconds() {
+        Long value = submissionProperties.getJudgeTimeout().getSentPendingWarnSeconds();
+        return value == null || value <= 0 ? DEFAULT_SENT_PENDING_WARN_SECONDS : value;
     }
 
     private Integer defaultZero(Integer value) {

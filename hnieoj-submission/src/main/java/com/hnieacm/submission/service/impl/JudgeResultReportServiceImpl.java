@@ -152,8 +152,7 @@ public class JudgeResultReportServiceImpl implements JudgeResultReportService {
         appendProgressUpdate(wrapper, "total_case", request.getTotalCase());
         appendProgressUpdate(wrapper, "judged_case", request.getJudgedCase());
         appendProgressUpdate(wrapper, "current_case", request.getCurrentCase());
-        wrapper.set(Judge::getTime, maxCaseTime(judge.getId()));
-        wrapper.set(Judge::getMemory, maxCaseMemory(judge.getId()));
+        appendCaseMetricUpdate(wrapper, request.getCaseResult());
         if (score != null) {
             wrapper.set(Judge::getScore, score);
         }
@@ -189,9 +188,11 @@ public class JudgeResultReportServiceImpl implements JudgeResultReportService {
                 judgeCaseMapper.insert(entity);
             } catch (DuplicateKeyException e) {
                 updateJudgeCase(judge.getId(), caseId, entity);
+                refreshJudgeCaseMetrics(judge);
             }
         } else {
             judgeCaseMapper.updateById(entity);
+            refreshJudgeCaseMetrics(judge);
         }
     }
 
@@ -199,6 +200,31 @@ public class JudgeResultReportServiceImpl implements JudgeResultReportService {
         judgeCaseMapper.update(entity, new LambdaUpdateWrapper<JudgeCase>()
                 .eq(JudgeCase::getSubmitId, judgeId)
                 .eq(JudgeCase::getCaseId, caseId));
+    }
+
+    private void refreshJudgeCaseMetrics(Judge judge) {
+        List<JudgeCase> cases = judgeCaseMapper.selectList(new LambdaQueryWrapper<JudgeCase>()
+                .eq(JudgeCase::getSubmitId, judge.getId()));
+        Integer maxTime = cases.stream()
+                .map(JudgeCase::getTime)
+                .filter(item -> item != null)
+                .max(Integer::compareTo)
+                .orElse(null);
+        Integer maxMemory = cases.stream()
+                .map(JudgeCase::getMemory)
+                .filter(item -> item != null)
+                .max(Integer::compareTo)
+                .orElse(null);
+        LambdaUpdateWrapper<Judge> wrapper = new LambdaUpdateWrapper<Judge>()
+                .eq(Judge::getId, judge.getId())
+                .lt(Judge::getStatus, SubmissionStatusConstant.ACCEPTED)
+                .set(Judge::getTime, maxTime)
+                .set(Judge::getMemory, maxMemory);
+        String judgeTaskId = StrUtil.trimToNull(judge.getJudgeTaskId());
+        if (judgeTaskId != null) {
+            wrapper.eq(Judge::getJudgeTaskId, judgeTaskId);
+        }
+        judgeMapper.update(null, wrapper);
     }
 
     private boolean isCurrentJudgeTask(Judge judge, JudgeResultEventRequest request) {
@@ -209,27 +235,6 @@ public class JudgeResultReportServiceImpl implements JudgeResultReportService {
         String incomingTaskId = StrUtil.trimToNull(request.getJudgeTaskId());
         request.setJudgeTaskId(incomingTaskId);
         return currentTaskId.equals(incomingTaskId);
-    }
-
-    private Integer maxCaseTime(Long judgeId) {
-        return listCases(judgeId).stream()
-                .map(JudgeCase::getTime)
-                .filter(item -> item != null)
-                .max(Integer::compareTo)
-                .orElse(null);
-    }
-
-    private Integer maxCaseMemory(Long judgeId) {
-        return listCases(judgeId).stream()
-                .map(JudgeCase::getMemory)
-                .filter(item -> item != null)
-                .max(Integer::compareTo)
-                .orElse(null);
-    }
-
-    private List<JudgeCase> listCases(Long judgeId) {
-        return judgeCaseMapper.selectList(new LambdaQueryWrapper<JudgeCase>()
-                .eq(JudgeCase::getSubmitId, judgeId));
     }
 
     private void validateEvent(JudgeResultEventRequest request) {
@@ -339,6 +344,20 @@ public class JudgeResultReportServiceImpl implements JudgeResultReportService {
             return;
         }
         wrapper.setSql(columnName + " = GREATEST(COALESCE(" + columnName + ", 0), " + value + ")");
+    }
+
+    private void appendCaseMetricUpdate(LambdaUpdateWrapper<Judge> wrapper, JudgeResultEventRequest.CaseResult result) {
+        if (result == null) {
+            return;
+        }
+        Integer time = toInteger(result.getTime());
+        if (time != null) {
+            wrapper.setSql("time = GREATEST(COALESCE(time, 0), " + time + ")");
+        }
+        Integer memory = toInteger(result.getMemory());
+        if (memory != null) {
+            wrapper.setSql("memory = GREATEST(COALESCE(memory, 0), " + memory + ")");
+        }
     }
 
     private Integer toInteger(Long value) {

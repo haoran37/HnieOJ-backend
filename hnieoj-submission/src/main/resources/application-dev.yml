@@ -36,6 +36,9 @@ hnieoj:
       dead-letter-routing-key: ${HNIEOJ_JUDGE_MQ_DLX_ROUTING_KEY:judge.submission.created.dlq}
   submission:
     max-code-bytes: ${HNIEOJ_SUBMISSION_MAX_CODE_BYTES:65536}
+    max-checker-bytes: ${HNIEOJ_SUBMISSION_MAX_CHECKER_BYTES:262144}
+    max-interactor-bytes: ${HNIEOJ_SUBMISSION_MAX_INTERACTOR_BYTES:262144}
+    max-message-payload-bytes: ${HNIEOJ_SUBMISSION_MAX_MESSAGE_PAYLOAD_BYTES:1048576}
     supported-judge-modes: ${HNIEOJ_SUBMISSION_SUPPORTED_JUDGE_MODES:default}
     judge-outbox:
       retry-interval-ms: ${HNIEOJ_JUDGE_OUTBOX_RETRY_INTERVAL_MS:10000}
@@ -49,7 +52,9 @@ hnieoj:
       batch-size: ${HNIEOJ_JUDGE_TIMEOUT_BATCH_SIZE:100}
       pending-timeout-seconds: ${HNIEOJ_JUDGE_PENDING_TIMEOUT_SECONDS:1800}
       active-timeout-seconds: ${HNIEOJ_JUDGE_ACTIVE_TIMEOUT_SECONDS:1800}
+      sent-pending-warn-seconds: ${HNIEOJ_JUDGE_SENT_PENDING_WARN_SECONDS:3600}
     rejudge-task:
       scan-interval-ms: ${HNIEOJ_REJUDGE_TASK_SCAN_INTERVAL_MS:10000}
       batch-size: ${HNIEOJ_REJUDGE_TASK_BATCH_SIZE:50}
       lease-seconds: ${HNIEOJ_REJUDGE_TASK_LEASE_SECONDS:300}
+      lease-renew-every: ${HNIEOJ_REJUDGE_TASK_LEASE_RENEW_EVERY:10}

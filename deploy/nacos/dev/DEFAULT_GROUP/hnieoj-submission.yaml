@@ -23,7 +23,6 @@ spring:
 sa-token:
   is-print: false
 
-# 本地调试
 hnieoj:
   judge:
     mq:
@@ -38,6 +37,12 @@ hnieoj:
   submission:
     # 单次提交代码最大字节数，按 UTF-8 编码计算。
     max-code-bytes: ${HNIEOJ_SUBMISSION_MAX_CODE_BYTES:65536}
+    # SPJ checker 源码最大字节数，防止判题任务消息过大。
+    max-checker-bytes: ${HNIEOJ_SUBMISSION_MAX_CHECKER_BYTES:262144}
+    # 交互题 interactor 源码最大字节数，防止判题任务消息过大。
+    max-interactor-bytes: ${HNIEOJ_SUBMISSION_MAX_INTERACTOR_BYTES:262144}
+    # 判题任务完整 MQ payload 最大字节数。
+    max-message-payload-bytes: ${HNIEOJ_SUBMISSION_MAX_MESSAGE_PAYLOAD_BYTES:1048576}
     # 允许进入 MQ 的判题模式；生产启用 spj/interactive 前，判题节点必须通过心跳上报对应能力。
     supported-judge-modes: ${HNIEOJ_SUBMISSION_SUPPORTED_JUDGE_MODES:default}
     judge-outbox:
@@ -62,12 +67,17 @@ hnieoj:
       pending-timeout-seconds: ${HNIEOJ_JUDGE_PENDING_TIMEOUT_SECONDS:1800}
       # Compiling/Running 状态超时时间，单位秒。
       active-timeout-seconds: ${HNIEOJ_JUDGE_ACTIVE_TIMEOUT_SECONDS:1800}
+      # 已投递到 RabbitMQ 但仍 Pending 的告警阈值，单位秒；不会直接终态化任务。
+      sent-pending-warn-seconds: ${HNIEOJ_JUDGE_SENT_PENDING_WARN_SECONDS:3600}
     rejudge-task:
       # 批量重判任务扫描间隔，单位毫秒。
       scan-interval-ms: ${HNIEOJ_REJUDGE_TASK_SCAN_INTERVAL_MS:10000}
       # 单个任务每轮最多处理的提交数量。
       batch-size: ${HNIEOJ_REJUDGE_TASK_BATCH_SIZE:50}
+      # 调度租约时长，单位秒；超过该时间未释放时允许其他实例接管。
       lease-seconds: ${HNIEOJ_REJUDGE_TASK_LEASE_SECONDS:300}
+      # 处理多少条提交后刷新一次租约。
+      lease-renew-every: ${HNIEOJ_REJUDGE_TASK_LEASE_RENEW_EVERY:10}
     websocket:
       allowed-origins:
         - "http://localhost:3000"

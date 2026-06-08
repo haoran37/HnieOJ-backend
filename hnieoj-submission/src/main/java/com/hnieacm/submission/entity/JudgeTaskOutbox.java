@@ -42,6 +42,9 @@ public class JudgeTaskOutbox {
     @TableField("retry_count")
     private Integer retryCount;
 
+    @TableField("publish_attempt")
+    private Integer publishAttempt;
+
     @TableField("max_retry_count")
     private Integer maxRetryCount;
 

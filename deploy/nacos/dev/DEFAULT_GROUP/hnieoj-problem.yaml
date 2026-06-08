@@ -25,3 +25,8 @@ hnieoj:
       max-testdata-zip-size: 50MB
       max-testdata-uncompressed-size: 200MB
       max-testdata-file-count: 2000
+    judge-asset:
+      # SPJ checker 源码最大字节数，按 UTF-8 编码计算。
+      max-checker-bytes: ${HNIEOJ_PROBLEM_MAX_CHECKER_BYTES:262144}
+      # 交互题 interactor 源码最大字节数，按 UTF-8 编码计算。
+      max-interactor-bytes: ${HNIEOJ_PROBLEM_MAX_INTERACTOR_BYTES:262144}

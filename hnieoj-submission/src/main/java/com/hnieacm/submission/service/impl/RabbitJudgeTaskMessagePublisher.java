@@ -26,6 +26,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
@@ -53,14 +54,17 @@ public class RabbitJudgeTaskMessagePublisher implements JudgeTaskMessagePublishe
     private static final int DEFAULT_SPJ_MEMORY_LIMIT = 256;
     private static final int DEFAULT_SPJ_STACK_LIMIT = 128;
     private static final int DEFAULT_SPJ_OUTPUT_LIMIT = 16777216;
-    private static final String DEFAULT_SPJ_PROTOCOL = "testlib";
+    private static final String DEFAULT_RESULT_PROTOCOL = "hnieoj-result-json-v1";
+    private static final String DEFAULT_SPJ_ARGUMENT_TEMPLATE = "{input} {expected} {actual} {result}";
     private static final int DEFAULT_SCHEMA_VERSION = 2;
     private static final int DEFAULT_INTERACTOR_TIME_LIMIT = 5000;
     private static final int DEFAULT_INTERACTOR_MEMORY_LIMIT = 256;
     private static final int DEFAULT_INTERACTOR_STACK_LIMIT = 128;
     private static final int DEFAULT_INTERACTOR_OUTPUT_LIMIT = 16777216;
-    private static final String DEFAULT_INTERACTOR_PROTOCOL = "stdio";
-    private static final String DEFAULT_INTERACTION_WIRING = "user_stdout_to_interactor_stdin,interactor_stdout_to_user_stdin";
+    private static final String DEFAULT_INTERACTOR_ARGUMENT_TEMPLATE = "{input} {expected} {result}";
+    private static final String DEFAULT_INTERACTION_PROTOCOL = "stdio";
+    private static final String DEFAULT_INTERACTION_WIRING = "bidirectional-stdio";
+    private static final String DEFAULT_INTERACTION_SCORE_MODE = "interactor";
     private static final String SPJ_JUDGE_MODE = "spj";
     private static final String INTERACTIVE_JUDGE_MODE = "interactive";
     private static final int DEFAULT_RETRY_BATCH_SIZE = 20;
@@ -68,6 +72,10 @@ public class RabbitJudgeTaskMessagePublisher implements JudgeTaskMessagePublishe
     private static final long DEFAULT_RETRY_BACKOFF_SECONDS = 30L;
     private static final long DEFAULT_PROCESSING_TIMEOUT_SECONDS = 120L;
     private static final int MAX_ERROR_LENGTH = 1000;
+    private static final int DEFAULT_MAX_CODE_BYTES = 65536;
+    private static final int DEFAULT_MAX_CHECKER_BYTES = 262144;
+    private static final int DEFAULT_MAX_INTERACTOR_BYTES = 262144;
+    private static final int DEFAULT_MAX_MESSAGE_PAYLOAD_BYTES = 1048576;
 
     private final RabbitTemplate rabbitTemplate;
     private final JudgeMqProperties properties;
@@ -79,25 +87,25 @@ public class RabbitJudgeTaskMessagePublisher implements JudgeTaskMessagePublishe
     public void initRabbitCallbacks() {
         rabbitTemplate.setMandatory(true);
         rabbitTemplate.setConfirmCallback((correlationData, ack, cause) -> {
-            Long outboxId = parseOutboxId(correlationData == null ? null : correlationData.getId());
-            if (outboxId == null) {
+            PublishCorrelation correlation = parseCorrelation(correlationData == null ? null : correlationData.getId());
+            if (correlation == null) {
                 log.warn("Rabbit confirm ignored because correlation id is missing, ack: {}, cause: {}", ack, cause);
                 return;
             }
             if (ack) {
-                markSent(outboxId);
+                markSent(correlation);
                 return;
             }
-            markFailed(outboxId, new IllegalStateException(defaultString(cause, "RabbitMQ publisher confirm nack")));
+            markFailed(correlation, new IllegalStateException(defaultString(cause, "RabbitMQ publisher confirm nack")));
         });
         rabbitTemplate.setReturnsCallback(returned -> {
-            Long outboxId = parseOutboxId(returned.getMessage().getMessageProperties().getCorrelationId());
-            if (outboxId == null) {
+            PublishCorrelation correlation = parseCorrelation(returned.getMessage().getMessageProperties().getCorrelationId());
+            if (correlation == null) {
                 log.warn("Rabbit returned message ignored because correlation id is missing, replyCode: {}, replyText: {}",
                         returned.getReplyCode(), returned.getReplyText());
                 return;
             }
-            markFailed(outboxId, new IllegalStateException("RabbitMQ returned message, replyCode: "
+            markFailed(correlation, new IllegalStateException("RabbitMQ returned message, replyCode: "
                     + returned.getReplyCode() + ", replyText: " + returned.getReplyText()));
         });
     }
@@ -156,21 +164,23 @@ public class RabbitJudgeTaskMessagePublisher implements JudgeTaskMessagePublishe
         if (outbox == null || JudgeTaskOutboxStatusConstant.SENT.equals(outbox.getStatus())) {
             return;
         }
-        if (!markProcessing(outbox)) {
+        JudgeTaskOutbox processingOutbox = markProcessing(outbox);
+        if (processingOutbox == null) {
             return;
         }
         try {
-            JudgeTaskMessage message = objectMapper.readValue(outbox.getPayload(), JudgeTaskMessage.class);
-            rabbitTemplate.convertAndSend(outbox.getExchangeName(), outbox.getRoutingKey(), message, item -> {
+            JudgeTaskMessage message = objectMapper.readValue(processingOutbox.getPayload(), JudgeTaskMessage.class);
+            String correlationId = buildCorrelationId(processingOutbox);
+            rabbitTemplate.convertAndSend(processingOutbox.getExchangeName(), processingOutbox.getRoutingKey(), message, item -> {
                 item.getMessageProperties().setMessageId(message.getMessageId());
-                item.getMessageProperties().setCorrelationId(String.valueOf(outbox.getId()));
+                item.getMessageProperties().setCorrelationId(correlationId);
                 item.getMessageProperties().setDeliveryMode(MessageDeliveryMode.PERSISTENT);
                 return item;
-            }, new CorrelationData(String.valueOf(outbox.getId())));
+            }, new CorrelationData(correlationId));
             log.info("Judge task message sent to RabbitTemplate, submissionId: {}, judgeId: {}, messageId: {}",
                     message.getSubmissionId(), message.getJudgeId(), message.getMessageId());
         } catch (Exception e) {
-            markFailed(outbox, e);
+            markFailed(processingOutbox, e);
             log.error("Publish judge task message failed, outboxId: {}, submissionId: {}, messageId: {}",
                     outbox.getId(), outbox.getSubmissionId(), outbox.getMessageId(), e);
         }
@@ -185,10 +195,14 @@ public class RabbitJudgeTaskMessagePublisher implements JudgeTaskMessagePublishe
         outbox.setRoutingKey(routingKey(message.getJudgeMode()));
         outbox.setStatus(JudgeTaskOutboxStatusConstant.PENDING);
         outbox.setRetryCount(0);
+        outbox.setPublishAttempt(0);
         outbox.setMaxRetryCount(maxRetryCount());
         outbox.setNextRetryTime(LocalDateTime.now());
         try {
-            outbox.setPayload(objectMapper.writeValueAsString(message));
+            validateTaskPayload(message);
+            String payload = objectMapper.writeValueAsString(message);
+            validateBytes(payload, maxMessagePayloadBytes(), "判题任务消息不能超过 " + maxMessagePayloadBytes() + " 字节");
+            outbox.setPayload(payload);
         } catch (JsonProcessingException e) {
             throw new BizException(ResultCode.INTERNAL_ERROR, "创建判题任务失败");
         }
@@ -212,7 +226,7 @@ public class RabbitJudgeTaskMessagePublisher implements JudgeTaskMessagePublishe
                 .last("limit " + retryBatchSize()));
     }
 
-    private boolean markProcessing(JudgeTaskOutbox outbox) {
+    private JudgeTaskOutbox markProcessing(JudgeTaskOutbox outbox) {
         LocalDateTime now = LocalDateTime.now();
         LocalDateTime staleProcessingTime = now.minusSeconds(processingTimeoutSeconds());
         int updated = outboxMapper.update(null, new LambdaUpdateWrapper<JudgeTaskOutbox>()
@@ -225,13 +239,18 @@ public class RabbitJudgeTaskMessagePublisher implements JudgeTaskMessagePublishe
                                 .le(JudgeTaskOutbox::getNextRetryTime, now))
                         .or(item -> item.eq(JudgeTaskOutbox::getStatus, JudgeTaskOutboxStatusConstant.PROCESSING)
                                 .le(JudgeTaskOutbox::getGmtModified, staleProcessingTime)))
-                .set(JudgeTaskOutbox::getStatus, JudgeTaskOutboxStatusConstant.PROCESSING));
-        return updated > 0;
+                .set(JudgeTaskOutbox::getStatus, JudgeTaskOutboxStatusConstant.PROCESSING)
+                .setSql("publish_attempt = publish_attempt + 1"));
+        if (updated <= 0) {
+            return null;
+        }
+        return outboxMapper.selectById(outbox.getId());
     }
 
-    private void markSent(Long outboxId) {
+    private void markSent(PublishCorrelation correlation) {
         outboxMapper.update(null, new LambdaUpdateWrapper<JudgeTaskOutbox>()
-                .eq(JudgeTaskOutbox::getId, outboxId)
+                .eq(JudgeTaskOutbox::getId, correlation.outboxId())
+                .eq(JudgeTaskOutbox::getPublishAttempt, correlation.publishAttempt())
                 .eq(JudgeTaskOutbox::getStatus, JudgeTaskOutboxStatusConstant.PROCESSING)
                 .set(JudgeTaskOutbox::getStatus, JudgeTaskOutboxStatusConstant.SENT)
                 .set(JudgeTaskOutbox::getSentTime, LocalDateTime.now())
@@ -239,9 +258,14 @@ public class RabbitJudgeTaskMessagePublisher implements JudgeTaskMessagePublishe
                 .set(JudgeTaskOutbox::getNextRetryTime, null));
     }
 
-    private void markFailed(Long outboxId, Exception e) {
-        JudgeTaskOutbox outbox = outboxMapper.selectById(outboxId);
+    private void markFailed(PublishCorrelation correlation, Exception e) {
+        JudgeTaskOutbox outbox = outboxMapper.selectById(correlation.outboxId());
         if (outbox == null) {
+            return;
+        }
+        if (!Integer.valueOf(correlation.publishAttempt()).equals(defaultInteger(outbox.getPublishAttempt(), 0))) {
+            log.info("Rabbit callback ignored because publish attempt mismatch, outboxId: {}, callbackAttempt: {}, currentAttempt: {}",
+                    correlation.outboxId(), correlation.publishAttempt(), outbox.getPublishAttempt());
             return;
         }
         markFailed(outbox, e);
@@ -252,6 +276,7 @@ public class RabbitJudgeTaskMessagePublisher implements JudgeTaskMessagePublishe
         boolean exhausted = nextRetryCount >= maxRetryCount();
         LambdaUpdateWrapper<JudgeTaskOutbox> wrapper = new LambdaUpdateWrapper<JudgeTaskOutbox>()
                 .eq(JudgeTaskOutbox::getId, outbox.getId())
+                .eq(JudgeTaskOutbox::getPublishAttempt, defaultInteger(outbox.getPublishAttempt(), 0))
                 .eq(JudgeTaskOutbox::getStatus, JudgeTaskOutboxStatusConstant.PROCESSING)
                 .set(JudgeTaskOutbox::getRetryCount, nextRetryCount)
                 .set(JudgeTaskOutbox::getStatus, exhausted
@@ -308,8 +333,8 @@ public class RabbitJudgeTaskMessagePublisher implements JudgeTaskMessagePublishe
         checker.setMemoryLimit(defaultInteger(problem.getSpjMemoryLimit(), DEFAULT_SPJ_MEMORY_LIMIT));
         checker.setStackLimit(defaultInteger(problem.getSpjStackLimit(), DEFAULT_SPJ_STACK_LIMIT));
         checker.setOutputLimit(defaultInteger(problem.getSpjOutputLimit(), DEFAULT_SPJ_OUTPUT_LIMIT));
-        checker.setProtocol(defaultString(problem.getSpjProtocol(), DEFAULT_SPJ_PROTOCOL));
-        checker.setArgumentTemplate(List.of("${input}", "${expected}", "${userOutput}"));
+        checker.setProtocol(defaultString(problem.getSpjProtocol(), DEFAULT_RESULT_PROTOCOL));
+        checker.setArgumentTemplate(DEFAULT_SPJ_ARGUMENT_TEMPLATE);
         return checker;
     }
 
@@ -325,7 +350,8 @@ public class RabbitJudgeTaskMessagePublisher implements JudgeTaskMessagePublishe
         interactor.setMemoryLimit(defaultInteger(problem.getInteractorMemoryLimit(), DEFAULT_INTERACTOR_MEMORY_LIMIT));
         interactor.setStackLimit(defaultInteger(problem.getInteractorStackLimit(), DEFAULT_INTERACTOR_STACK_LIMIT));
         interactor.setOutputLimit(defaultInteger(problem.getInteractorOutputLimit(), DEFAULT_INTERACTOR_OUTPUT_LIMIT));
-        interactor.setProtocol(defaultString(problem.getInteractorProtocol(), DEFAULT_INTERACTOR_PROTOCOL));
+        interactor.setProtocol(defaultString(problem.getInteractorProtocol(), DEFAULT_RESULT_PROTOCOL));
+        interactor.setArgumentTemplate(DEFAULT_INTERACTOR_ARGUMENT_TEMPLATE);
         return interactor;
     }
 
@@ -334,9 +360,9 @@ public class RabbitJudgeTaskMessagePublisher implements JudgeTaskMessagePublishe
             return null;
         }
         JudgeTaskMessage.InteractionConfig interaction = new JudgeTaskMessage.InteractionConfig();
-        interaction.setProtocol(defaultString(problem.getInteractorProtocol(), DEFAULT_INTERACTOR_PROTOCOL));
+        interaction.setProtocol(DEFAULT_INTERACTION_PROTOCOL);
         interaction.setWiring(DEFAULT_INTERACTION_WIRING);
-        interaction.setScoreMode(defaultInteger(problem.getType(), DEFAULT_PROBLEM_TYPE) == 1 ? "oi" : "acm");
+        interaction.setScoreMode(DEFAULT_INTERACTION_SCORE_MODE);
         return interaction;
     }
 
@@ -379,6 +405,47 @@ public class RabbitJudgeTaskMessagePublisher implements JudgeTaskMessagePublishe
         return value == null || value <= 0 ? DEFAULT_PROCESSING_TIMEOUT_SECONDS : value;
     }
 
+    private void validateTaskPayload(JudgeTaskMessage message) {
+        validateBytes(message.getCode(), maxCodeBytes(), "提交代码不能超过 " + maxCodeBytes() + " 字节");
+        if (message.getChecker() != null) {
+            validateBytes(message.getChecker().getSource(), maxCheckerBytes(),
+                    "SPJ checker 源码不能超过 " + maxCheckerBytes() + " 字节");
+        }
+        if (message.getInteractor() != null) {
+            validateBytes(message.getInteractor().getSource(), maxInteractorBytes(),
+                    "交互题 interactor 源码不能超过 " + maxInteractorBytes() + " 字节");
+        }
+    }
+
+    private void validateBytes(String value, int maxBytes, String message) {
+        if (value == null) {
+            return;
+        }
+        if (value.getBytes(StandardCharsets.UTF_8).length > maxBytes) {
+            throw new BizException(ResultCode.BAD_REQUEST, message);
+        }
+    }
+
+    private int maxCodeBytes() {
+        Integer value = submissionProperties.getMaxCodeBytes();
+        return value == null || value <= 0 ? DEFAULT_MAX_CODE_BYTES : value;
+    }
+
+    private int maxCheckerBytes() {
+        Integer value = submissionProperties.getMaxCheckerBytes();
+        return value == null || value <= 0 ? DEFAULT_MAX_CHECKER_BYTES : value;
+    }
+
+    private int maxInteractorBytes() {
+        Integer value = submissionProperties.getMaxInteractorBytes();
+        return value == null || value <= 0 ? DEFAULT_MAX_INTERACTOR_BYTES : value;
+    }
+
+    private int maxMessagePayloadBytes() {
+        Integer value = submissionProperties.getMaxMessagePayloadBytes();
+        return value == null || value <= 0 ? DEFAULT_MAX_MESSAGE_PAYLOAD_BYTES : value;
+    }
+
     private String truncateError(String message) {
         if (message == null) {
             return null;
@@ -386,14 +453,25 @@ public class RabbitJudgeTaskMessagePublisher implements JudgeTaskMessagePublishe
         return message.length() <= MAX_ERROR_LENGTH ? message : message.substring(0, MAX_ERROR_LENGTH);
     }
 
-    private Long parseOutboxId(String value) {
+    private String buildCorrelationId(JudgeTaskOutbox outbox) {
+        return outbox.getId() + ":" + defaultInteger(outbox.getPublishAttempt(), 0);
+    }
+
+    private PublishCorrelation parseCorrelation(String value) {
         if (value == null || value.isBlank()) {
             return null;
         }
+        String[] segments = value.split(":");
+        if (segments.length != 2) {
+            return null;
+        }
         try {
-            return Long.parseLong(value);
+            return new PublishCorrelation(Long.parseLong(segments[0]), Integer.parseInt(segments[1]));
         } catch (NumberFormatException e) {
             return null;
         }
+    }
+
+    private record PublishCorrelation(Long outboxId, Integer publishAttempt) {
     }
 }

@@ -4,8 +4,6 @@ import lombok.Data;
 
 import java.io.Serial;
 import java.io.Serializable;
-import java.util.List;
-
 /**
  * @Author: HaoRan_Lyu
  * @Date: 2026/06/06
@@ -87,7 +85,7 @@ public class JudgeTaskMessage implements Serializable {
 
         private String protocol;
 
-        private List<String> argumentTemplate;
+        private String argumentTemplate;
     }
 
     @Data

@@ -17,6 +17,7 @@ import com.hnieacm.problem.entity.Problem;
 import com.hnieacm.problem.mapper.ProblemMapper;
 import com.hnieacm.problem.mapper.ProblemTagMapper;
 import com.hnieacm.problem.mapper.TagMapper;
+import com.hnieacm.problem.properties.ProblemJudgeAssetProperties;
 import com.hnieacm.problem.service.AdminProblemService;
 import com.hnieacm.problem.service.ProblemFileStorageService;
 import com.hnieacm.problem.vo.AdminProblemListVo;
@@ -24,6 +25,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -43,6 +45,7 @@ public class AdminProblemServiceImpl implements AdminProblemService {
     private final ProblemTagMapper problemTagMapper;
     private final ObjectMapper objectMapper;
     private final ProblemFileStorageService problemFileStorageService;
+    private final ProblemJudgeAssetProperties problemJudgeAssetProperties;
 
     /**
      * @MethodName listProblems
@@ -270,6 +273,7 @@ public class AdminProblemServiceImpl implements AdminProblemService {
 
         String judgeMode = StrUtil.trimToNull(pr.getJudgeMode());
         entity.setJudgeMode(judgeMode);
+        validateJudgeAssetSize(pr);
 
         entity.setTimeLimit(pr.getTimeLimit());
         entity.setMemoryLimit(pr.getMemoryLimit());
@@ -310,6 +314,33 @@ public class AdminProblemServiceImpl implements AdminProblemService {
             entity.setExamples(null);
         }
         return entity;
+    }
+
+    private void validateJudgeAssetSize(ProblemRequest request) {
+        int maxCheckerBytes = maxCheckerBytes();
+        int maxInteractorBytes = maxInteractorBytes();
+        validateBytes(request.getSpjCode(), maxCheckerBytes, "SPJ checker 源码不能超过 " + maxCheckerBytes + " 字节");
+        validateBytes(request.getInteractorCode(), maxInteractorBytes,
+                "交互题 interactor 源码不能超过 " + maxInteractorBytes + " 字节");
+    }
+
+    private void validateBytes(String value, int maxBytes, String message) {
+        if (value == null) {
+            return;
+        }
+        if (value.getBytes(StandardCharsets.UTF_8).length > maxBytes) {
+            throw new BizException(ResultCode.BAD_REQUEST, message);
+        }
+    }
+
+    private int maxCheckerBytes() {
+        Integer value = problemJudgeAssetProperties.getMaxCheckerBytes();
+        return value == null || value <= 0 ? 262144 : value;
+    }
+
+    private int maxInteractorBytes() {
+        Integer value = problemJudgeAssetProperties.getMaxInteractorBytes();
+        return value == null || value <= 0 ? 262144 : value;
     }
 
     /**

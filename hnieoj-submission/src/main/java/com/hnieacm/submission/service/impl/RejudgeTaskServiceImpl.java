@@ -57,6 +57,7 @@ public class RejudgeTaskServiceImpl implements RejudgeTaskService {
     private static final int MAX_PAGE_SIZE = 100;
     private static final int DEFAULT_BATCH_SIZE = 50;
     private static final long DEFAULT_LEASE_SECONDS = 300L;
+    private static final int DEFAULT_LEASE_RENEW_EVERY = 10;
     private static final int WORKER_ID_UUID_LENGTH = 8;
     private static final int MAX_WORKER_ID_LENGTH = 128;
     private static final String DEFAULT_JUDGE_MODE = "default";
@@ -211,6 +212,11 @@ public class RejudgeTaskServiceImpl implements RejudgeTaskService {
         int failed = 0;
         String lastError = null;
         for (Judge judge : judges) {
+            if (processed % leaseRenewEvery() == 0 && !renewTaskLease(task.getId())) {
+                log.warn("Rejudge task processing stopped because lease renew failed, taskId: {}, workerId: {}",
+                        task.getId(), workerId);
+                return;
+            }
             lastJudgeId = judge.getId();
             try {
                 rejudge(judge, problem);
@@ -225,6 +231,11 @@ public class RejudgeTaskServiceImpl implements RejudgeTaskService {
                 lastError = e.getMessage();
                 log.warn("Rejudge submission failed, taskId: {}, submissionId: {}", task.getId(), judge.getSubmitId(), e);
             }
+        }
+        if (!renewTaskLease(task.getId())) {
+            log.warn("Rejudge task advance skipped because lease renew failed, taskId: {}, workerId: {}",
+                    task.getId(), workerId);
+            return;
         }
         advanceTask(task.getId(), lastJudgeId, processed, failed, lastError);
     }
@@ -346,6 +357,8 @@ public class RejudgeTaskServiceImpl implements RejudgeTaskService {
         int updated = rejudgeTaskMapper.update(null, new LambdaUpdateWrapper<RejudgeTask>()
                 .eq(RejudgeTask::getId, taskId)
                 .eq(RejudgeTask::getLockedBy, workerId)
+                .eq(RejudgeTask::getStatus, RejudgeTaskStatusConstant.PROCESSING)
+                .gt(RejudgeTask::getLockUntil, LocalDateTime.now())
                 .set(RejudgeTask::getLastJudgeId, lastJudgeId)
                 .setSql("processed_count = processed_count + " + processed)
                 .setSql("failed_count = failed_count + " + failed)
@@ -361,6 +374,8 @@ public class RejudgeTaskServiceImpl implements RejudgeTaskService {
         int updated = rejudgeTaskMapper.update(null, new LambdaUpdateWrapper<RejudgeTask>()
                 .eq(RejudgeTask::getId, taskId)
                 .eq(RejudgeTask::getLockedBy, workerId)
+                .eq(RejudgeTask::getStatus, RejudgeTaskStatusConstant.PROCESSING)
+                .gt(RejudgeTask::getLockUntil, LocalDateTime.now())
                 .set(RejudgeTask::getStatus, RejudgeTaskStatusConstant.FINISHED)
                 .set(RejudgeTask::getLockedBy, null)
                 .set(RejudgeTask::getLockUntil, null));
@@ -373,6 +388,8 @@ public class RejudgeTaskServiceImpl implements RejudgeTaskService {
         int updated = rejudgeTaskMapper.update(null, new LambdaUpdateWrapper<RejudgeTask>()
                 .eq(RejudgeTask::getId, taskId)
                 .eq(RejudgeTask::getLockedBy, workerId)
+                .eq(RejudgeTask::getStatus, RejudgeTaskStatusConstant.PROCESSING)
+                .gt(RejudgeTask::getLockUntil, LocalDateTime.now())
                 .set(RejudgeTask::getStatus, RejudgeTaskStatusConstant.FAILED)
                 .set(RejudgeTask::getLastError, StrUtil.trimToNull(errorMessage))
                 .set(RejudgeTask::getLockedBy, null)
@@ -380,6 +397,16 @@ public class RejudgeTaskServiceImpl implements RejudgeTaskService {
         if (updated <= 0) {
             log.warn("Fail rejudge task skipped because lease changed, taskId: {}, workerId: {}", taskId, workerId);
         }
+    }
+
+    private boolean renewTaskLease(Long taskId) {
+        int updated = rejudgeTaskMapper.update(null, new LambdaUpdateWrapper<RejudgeTask>()
+                .eq(RejudgeTask::getId, taskId)
+                .eq(RejudgeTask::getStatus, RejudgeTaskStatusConstant.PROCESSING)
+                .eq(RejudgeTask::getLockedBy, workerId)
+                .gt(RejudgeTask::getLockUntil, LocalDateTime.now())
+                .set(RejudgeTask::getLockUntil, LocalDateTime.now().plusSeconds(leaseSeconds())));
+        return updated > 0;
     }
 
     private RejudgeTaskVo toVo(RejudgeTask task) {
@@ -446,6 +473,11 @@ public class RejudgeTaskServiceImpl implements RejudgeTaskService {
     private long leaseSeconds() {
         Long value = submissionProperties.getRejudgeTask().getLeaseSeconds();
         return value == null || value <= 0 ? DEFAULT_LEASE_SECONDS : value;
+    }
+
+    private int leaseRenewEvery() {
+        Integer value = submissionProperties.getRejudgeTask().getLeaseRenewEvery();
+        return value == null || value <= 0 ? DEFAULT_LEASE_RENEW_EVERY : value;
     }
 
     private String buildWorkerId() {

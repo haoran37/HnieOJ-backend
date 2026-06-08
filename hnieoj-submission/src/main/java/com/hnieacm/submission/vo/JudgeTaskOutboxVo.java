@@ -24,6 +24,8 @@ public class JudgeTaskOutboxVo {
 
     private Integer retryCount;
 
+    private Integer publishAttempt;
+
     private Integer maxRetryCount;
 
     private LocalDateTime nextRetryTime;

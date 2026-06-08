@@ -93,6 +93,7 @@ public class JudgeTaskOutboxServiceImpl implements JudgeTaskOutboxService {
         vo.setSubmissionId(outbox.getSubmissionId());
         vo.setStatus(outbox.getStatus());
         vo.setRetryCount(outbox.getRetryCount());
+        vo.setPublishAttempt(outbox.getPublishAttempt());
         vo.setMaxRetryCount(outbox.getMaxRetryCount());
         vo.setNextRetryTime(outbox.getNextRetryTime());
         vo.setSentTime(outbox.getSentTime());

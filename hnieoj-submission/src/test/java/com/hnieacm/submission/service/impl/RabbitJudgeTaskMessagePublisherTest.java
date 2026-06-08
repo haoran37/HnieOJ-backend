@@ -1,22 +1,34 @@
 package com.hnieacm.submission.service.impl;
 
+import com.baomidou.mybatisplus.core.MybatisConfiguration;
+import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hnieacm.common.dto.JudgeTaskMessage;
+import com.hnieacm.common.exception.BizException;
 import com.hnieacm.common.properties.JudgeMqProperties;
 import com.hnieacm.submission.dto.ProblemBasicDto;
 import com.hnieacm.submission.entity.Judge;
 import com.hnieacm.submission.entity.JudgeTaskOutbox;
 import com.hnieacm.submission.mapper.JudgeTaskOutboxMapper;
 import com.hnieacm.submission.properties.SubmissionProperties;
+import org.apache.ibatis.builder.MapperBuilderAssistant;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.amqp.rabbit.connection.CorrelationData;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 
 /**
  * @Author: HaoRan_Lyu
@@ -31,6 +43,11 @@ class RabbitJudgeTaskMessagePublisherTest {
 
     @Mock
     private JudgeTaskOutboxMapper outboxMapper;
+
+    @BeforeEach
+    void setUp() {
+        initTableInfo(JudgeTaskOutbox.class);
+    }
 
     @Test
     void shouldWriteSpjCheckerIntoOutboxPayload() throws Exception {
@@ -52,10 +69,80 @@ class RabbitJudgeTaskMessagePublisherTest {
         assertThat(message.getChecker().getMemoryLimit()).isEqualTo(512);
         assertThat(message.getChecker().getStackLimit()).isEqualTo(256);
         assertThat(message.getChecker().getOutputLimit()).isEqualTo(1048576);
-        assertThat(message.getChecker().getProtocol()).isEqualTo("testlib");
-        assertThat(message.getChecker().getArgumentTemplate())
-                .containsExactly("${input}", "${expected}", "${userOutput}");
+        assertThat(message.getChecker().getProtocol()).isEqualTo("hnieoj-result-json-v1");
+        assertThat(message.getChecker().getArgumentTemplate()).isEqualTo("{input} {expected} {actual} {result}");
         assertThat(outboxCaptor.getValue().getRoutingKey()).isEqualTo("judge.submission.spj");
+    }
+
+    @Test
+    void shouldRejectOutboxWhenCheckerSourceTooLarge() {
+        ObjectMapper objectMapper = new ObjectMapper();
+        SubmissionProperties submissionProperties = new SubmissionProperties();
+        submissionProperties.setMaxCheckerBytes(4);
+        RabbitJudgeTaskMessagePublisher publisher = new RabbitJudgeTaskMessagePublisher(
+                rabbitTemplate, new JudgeMqProperties(), outboxMapper, objectMapper, submissionProperties);
+
+        assertThatThrownBy(() -> publisher.publishAfterCommit(buildJudge(), buildSpjProblem()))
+                .isInstanceOf(BizException.class)
+                .hasMessageContaining("SPJ checker");
+        verifyNoInteractions(outboxMapper);
+    }
+
+    @Test
+    void shouldWriteInteractiveContractIntoOutboxPayload() throws Exception {
+        ObjectMapper objectMapper = new ObjectMapper();
+        JudgeMqProperties mqProperties = new JudgeMqProperties();
+        mqProperties.setInteractiveRoutingKey("judge.submission.interactive");
+        RabbitJudgeTaskMessagePublisher publisher = new RabbitJudgeTaskMessagePublisher(
+                rabbitTemplate, mqProperties, outboxMapper, objectMapper, new SubmissionProperties());
+
+        publisher.publishAfterCommit(buildJudge(), buildInteractiveProblem());
+
+        ArgumentCaptor<JudgeTaskOutbox> outboxCaptor = ArgumentCaptor.forClass(JudgeTaskOutbox.class);
+        verify(outboxMapper).insert(outboxCaptor.capture());
+        JudgeTaskMessage message = objectMapper.readValue(outboxCaptor.getValue().getPayload(), JudgeTaskMessage.class);
+        assertThat(message.getJudgeMode()).isEqualTo("interactive");
+        assertThat(message.getInteractor()).isNotNull();
+        assertThat(message.getInteractor().getProtocol()).isEqualTo("hnieoj-result-json-v1");
+        assertThat(message.getInteractor().getArgumentTemplate()).isEqualTo("{input} {expected} {result}");
+        assertThat(message.getInteraction()).isNotNull();
+        assertThat(message.getInteraction().getProtocol()).isEqualTo("stdio");
+        assertThat(message.getInteraction().getWiring()).isEqualTo("bidirectional-stdio");
+        assertThat(message.getInteraction().getScoreMode()).isEqualTo("interactor");
+        assertThat(outboxCaptor.getValue().getRoutingKey()).isEqualTo("judge.submission.interactive");
+    }
+
+    @Test
+    void shouldMarkCurrentAttemptSentWhenRabbitAckArrives() {
+        RabbitJudgeTaskMessagePublisher publisher = new RabbitJudgeTaskMessagePublisher(
+                rabbitTemplate, new JudgeMqProperties(), outboxMapper, new ObjectMapper(), new SubmissionProperties());
+        publisher.initRabbitCallbacks();
+        ArgumentCaptor<RabbitTemplate.ConfirmCallback> callbackCaptor =
+                ArgumentCaptor.forClass(RabbitTemplate.ConfirmCallback.class);
+        verify(rabbitTemplate).setConfirmCallback(callbackCaptor.capture());
+
+        callbackCaptor.getValue().confirm(new CorrelationData("10:2"), true, null);
+
+        verify(outboxMapper).update(isNull(), any());
+    }
+
+    @Test
+    void shouldIgnoreStaleAttemptNack() {
+        JudgeTaskOutbox outbox = new JudgeTaskOutbox();
+        outbox.setId(10L);
+        outbox.setPublishAttempt(2);
+        outbox.setRetryCount(0);
+        RabbitJudgeTaskMessagePublisher publisher = new RabbitJudgeTaskMessagePublisher(
+                rabbitTemplate, new JudgeMqProperties(), outboxMapper, new ObjectMapper(), new SubmissionProperties());
+        publisher.initRabbitCallbacks();
+        ArgumentCaptor<RabbitTemplate.ConfirmCallback> callbackCaptor =
+                ArgumentCaptor.forClass(RabbitTemplate.ConfirmCallback.class);
+        verify(rabbitTemplate).setConfirmCallback(callbackCaptor.capture());
+        when(outboxMapper.selectById(10L)).thenReturn(outbox);
+
+        callbackCaptor.getValue().confirm(new CorrelationData("10:1"), false, "late nack");
+
+        verify(outboxMapper, never()).update(isNull(), any());
     }
 
     private Judge buildJudge() {
@@ -80,7 +167,28 @@ class RabbitJudgeTaskMessagePublisherTest {
         problem.setSpjMemoryLimit(512);
         problem.setSpjStackLimit(256);
         problem.setSpjOutputLimit(1048576);
-        problem.setSpjProtocol("testlib");
+        problem.setSpjProtocol("hnieoj-result-json-v1");
         return problem;
+    }
+
+    private ProblemBasicDto buildInteractiveProblem() {
+        ProblemBasicDto problem = new ProblemBasicDto();
+        problem.setJudgeMode("interactive");
+        problem.setInteractorLanguage("cpp17");
+        problem.setInteractorCode("// interactor");
+        problem.setInteractorTimeLimit(5000);
+        problem.setInteractorMemoryLimit(256);
+        problem.setInteractorStackLimit(128);
+        problem.setInteractorOutputLimit(16777216);
+        problem.setInteractorProtocol("hnieoj-result-json-v1");
+        return problem;
+    }
+
+    private void initTableInfo(Class<?> entityClass) {
+        if (TableInfoHelper.getTableInfo(entityClass) != null) {
+            return;
+        }
+        MapperBuilderAssistant assistant = new MapperBuilderAssistant(new MybatisConfiguration(), "");
+        TableInfoHelper.initTableInfo(assistant, entityClass);
     }
 }

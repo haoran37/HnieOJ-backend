@@ -23,6 +23,12 @@ public class SubmissionProperties {
      */
     private Integer maxCodeBytes = 65536;
 
+    private Integer maxCheckerBytes = 262144;
+
+    private Integer maxInteractorBytes = 262144;
+
+    private Integer maxMessagePayloadBytes = 1048576;
+
     private List<String> supportedJudgeModes = List.of("default");
 
     private JudgeOutbox judgeOutbox = new JudgeOutbox();
@@ -87,6 +93,8 @@ public class SubmissionProperties {
          * Compiling/Running 状态超时时间，单位秒。
          */
         private Long activeTimeoutSeconds = 1800L;
+
+        private Long sentPendingWarnSeconds = 3600L;
     }
 
     @Data
@@ -106,5 +114,7 @@ public class SubmissionProperties {
          * 调度租约时长，单位秒；超过该时间未释放时允许其他实例接管。
          */
         private Long leaseSeconds = 300L;
+
+        private Integer leaseRenewEvery = 10;
     }
 }

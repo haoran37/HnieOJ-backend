@@ -5,6 +5,8 @@ import cn.hutool.core.lang.Validator;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.crypto.digest.BCrypt;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hnieacm.auth.dto.LoginRequest;
 import com.hnieacm.auth.dto.LoginVo;
 import com.hnieacm.auth.dto.RegisterRequest;
@@ -50,6 +52,9 @@ public class AuthServiceImpl implements AuthService {
     private final AuthPermissionService authPermissionService;
     private final UserAuthCacheService userAuthCacheService;
     private final AuthValidationProperties authValidationProperties;
+    private final ObjectMapper objectMapper;
+    private static final TypeReference<List<String>> STRING_LIST_TYPE = new TypeReference<>() {
+    };
 
     /**
      * @MethodName login
@@ -60,7 +65,7 @@ public class AuthServiceImpl implements AuthService {
      * @Date 2026/02/13
      */
     @Override
-    public LoginVo login(LoginRequest request) {
+    public LoginVo login(LoginRequest request, String clientIp) {
         if (request == null) {
             throw new BizException(ResultCode.BAD_REQUEST, "请求参数不能为空");
         }
@@ -79,6 +84,8 @@ public class AuthServiceImpl implements AuthService {
         if (user.getStatus() == null || user.getStatus() != UserStatusConstant.NORMAL) {
             throw new BizException(ResultCode.USER_DISABLED, "用户已被禁用");
         }
+
+        checkIpRestriction(user, clientIp);
 
         // 执行登录
         StpUtil.login(user.getUid());
@@ -99,6 +106,37 @@ public class AuthServiceImpl implements AuthService {
                 Boolean.TRUE.equals(user.getPasswordResetRequired())
         );
         return new LoginVo(token, userInfo);
+    }
+
+    private void checkIpRestriction(UserInfo user, String clientIp) {
+        if (!Boolean.TRUE.equals(user.getIpRestricted())) {
+            return;
+        }
+        String normalizedClientIp = StrUtil.trimToNull(clientIp);
+        if (normalizedClientIp == null) {
+            throw new BizException(ResultCode.FORBIDDEN, "当前 IP 不允许登录");
+        }
+        List<String> whitelist = parseIpWhitelist(user.getIpWhitelist());
+        if (!whitelist.contains(normalizedClientIp)) {
+            throw new BizException(ResultCode.FORBIDDEN, "当前 IP 不允许登录");
+        }
+    }
+
+    private List<String> parseIpWhitelist(String json) {
+        String normalizedJson = StrUtil.trimToNull(json);
+        if (normalizedJson == null) {
+            return List.of();
+        }
+        try {
+            List<String> values = objectMapper.readValue(normalizedJson, STRING_LIST_TYPE);
+            return values == null ? List.of() : values.stream()
+                    .map(StrUtil::trimToNull)
+                    .filter(item -> item != null)
+                    .toList();
+        } catch (Exception e) {
+            log.warn("Parse user IP whitelist failed");
+            return List.of();
+        }
     }
 
     /**

@@ -19,7 +19,7 @@ public interface AuthService {
      * @Author HaoRan_Lyu
      * @Date 2026/02/13
      */
-    LoginVo login(LoginRequest request);
+    LoginVo login(LoginRequest request, String clientIp);
 
     /**
      * @MethodName register

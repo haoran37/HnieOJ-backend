@@ -1,6 +1,7 @@
 package com.hnieacm.achievement.service;
 
 import com.hnieacm.achievement.vo.AchievementApplyAdminVo;
+import com.hnieacm.achievement.vo.BatchAchievementApplyResultVo;
 import com.hnieacm.common.dto.PageVo;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -25,6 +26,8 @@ public interface AchievementApplyService {
      * 通过成就认证申请
      */
     void approve(Long id);
+
+    BatchAchievementApplyResultVo batchApprove(Iterable<Long> ids);
 
     /**
      * 驳回成就认证申请

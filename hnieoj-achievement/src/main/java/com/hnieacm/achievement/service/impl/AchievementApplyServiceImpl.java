@@ -14,6 +14,7 @@ import com.hnieacm.achievement.mapper.UserInfoMapper;
 import com.hnieacm.achievement.service.AchievementApplyService;
 import com.hnieacm.achievement.service.AchievementFileService;
 import com.hnieacm.achievement.vo.AchievementApplyAdminVo;
+import com.hnieacm.achievement.vo.BatchAchievementApplyResultVo;
 import com.hnieacm.common.dto.PageVo;
 import com.hnieacm.common.exception.BizException;
 import com.hnieacm.common.result.ResultCode;
@@ -25,6 +26,8 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
 import java.util.Collections;
+import java.util.HashSet;
+import java.util.Set;
 
 /**
  * @Author: HaoRan_Lyu
@@ -153,6 +156,27 @@ public class AchievementApplyServiceImpl implements AchievementApplyService {
         achievementApplyMapper.updateById(apply);
 
         log.info("Achievement apply approved, id: {}, uid: {}", id, apply.getUid());
+    }
+
+    @Override
+    public BatchAchievementApplyResultVo batchApprove(Iterable<Long> ids) {
+        if (ids == null) {
+            throw new BizException(ResultCode.BAD_REQUEST, "ids 不能为空");
+        }
+        BatchAchievementApplyResultVo result = new BatchAchievementApplyResultVo();
+        Set<Long> seen = new HashSet<>();
+        for (Long id : ids) {
+            if (id == null || id <= 0 || !seen.add(id)) {
+                continue;
+            }
+            try {
+                approve(id);
+                result.addSuccess();
+            } catch (Exception e) {
+                result.addFailure(id, e.getMessage());
+            }
+        }
+        return result;
     }
 
     /**

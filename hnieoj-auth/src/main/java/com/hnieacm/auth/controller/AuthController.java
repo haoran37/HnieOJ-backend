@@ -7,6 +7,7 @@ import com.hnieacm.auth.service.AuthService;
 import com.hnieacm.common.result.Result;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -39,10 +40,22 @@ public class AuthController {
      */
     @Operation(summary = "用户登录")
     @PostMapping("/login")
-    public Result<LoginVo> login(@Valid @RequestBody LoginRequest request) {
+    public Result<LoginVo> login(@Valid @RequestBody LoginRequest request, HttpServletRequest servletRequest) {
         log.info("User login, uid: {}", request.getUid());
-        LoginVo loginVo = authService.login(request);
+        LoginVo loginVo = authService.login(request, resolveClientIp(servletRequest));
         return Result.success("登录成功", loginVo);
+    }
+
+    private String resolveClientIp(HttpServletRequest request) {
+        String forwardedFor = request.getHeader("X-Forwarded-For");
+        if (forwardedFor != null && !forwardedFor.isBlank()) {
+            return forwardedFor.split(",")[0].trim();
+        }
+        String realIp = request.getHeader("X-Real-IP");
+        if (realIp != null && !realIp.isBlank()) {
+            return realIp.trim();
+        }
+        return request.getRemoteAddr();
     }
 
     /**

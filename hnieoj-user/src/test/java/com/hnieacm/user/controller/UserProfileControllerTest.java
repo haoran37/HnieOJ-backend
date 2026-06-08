@@ -3,6 +3,7 @@ package com.hnieacm.user.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hnieacm.user.dto.ChangeCurrentPasswordRequest;
 import com.hnieacm.user.service.UserManageService;
+import com.hnieacm.user.service.UserProfileChangeService;
 import com.hnieacm.user.service.UserProfileService;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -30,8 +31,9 @@ class UserProfileControllerTest {
     void shouldBindOldPasswordWhenChangingCurrentPassword() throws Exception {
         UserProfileService userProfileService = mock(UserProfileService.class);
         UserManageService userManageService = mock(UserManageService.class);
+        UserProfileChangeService userProfileChangeService = mock(UserProfileChangeService.class);
         MockMvc mockMvc = MockMvcBuilders
-                .standaloneSetup(new UserProfileController(userProfileService, userManageService))
+                .standaloneSetup(new UserProfileController(userProfileService, userManageService, userProfileChangeService))
                 .build();
 
         mockMvc.perform(put("/api/user/profile/password")

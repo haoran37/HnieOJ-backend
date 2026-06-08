@@ -2,9 +2,11 @@ package com.hnieacm.achievement.controller;
 
 import cn.dev33.satoken.annotation.SaCheckRole;
 import cn.dev33.satoken.annotation.SaMode;
+import com.hnieacm.achievement.dto.BatchAchievementApplyRequest;
 import com.hnieacm.achievement.dto.RejectAchievementApplyRequest;
 import com.hnieacm.achievement.service.AchievementApplyService;
 import com.hnieacm.achievement.vo.AchievementApplyAdminVo;
+import com.hnieacm.achievement.vo.BatchAchievementApplyResultVo;
 import com.hnieacm.common.constant.RoleConstant;
 import com.hnieacm.common.dto.PageVo;
 import com.hnieacm.common.result.Result;
@@ -52,6 +54,12 @@ public class AdminAchievementApplyController {
     public Result<Void> approve(@PathVariable Long id) {
         achievementApplyService.approve(id);
         return Result.success("操作成功", null);
+    }
+
+    @Operation(summary = "批量通过成就认证申请")
+    @PostMapping("/batch/approve")
+    public Result<BatchAchievementApplyResultVo> batchApprove(@Valid @RequestBody BatchAchievementApplyRequest request) {
+        return Result.success("操作成功", achievementApplyService.batchApprove(request.getIds()));
     }
 
     @Operation(summary = "驳回成就认证申请")

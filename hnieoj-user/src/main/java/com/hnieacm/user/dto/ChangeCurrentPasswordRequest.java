@@ -6,7 +6,7 @@ import lombok.Data;
 /**
  * @Author: HaoRan_Lyu
  * @Date: 2026/06/08
- * @Description: Current user password change request
+ * @Description: 当前用户修改密码请求
  */
 @Data
 public class ChangeCurrentPasswordRequest {

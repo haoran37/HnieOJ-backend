@@ -1,0 +1,19 @@
+{
+  "properties": [
+    {
+      "name": "hnieoj.problem.storage.max-image-size",
+      "type": "org.springframework.util.unit.DataSize",
+      "description": "Maximum uploaded statement image size."
+    },
+    {
+      "name": "hnieoj.problem.storage.allowed-image-extensions",
+      "type": "java.util.List<java.lang.String>",
+      "description": "Allowed statement image file extensions."
+    },
+    {
+      "name": "hnieoj.problem.storage.allowed-image-content-types",
+      "type": "java.util.List<java.lang.String>",
+      "description": "Allowed statement image content types."
+    }
+  ]
+}

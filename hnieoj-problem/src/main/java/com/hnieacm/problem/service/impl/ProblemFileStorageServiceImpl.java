@@ -110,9 +110,7 @@ public class ProblemFileStorageServiceImpl implements ProblemFileStorageService 
      */
     @Override
     public String saveImage(Long problemId, MultipartFile file) {
-        if (file == null || file.isEmpty()) {
-            throw new BizException(ResultCode.BAD_REQUEST, "图片文件不能为空");
-        }
+        checkImageUploadFile(file);
         String originalFilename = normalizeFilename(file.getOriginalFilename());
         Path imageDir = resolveProblemPath(problemId, IMAGES_DIR);
         Path targetPath = generateImageStoragePath(imageDir, originalFilename);
@@ -126,6 +124,27 @@ public class ProblemFileStorageServiceImpl implements ProblemFileStorageService 
         }
         String prefix = StrUtil.removeSuffix(storageProperties.getImageUrlPrefix(), "/");
         return prefix + "/" + problemId + "/" + filename;
+    }
+
+    private void checkImageUploadFile(MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new BizException(ResultCode.BAD_REQUEST, "图片文件不能为空");
+        }
+        if (file.getSize() > storageProperties.getMaxImageSize().toBytes()) {
+            throw new BizException(ResultCode.BAD_REQUEST, "图片文件超过大小限制");
+        }
+
+        String originalFilename = normalizeFilename(file.getOriginalFilename());
+        String extension = StringUtils.getFilenameExtension(originalFilename);
+        if (StrUtil.isBlank(extension) || !storageProperties.getAllowedImageExtensions().contains(extension.toLowerCase())) {
+            throw new BizException(ResultCode.BAD_REQUEST, "图片文件扩展名不支持");
+        }
+
+        String contentType = file.getContentType();
+        if (StrUtil.isBlank(contentType)
+                || !storageProperties.getAllowedImageContentTypes().contains(contentType.toLowerCase())) {
+            throw new BizException(ResultCode.BAD_REQUEST, "图片文件类型不支持");
+        }
     }
 
     /**

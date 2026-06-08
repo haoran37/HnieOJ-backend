@@ -15,6 +15,10 @@ spring:
 
 hnieoj:
   problem:
+    storage:
+      max-image-size: ${HNIEOJ_PROBLEM_MAX_IMAGE_SIZE:5MB}
+      allowed-image-extensions: ${HNIEOJ_PROBLEM_ALLOWED_IMAGE_EXTENSIONS:jpg,jpeg,png,gif,webp}
+      allowed-image-content-types: ${HNIEOJ_PROBLEM_ALLOWED_IMAGE_CONTENT_TYPES:image/jpeg,image/png,image/gif,image/webp}
     judge-asset:
       max-checker-bytes: ${HNIEOJ_PROBLEM_MAX_CHECKER_BYTES:262144}
       max-interactor-bytes: ${HNIEOJ_PROBLEM_MAX_INTERACTOR_BYTES:262144}

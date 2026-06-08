@@ -22,6 +22,12 @@ hnieoj:
     storage:
       root-path: ${HNIEOJ_PROBLEM_STORAGE_ROOT:/data/oj/problems}
       image-url-prefix: ${HNIEOJ_PROBLEM_IMAGE_URL_PREFIX:/oj/images}
+      # 题面图片最大上传大小。
+      max-image-size: ${HNIEOJ_PROBLEM_MAX_IMAGE_SIZE:5MB}
+      # 题面图片允许的文件扩展名。
+      allowed-image-extensions: ${HNIEOJ_PROBLEM_ALLOWED_IMAGE_EXTENSIONS:jpg,jpeg,png,gif,webp}
+      # 题面图片允许的 Content-Type。
+      allowed-image-content-types: ${HNIEOJ_PROBLEM_ALLOWED_IMAGE_CONTENT_TYPES:image/jpeg,image/png,image/gif,image/webp}
       max-testdata-zip-size: 50MB
       max-testdata-uncompressed-size: 200MB
       max-testdata-file-count: 2000

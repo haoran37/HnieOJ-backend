@@ -24,4 +24,8 @@ public class JudgeSecurityProperties {
     private int authCodeMaxExchange = 1;
 
     private long nodeActiveTimeoutSeconds = 90;
+
+    private long nodeExpireWarnSeconds = 1800;
+
+    private double nodeDiskFreeWarnRatio = 0.1D;
 }

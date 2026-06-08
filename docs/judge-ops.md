@@ -83,6 +83,7 @@ Before requeue:
 
 ```http
 GET /api/admin/judge/nodes
+GET /api/admin/judge/nodes/summary
 ```
 
 Check:
@@ -97,6 +98,17 @@ Check:
 - `diskFreeBytes`
 
 If SPJ or interactive tasks are enabled, only publish them to nodes whose `supportedJudgeModes` include the required mode.
+
+The node summary endpoint reports:
+
+- online and offline active node counts
+- formal and temporary node counts
+- total running tasks and online capacity
+- online node counts by judge mode
+- overloaded node count
+- low disk node count
+- expiring temporary token count
+- warning codes for dashboard display
 
 ## Deployment Notes
 

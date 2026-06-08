@@ -6,9 +6,11 @@ import com.hnieacm.common.constant.RoleConstant;
 import com.hnieacm.common.result.Result;
 import com.hnieacm.judge.dto.CreateJudgeAuthCodeRequest;
 import com.hnieacm.judge.service.FormalJudgeTokenService;
+import com.hnieacm.judge.service.JudgeNodeOpsService;
 import com.hnieacm.judge.service.JudgeNodeSecurityService;
 import com.hnieacm.judge.vo.JudgeAuthCodeVo;
 import com.hnieacm.judge.vo.JudgeFormalTokenVo;
+import com.hnieacm.judge.vo.JudgeNodeOpsSummaryVo;
 import com.hnieacm.judge.vo.JudgeNodeTokenVo;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -40,6 +42,7 @@ public class AdminJudgeNodeController {
 
     private final JudgeNodeSecurityService judgeNodeSecurityService;
     private final FormalJudgeTokenService formalJudgeTokenService;
+    private final JudgeNodeOpsService judgeNodeOpsService;
 
     @Operation(summary = "创建临时判题节点授权码")
     @PostMapping("/auth-codes")
@@ -51,6 +54,12 @@ public class AdminJudgeNodeController {
     @GetMapping
     public Result<List<JudgeNodeTokenVo>> listNodes(@RequestParam(required = false) String status) {
         return Result.success(judgeNodeSecurityService.listTokens(status));
+    }
+
+    @Operation(summary = "鏌ヨ鍒ら鑺傜偣杩愮淮鎽樿")
+    @GetMapping("/summary")
+    public Result<JudgeNodeOpsSummaryVo> summary() {
+        return Result.success(judgeNodeOpsService.summary());
     }
 
     @Operation(summary = "查询判题节点短期 Token")

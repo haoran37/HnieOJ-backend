@@ -1,6 +1,8 @@
 package com.hnieacm.discussion.controller;
 
-import cn.dev33.satoken.annotation.SaCheckLogin;
+import cn.dev33.satoken.annotation.SaCheckRole;
+import cn.dev33.satoken.annotation.SaMode;
+import com.hnieacm.common.constant.RoleConstant;
 import com.hnieacm.common.dto.PageVo;
 import com.hnieacm.common.result.Result;
 import com.hnieacm.discussion.dto.AdminUpdateDiscussionRequest;
@@ -28,7 +30,7 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @Tag(name = "讨论管理模块（管理员）")
 @Validated
-@SaCheckLogin
+@SaCheckRole(value = {RoleConstant.ADMIN, RoleConstant.ROOT}, mode = SaMode.OR)
 @RestController
 @RequestMapping("/api/admin/discussions")
 @RequiredArgsConstructor

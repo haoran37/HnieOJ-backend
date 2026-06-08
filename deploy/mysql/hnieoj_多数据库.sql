@@ -97,7 +97,9 @@ CREATE TABLE `user_register_apply` (
   `reply_info` varchar(255) DEFAULT NULL COMMENT '驳回原因',
   `gmt_create` datetime DEFAULT CURRENT_TIMESTAMP,
   `gmt_modified` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (`id`)
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_register_apply_uid` (`uid`),
+  UNIQUE KEY `uk_register_apply_email` (`email`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户注册审核表';
 
 -- 角色表

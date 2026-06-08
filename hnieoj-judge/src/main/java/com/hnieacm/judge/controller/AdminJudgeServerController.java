@@ -1,5 +1,8 @@
 package com.hnieacm.judge.controller;
 
+import cn.dev33.satoken.annotation.SaCheckRole;
+import cn.dev33.satoken.annotation.SaMode;
+import com.hnieacm.common.constant.RoleConstant;
 import com.hnieacm.common.exception.BizException;
 import com.hnieacm.common.result.Result;
 import com.hnieacm.common.result.ResultCode;
@@ -26,6 +29,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/admin/judge")
 @RequiredArgsConstructor
+@SaCheckRole(value = {RoleConstant.ADMIN, RoleConstant.ROOT}, mode = SaMode.OR)
 public class AdminJudgeServerController {
 
     private static final int STATUS_NORMAL = 0;

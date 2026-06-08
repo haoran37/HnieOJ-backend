@@ -1,5 +1,8 @@
 package com.hnieacm.judge.controller;
 
+import cn.dev33.satoken.annotation.SaCheckRole;
+import cn.dev33.satoken.annotation.SaMode;
+import com.hnieacm.common.constant.RoleConstant;
 import com.hnieacm.common.result.Result;
 import com.hnieacm.judge.dto.SystemConfigSaveRequest;
 import com.hnieacm.judge.service.SystemConfigService;
@@ -25,6 +28,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/admin/config")
 @RequiredArgsConstructor
+@SaCheckRole(value = {RoleConstant.ADMIN, RoleConstant.ROOT}, mode = SaMode.OR)
 public class AdminSystemConfigController {
 
     private final SystemConfigService systemConfigService;

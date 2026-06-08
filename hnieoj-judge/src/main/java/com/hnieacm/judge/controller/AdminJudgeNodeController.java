@@ -1,5 +1,8 @@
 package com.hnieacm.judge.controller;
 
+import cn.dev33.satoken.annotation.SaCheckRole;
+import cn.dev33.satoken.annotation.SaMode;
+import com.hnieacm.common.constant.RoleConstant;
 import com.hnieacm.common.result.Result;
 import com.hnieacm.judge.dto.CreateJudgeAuthCodeRequest;
 import com.hnieacm.judge.service.FormalJudgeTokenService;
@@ -32,6 +35,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/admin/judge/nodes")
 @RequiredArgsConstructor
+@SaCheckRole(value = {RoleConstant.ADMIN, RoleConstant.ROOT}, mode = SaMode.OR)
 public class AdminJudgeNodeController {
 
     private final JudgeNodeSecurityService judgeNodeSecurityService;

@@ -47,6 +47,13 @@ public class SubmissionJudgeTimeoutScanner {
     private final SubmissionProperties submissionProperties;
     private final SimpMessagingTemplate messagingTemplate;
 
+    /**
+     * @MethodName scanTimeoutSubmissions
+     * @Description 扫描长时间停留在判题中状态的提交
+     * @Return
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     @Scheduled(fixedDelayString = "${hnieoj.submission.judge-timeout.scan-interval-ms:60000}")
     public void scanTimeoutSubmissions() {
         if (!Boolean.TRUE.equals(submissionProperties.getJudgeTimeout().getEnabled())) {
@@ -57,6 +64,16 @@ public class SubmissionJudgeTimeoutScanner {
         scanStatus(SubmissionStatusConstant.RUNNING, activeTimeoutSeconds(), "Judge task running timeout");
     }
 
+    /**
+     * @MethodName scanStatus
+     * @Param status
+     * @Param timeoutSeconds
+     * @Param message
+     * @Description 扫描指定状态下已经超时的提交
+     * @Return
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private void scanStatus(Integer status, long timeoutSeconds, String message) {
         LocalDateTime cutoffTime = LocalDateTime.now().minusSeconds(timeoutSeconds);
         List<Judge> candidates = judgeMapper.selectList(new LambdaQueryWrapper<Judge>()
@@ -69,6 +86,16 @@ public class SubmissionJudgeTimeoutScanner {
         }
     }
 
+    /**
+     * @MethodName handleTimeoutJudge
+     * @Param judge
+     * @Param expectedStatus
+     * @Param message
+     * @Description 处理单条超时提交
+     * @Return
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private void handleTimeoutJudge(Judge judge, Integer expectedStatus, String message) {
         if (expectedStatus != null && expectedStatus == SubmissionStatusConstant.PENDING
                 && hasSentOutbox(judge.getJudgeTaskId())) {
@@ -96,6 +123,14 @@ public class SubmissionJudgeTimeoutScanner {
         pushTimeoutEvent(judge, message);
     }
 
+    /**
+     * @MethodName freezeRejudgeTaskDetailByTimeout
+     * @Param judge
+     * @Description 将超时产生的系统错误固化到重判明细
+     * @Return
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private void freezeRejudgeTaskDetailByTimeout(Judge judge) {
         String judgeTaskId = StrUtil.trimToNull(judge.getJudgeTaskId());
         if (judgeTaskId == null) {
@@ -111,6 +146,14 @@ public class SubmissionJudgeTimeoutScanner {
                 .set(RejudgeTaskDetail::getFinishedTime, LocalDateTime.now()));
     }
 
+    /**
+     * @MethodName hasActiveOutbox
+     * @Param judgeTaskId
+     * @Description 判断判题任务是否仍有可重试的 outbox
+     * @Return @return boolean
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private boolean hasActiveOutbox(String judgeTaskId) {
         String normalizedJudgeTaskId = StrUtil.trimToNull(judgeTaskId);
         if (normalizedJudgeTaskId == null) {
@@ -126,6 +169,14 @@ public class SubmissionJudgeTimeoutScanner {
         return count != null && count > 0;
     }
 
+    /**
+     * @MethodName hasSentOutbox
+     * @Param judgeTaskId
+     * @Description 判断判题任务是否已成功投递到 RabbitMQ
+     * @Return @return boolean
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private boolean hasSentOutbox(String judgeTaskId) {
         String normalizedJudgeTaskId = StrUtil.trimToNull(judgeTaskId);
         if (normalizedJudgeTaskId == null) {
@@ -137,6 +188,14 @@ public class SubmissionJudgeTimeoutScanner {
         return count != null && count > 0;
     }
 
+    /**
+     * @MethodName warnSentPendingIfNeeded
+     * @Param judge
+     * @Description 对已投递但长时间未被消费的任务输出告警日志
+     * @Return
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private void warnSentPendingIfNeeded(Judge judge) {
         LocalDateTime cutoffTime = LocalDateTime.now().minusSeconds(sentPendingWarnSeconds());
         Long count = outboxMapper.selectCount(new LambdaQueryWrapper<JudgeTaskOutbox>()
@@ -152,6 +211,15 @@ public class SubmissionJudgeTimeoutScanner {
                 judge.getSubmitId(), judge.getJudgeTaskId(), sentPendingWarnSeconds());
     }
 
+    /**
+     * @MethodName pushTimeoutEvent
+     * @Param judge
+     * @Param message
+     * @Description 推送超时失败事件到提交进度 WebSocket
+     * @Return
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private void pushTimeoutEvent(Judge judge, String message) {
         JudgeResultEventRequest event = new JudgeResultEventRequest();
         event.setEventType(EVENT_JUDGE_FAILED);
@@ -168,26 +236,62 @@ public class SubmissionJudgeTimeoutScanner {
         messagingTemplate.convertAndSend(PROGRESS_TOPIC_PREFIX + judge.getSubmitId() + PROGRESS_TOPIC_SUFFIX, event);
     }
 
+    /**
+     * @MethodName batchSize
+     * @Description 获取超时扫描批次大小
+     * @Return @return int
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private int batchSize() {
         Integer value = submissionProperties.getJudgeTimeout().getBatchSize();
         return value == null || value <= 0 ? DEFAULT_BATCH_SIZE : value;
     }
 
+    /**
+     * @MethodName pendingTimeoutSeconds
+     * @Description 获取待投递状态超时时间
+     * @Return @return long
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private long pendingTimeoutSeconds() {
         Long value = submissionProperties.getJudgeTimeout().getPendingTimeoutSeconds();
         return value == null || value <= 0 ? DEFAULT_PENDING_TIMEOUT_SECONDS : value;
     }
 
+    /**
+     * @MethodName activeTimeoutSeconds
+     * @Description 获取编译或运行状态超时时间
+     * @Return @return long
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private long activeTimeoutSeconds() {
         Long value = submissionProperties.getJudgeTimeout().getActiveTimeoutSeconds();
         return value == null || value <= 0 ? DEFAULT_ACTIVE_TIMEOUT_SECONDS : value;
     }
 
+    /**
+     * @MethodName sentPendingWarnSeconds
+     * @Description 获取已投递未消费告警阈值
+     * @Return @return long
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private long sentPendingWarnSeconds() {
         Long value = submissionProperties.getJudgeTimeout().getSentPendingWarnSeconds();
         return value == null || value <= 0 ? DEFAULT_SENT_PENDING_WARN_SECONDS : value;
     }
 
+    /**
+     * @MethodName defaultZero
+     * @Param value
+     * @Description 空值转为 0
+     * @Return @return {@link Integer }
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private Integer defaultZero(Integer value) {
         return value == null ? 0 : value;
     }

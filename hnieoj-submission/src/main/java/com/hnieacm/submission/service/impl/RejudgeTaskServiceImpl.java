@@ -84,6 +84,14 @@ public class RejudgeTaskServiceImpl implements RejudgeTaskService {
     private final TransactionTemplate transactionTemplate;
     private final String workerId = buildWorkerId();
 
+    /**
+     * @MethodName create
+     * @Param request
+     * @Description 创建批量重判任务并固化重判明细
+     * @Return @return {@link RejudgeTaskVo }
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public RejudgeTaskVo create(CreateRejudgeTaskRequest request) {
@@ -122,6 +130,14 @@ public class RejudgeTaskServiceImpl implements RejudgeTaskService {
         return toVo(task);
     }
 
+    /**
+     * @MethodName list
+     * @Param request
+     * @Description 分页查询批量重判任务
+     * @Return @return {@link PageVo }<{@link RejudgeTaskVo }>
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     @Override
     public PageVo<RejudgeTaskVo> list(RejudgeTaskQueryRequest request) {
         int page = normalizePage(request == null ? null : request.getPage());
@@ -146,6 +162,14 @@ public class RejudgeTaskServiceImpl implements RejudgeTaskService {
         return new PageVo<>(pageResult.getRecords().stream().map(this::toVo).toList(), pageResult.getTotal());
     }
 
+    /**
+     * @MethodName details
+     * @Param taskId
+     * @Description 查询批量重判任务明细和前后状态对比
+     * @Return @return {@link List }<{@link RejudgeTaskDetailVo }>
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     @Override
     public List<RejudgeTaskDetailVo> details(Long taskId) {
         if (taskId == null || taskId <= 0) {
@@ -169,6 +193,13 @@ public class RejudgeTaskServiceImpl implements RejudgeTaskService {
         return details.stream().map(detail -> toDetailVo(detail, findJudge(judges, detail.getJudgeId()))).toList();
     }
 
+    /**
+     * @MethodName processPendingTasks
+     * @Description 定时领取并推进批量重判任务
+     * @Return
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     @Scheduled(fixedDelayString = "${hnieoj.submission.rejudge-task.scan-interval-ms:10000}")
     public void processPendingTasks() {
         LocalDateTime now = LocalDateTime.now();
@@ -191,6 +222,15 @@ public class RejudgeTaskServiceImpl implements RejudgeTaskService {
         processTask(claimedTask);
     }
 
+    /**
+     * @MethodName claimTask
+     * @Param task
+     * @Param now
+     * @Description 通过租约抢占一个可处理的重判任务
+     * @Return @return {@link RejudgeTask }
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private RejudgeTask claimTask(RejudgeTask task, LocalDateTime now) {
         LocalDateTime lockUntil = now.plusSeconds(leaseSeconds());
         LambdaUpdateWrapper<RejudgeTask> wrapper = new LambdaUpdateWrapper<RejudgeTask>()
@@ -219,6 +259,14 @@ public class RejudgeTaskServiceImpl implements RejudgeTaskService {
         return claimedTask;
     }
 
+    /**
+     * @MethodName processTask
+     * @Param task
+     * @Description 按重判明细批量重置提交并投递判题任务
+     * @Return
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private void processTask(RejudgeTask task) {
         ProblemBasicDto problem;
         try {
@@ -290,6 +338,18 @@ public class RejudgeTaskServiceImpl implements RejudgeTaskService {
         advanceTask(task.getId(), lastJudgeId, processed, failed, lastError);
     }
 
+    /**
+     * @MethodName buildJudgeRangeWrapper
+     * @Param problemId
+     * @Param contestId
+     * @Param rangeStart
+     * @Param rangeEnd
+     * @Param lastJudgeId
+     * @Description 构造可重判提交范围查询条件
+     * @Return @return {@link LambdaQueryWrapper }<{@link Judge }>
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private LambdaQueryWrapper<Judge> buildJudgeRangeWrapper(Long problemId, Long contestId,
                                                              LocalDateTime rangeStart, LocalDateTime rangeEnd,
                                                              Long lastJudgeId) {
@@ -300,6 +360,18 @@ public class RejudgeTaskServiceImpl implements RejudgeTaskService {
         return wrapper;
     }
 
+    /**
+     * @MethodName buildJudgeTaskScopeWrapper
+     * @Param problemId
+     * @Param contestId
+     * @Param rangeStart
+     * @Param rangeEnd
+     * @Param lastJudgeId
+     * @Description 构造重判任务范围内提交查询条件
+     * @Return @return {@link LambdaQueryWrapper }<{@link Judge }>
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private LambdaQueryWrapper<Judge> buildJudgeTaskScopeWrapper(Long problemId, Long contestId,
                                                                  LocalDateTime rangeStart, LocalDateTime rangeEnd,
                                                                  Long lastJudgeId) {
@@ -320,6 +392,16 @@ public class RejudgeTaskServiceImpl implements RejudgeTaskService {
         return wrapper;
     }
 
+    /**
+     * @MethodName rejudge
+     * @Param judge
+     * @Param problem
+     * @Param taskId
+     * @Description 重置单条提交并投递新的判题任务
+     * @Return
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private void rejudge(Judge judge, ProblemBasicDto problem, Long taskId) {
         transactionTemplate.executeWithoutResult(status -> {
             String judgeTaskId = UUID.randomUUID().toString().replace("-", "");
@@ -354,6 +436,14 @@ public class RejudgeTaskServiceImpl implements RejudgeTaskService {
         });
     }
 
+    /**
+     * @MethodName queryProblemBasic
+     * @Param problemCode
+     * @Description 查询题目判题所需基础信息
+     * @Return @return {@link ProblemBasicDto }
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private ProblemBasicDto queryProblemBasic(String problemCode) {
         Result<ProblemBasicDto> result;
         try {
@@ -368,6 +458,14 @@ public class RejudgeTaskServiceImpl implements RejudgeTaskService {
         return result.getData();
     }
 
+    /**
+     * @MethodName ensureProblemHasTestdata
+     * @Param problem
+     * @Description 校验题目是否已配置测试数据
+     * @Return
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private void ensureProblemHasTestdata(ProblemBasicDto problem) {
         if (!Boolean.TRUE.equals(problem.getHasTestdata()) || defaultZero(problem.getTestdataCaseCount()) <= 0) {
             throw new BizException(ResultCode.BAD_REQUEST, "题目测试数据未配置，暂不能重判");
@@ -375,6 +473,14 @@ public class RejudgeTaskServiceImpl implements RejudgeTaskService {
         ensureJudgeModeSupported(problem);
     }
 
+    /**
+     * @MethodName ensureJudgeModeSupported
+     * @Param problem
+     * @Description 校验当前判题节点能力是否支持题目判题模式
+     * @Return
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private void ensureJudgeModeSupported(ProblemBasicDto problem) {
         String judgeMode = StrUtil.blankToDefault(problem.getJudgeMode(), DEFAULT_JUDGE_MODE);
         List<String> supportedModes = submissionProperties.getSupportedJudgeModes();
@@ -393,6 +499,15 @@ public class RejudgeTaskServiceImpl implements RejudgeTaskService {
         }
     }
 
+    /**
+     * @MethodName ensureJudgeModeContract
+     * @Param problem
+     * @Param judgeMode
+     * @Description 校验特殊判题模式必需的任务合约字段
+     * @Return
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private void ensureJudgeModeContract(ProblemBasicDto problem, String judgeMode) {
         if (DEFAULT_JUDGE_MODE.equalsIgnoreCase(judgeMode)) {
             return;
@@ -412,6 +527,18 @@ public class RejudgeTaskServiceImpl implements RejudgeTaskService {
         throw new BizException(ResultCode.BAD_REQUEST, "不支持的判题模式: " + judgeMode);
     }
 
+    /**
+     * @MethodName advanceTask
+     * @Param taskId
+     * @Param lastJudgeId
+     * @Param processed
+     * @Param failed
+     * @Param lastError
+     * @Description 推进重判任务处理进度
+     * @Return
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private void advanceTask(Long taskId, Long lastJudgeId, int processed, int failed, String lastError) {
         int updated = rejudgeTaskMapper.update(null, new LambdaUpdateWrapper<RejudgeTask>()
                 .eq(RejudgeTask::getId, taskId)
@@ -429,6 +556,14 @@ public class RejudgeTaskServiceImpl implements RejudgeTaskService {
         }
     }
 
+    /**
+     * @MethodName markTaskFinished
+     * @Param taskId
+     * @Description 标记重判任务完成
+     * @Return
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private void markTaskFinished(Long taskId) {
         int updated = rejudgeTaskMapper.update(null, new LambdaUpdateWrapper<RejudgeTask>()
                 .eq(RejudgeTask::getId, taskId)
@@ -443,6 +578,15 @@ public class RejudgeTaskServiceImpl implements RejudgeTaskService {
         }
     }
 
+    /**
+     * @MethodName markTaskFailed
+     * @Param taskId
+     * @Param errorMessage
+     * @Description 标记重判任务失败
+     * @Return
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private void markTaskFailed(Long taskId, String errorMessage) {
         int updated = rejudgeTaskMapper.update(null, new LambdaUpdateWrapper<RejudgeTask>()
                 .eq(RejudgeTask::getId, taskId)
@@ -458,6 +602,14 @@ public class RejudgeTaskServiceImpl implements RejudgeTaskService {
         }
     }
 
+    /**
+     * @MethodName renewTaskLease
+     * @Param taskId
+     * @Description 续约当前实例持有的重判任务租约
+     * @Return @return boolean
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private boolean renewTaskLease(Long taskId) {
         int updated = rejudgeTaskMapper.update(null, new LambdaUpdateWrapper<RejudgeTask>()
                 .eq(RejudgeTask::getId, taskId)
@@ -468,6 +620,14 @@ public class RejudgeTaskServiceImpl implements RejudgeTaskService {
         return updated > 0;
     }
 
+    /**
+     * @MethodName toVo
+     * @Param task
+     * @Description 转换重判任务展示对象
+     * @Return @return {@link RejudgeTaskVo }
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private RejudgeTaskVo toVo(RejudgeTask task) {
         RejudgeTaskVo vo = new RejudgeTaskVo();
         vo.setId(task.getId());
@@ -490,6 +650,15 @@ public class RejudgeTaskServiceImpl implements RejudgeTaskService {
         return vo;
     }
 
+    /**
+     * @MethodName saveTaskDetails
+     * @Param task
+     * @Param judges
+     * @Description 保存重判任务明细并记录重判前状态
+     * @Return
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private void saveTaskDetails(RejudgeTask task, List<Judge> judges) {
         if (judges == null || judges.isEmpty()) {
             return;
@@ -513,6 +682,16 @@ public class RejudgeTaskServiceImpl implements RejudgeTaskService {
         }
     }
 
+    /**
+     * @MethodName bindTaskDetailToJudgeTask
+     * @Param taskId
+     * @Param judgeId
+     * @Param judgeTaskId
+     * @Description 将重判明细绑定到本次判题任务 ID
+     * @Return
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private void bindTaskDetailToJudgeTask(Long taskId, Long judgeId, String judgeTaskId) {
         if (taskId == null || judgeId == null || StrUtil.isBlank(judgeTaskId)) {
             return;
@@ -528,6 +707,15 @@ public class RejudgeTaskServiceImpl implements RejudgeTaskService {
                 .set(RejudgeTaskDetail::getFinishedTime, null));
     }
 
+    /**
+     * @MethodName findJudge
+     * @Param judges
+     * @Param judgeId
+     * @Description 从批量查询结果中查找指定提交
+     * @Return @return {@link Judge }
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private Judge findJudge(List<Judge> judges, Long judgeId) {
         if (judges == null || judgeId == null) {
             return null;
@@ -538,6 +726,15 @@ public class RejudgeTaskServiceImpl implements RejudgeTaskService {
                 .orElse(null);
     }
 
+    /**
+     * @MethodName toDetailVo
+     * @Param detail
+     * @Param judge
+     * @Description 转换重判明细前后状态展示对象
+     * @Return @return {@link RejudgeTaskDetailVo }
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private RejudgeTaskDetailVo toDetailVo(RejudgeTaskDetail detail, Judge judge) {
         Integer currentStatus = detail.getFinalStatus() == null
                 ? (judge == null ? null : judge.getStatus())
@@ -576,6 +773,14 @@ public class RejudgeTaskServiceImpl implements RejudgeTaskService {
         return vo;
     }
 
+    /**
+     * @MethodName normalizeStatus
+     * @Param status
+     * @Description 规范化并校验重判任务状态
+     * @Return @return {@link String }
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private String normalizeStatus(String status) {
         String normalized = StrUtil.trimToNull(status);
         if (normalized == null) {
@@ -587,6 +792,14 @@ public class RejudgeTaskServiceImpl implements RejudgeTaskService {
         return normalized;
     }
 
+    /**
+     * @MethodName normalizePage
+     * @Param page
+     * @Description 规范化页码
+     * @Return @return int
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private int normalizePage(Integer page) {
         if (page == null) {
             return DEFAULT_PAGE;
@@ -597,6 +810,14 @@ public class RejudgeTaskServiceImpl implements RejudgeTaskService {
         return page;
     }
 
+    /**
+     * @MethodName normalizePageSize
+     * @Param pageSize
+     * @Description 规范化每页数量
+     * @Return @return int
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private int normalizePageSize(Integer pageSize) {
         if (pageSize == null) {
             return DEFAULT_PAGE_SIZE;
@@ -610,21 +831,49 @@ public class RejudgeTaskServiceImpl implements RejudgeTaskService {
         return pageSize;
     }
 
+    /**
+     * @MethodName batchSize
+     * @Description 获取重判任务每轮处理批次大小
+     * @Return @return int
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private int batchSize() {
         Integer value = submissionProperties.getRejudgeTask().getBatchSize();
         return value == null || value <= 0 ? DEFAULT_BATCH_SIZE : value;
     }
 
+    /**
+     * @MethodName leaseSeconds
+     * @Description 获取重判任务租约秒数
+     * @Return @return long
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private long leaseSeconds() {
         Long value = submissionProperties.getRejudgeTask().getLeaseSeconds();
         return value == null || value <= 0 ? DEFAULT_LEASE_SECONDS : value;
     }
 
+    /**
+     * @MethodName leaseRenewEvery
+     * @Description 获取重判任务续约间隔条数
+     * @Return @return int
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private int leaseRenewEvery() {
         Integer value = submissionProperties.getRejudgeTask().getLeaseRenewEvery();
         return value == null || value <= 0 ? DEFAULT_LEASE_RENEW_EVERY : value;
     }
 
+    /**
+     * @MethodName buildWorkerId
+     * @Description 构造当前服务实例的重判任务 workerId
+     * @Return @return {@link String }
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private String buildWorkerId() {
         String hostName;
         try {
@@ -638,10 +887,26 @@ public class RejudgeTaskServiceImpl implements RejudgeTaskService {
         return value.length() <= MAX_WORKER_ID_LENGTH ? value : value.substring(0, MAX_WORKER_ID_LENGTH);
     }
 
+    /**
+     * @MethodName defaultZero
+     * @Param value
+     * @Description 空值转为 0
+     * @Return @return {@link Integer }
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private Integer defaultZero(Integer value) {
         return value == null ? 0 : value;
     }
 
+    /**
+     * @MethodName toInteger
+     * @Param value
+     * @Description long 转 int，超出范围时按最大 int 处理
+     * @Return @return int
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private int toInteger(long value) {
         return value > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) value;
     }

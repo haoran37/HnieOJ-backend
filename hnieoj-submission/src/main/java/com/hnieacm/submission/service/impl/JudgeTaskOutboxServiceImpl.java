@@ -42,6 +42,14 @@ public class JudgeTaskOutboxServiceImpl implements JudgeTaskOutboxService {
     private final JudgeTaskOutboxMapper outboxMapper;
     private final JudgeTaskMessagePublisher judgeTaskMessagePublisher;
 
+    /**
+     * @MethodName list
+     * @Param request
+     * @Description 分页查询判题任务 outbox 记录
+     * @Return @return {@link PageVo }<{@link JudgeTaskOutboxVo }>
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     @Override
     public PageVo<JudgeTaskOutboxVo> list(JudgeTaskOutboxQueryRequest request) {
         int page = normalizePage(request == null ? null : request.getPage());
@@ -70,6 +78,14 @@ public class JudgeTaskOutboxServiceImpl implements JudgeTaskOutboxService {
         return new PageVo<>(pageResult.getRecords().stream().map(this::toVo).toList(), pageResult.getTotal());
     }
 
+    /**
+     * @MethodName retry
+     * @Param id
+     * @Description 手动重试指定 outbox 记录
+     * @Return
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     @Override
     public void retry(Long id) {
         if (id == null || id <= 0) {
@@ -85,6 +101,14 @@ public class JudgeTaskOutboxServiceImpl implements JudgeTaskOutboxService {
         judgeTaskMessagePublisher.retryOutbox(id);
     }
 
+    /**
+     * @MethodName toVo
+     * @Param outbox
+     * @Description 转换 outbox 展示对象
+     * @Return @return {@link JudgeTaskOutboxVo }
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private JudgeTaskOutboxVo toVo(JudgeTaskOutbox outbox) {
         JudgeTaskOutboxVo vo = new JudgeTaskOutboxVo();
         vo.setId(outbox.getId());
@@ -103,6 +127,15 @@ public class JudgeTaskOutboxServiceImpl implements JudgeTaskOutboxService {
         return vo;
     }
 
+    /**
+     * @MethodName normalizeStatus
+     * @Param status
+     * @Param required
+     * @Description 规范化并校验 outbox 状态
+     * @Return @return {@link String }
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private String normalizeStatus(String status, boolean required) {
         String normalized = StrUtil.trimToNull(status);
         if (normalized == null) {
@@ -117,6 +150,14 @@ public class JudgeTaskOutboxServiceImpl implements JudgeTaskOutboxService {
         return normalized;
     }
 
+    /**
+     * @MethodName normalizePage
+     * @Param page
+     * @Description 规范化页码
+     * @Return @return int
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private int normalizePage(Integer page) {
         if (page == null) {
             return DEFAULT_PAGE;
@@ -127,6 +168,14 @@ public class JudgeTaskOutboxServiceImpl implements JudgeTaskOutboxService {
         return page;
     }
 
+    /**
+     * @MethodName normalizePageSize
+     * @Param pageSize
+     * @Description 规范化每页数量
+     * @Return @return int
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private int normalizePageSize(Integer pageSize) {
         if (pageSize == null) {
             return DEFAULT_PAGE_SIZE;

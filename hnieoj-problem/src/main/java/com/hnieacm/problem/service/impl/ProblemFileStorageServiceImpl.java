@@ -57,6 +57,14 @@ public class ProblemFileStorageServiceImpl implements ProblemFileStorageService 
 
     private final ProblemStorageProperties storageProperties;
 
+    /**
+     * @MethodName initializeProblemResources
+     * @Param problemId
+     * @Description 初始化问题资源
+     * @Return
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     @Override
     public void initializeProblemResources(Long problemId) {
         Path problemDir = resolveProblemDir(problemId);
@@ -69,6 +77,14 @@ public class ProblemFileStorageServiceImpl implements ProblemFileStorageService 
         }
     }
 
+    /**
+     * @MethodName deleteProblemResources
+     * @Param problemId
+     * @Description 删除问题资源
+     * @Return
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     @Override
     public void deleteProblemResources(Long problemId) {
         Path problemDir = resolveProblemDir(problemId);
@@ -83,6 +99,15 @@ public class ProblemFileStorageServiceImpl implements ProblemFileStorageService 
         }
     }
 
+    /**
+     * @MethodName saveImage
+     * @Param problemId
+     * @Param file
+     * @Description 保存图片
+     * @Return @return {@link String }
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     @Override
     public String saveImage(Long problemId, MultipartFile file) {
         if (file == null || file.isEmpty()) {
@@ -103,6 +128,15 @@ public class ProblemFileStorageServiceImpl implements ProblemFileStorageService 
         return prefix + "/" + problemId + "/" + filename;
     }
 
+    /**
+     * @MethodName generateImageStoragePath
+     * @Param imageDir
+     * @Param originalFilename
+     * @Description 生成图像存储路径
+     * @Return @return {@link Path }
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private Path generateImageStoragePath(Path imageDir, String originalFilename) {
         for (int i = 0; i < IMAGE_FILENAME_GENERATE_MAX_RETRY; i++) {
             String filename = generateImageStorageFilename(originalFilename);
@@ -114,12 +148,29 @@ public class ProblemFileStorageServiceImpl implements ProblemFileStorageService 
         throw new BizException(ResultCode.INTERNAL_ERROR, "生成图片文件名失败");
     }
 
+    /**
+     * @MethodName generateImageStorageFilename
+     * @Param originalFilename
+     * @Description 生成图像存储文件名
+     * @Return @return {@link String }
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private String generateImageStorageFilename(String originalFilename) {
         String extension = StringUtils.getFilenameExtension(originalFilename);
         String suffix = StrUtil.isBlank(extension) ? "" : "." + extension.toLowerCase();
         return UUID.randomUUID().toString().replace("-", "").toUpperCase() + suffix;
     }
 
+    /**
+     * @MethodName deleteImage
+     * @Param problemId
+     * @Param filename
+     * @Description 删除图像
+     * @Return
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     @Override
     public void deleteImage(Long problemId, String filename) {
         String normalizedFilename = normalizeFilename(filename);
@@ -136,12 +187,29 @@ public class ProblemFileStorageServiceImpl implements ProblemFileStorageService 
         }
     }
 
+    /**
+     * @MethodName validateTestdata
+     * @Param file
+     * @Description 验证测试数据
+     * @Return
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     @Override
     public void validateTestdata(MultipartFile file) {
         checkTestdataUploadFile(file);
         readAndValidateTestdataZip(file);
     }
 
+    /**
+     * @MethodName replaceTestdata
+     * @Param problemId
+     * @Param file
+     * @Description 替换测试数据
+     * @Return
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     @Override
     public void replaceTestdata(Long problemId, MultipartFile file) {
         checkTestdataUploadFile(file);
@@ -166,6 +234,14 @@ public class ProblemFileStorageServiceImpl implements ProblemFileStorageService 
         }
     }
 
+    /**
+     * @MethodName checkTestdataUploadFile
+     * @Param file
+     * @Description 测试数据上传文件
+     * @Return
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private void checkTestdataUploadFile(MultipartFile file) {
         if (file == null || file.isEmpty()) {
             throw new BizException(ResultCode.BAD_REQUEST, "测试数据 ZIP 不能为空");
@@ -175,6 +251,15 @@ public class ProblemFileStorageServiceImpl implements ProblemFileStorageService 
         }
     }
 
+    /**
+     * @MethodName writeTestdataZip
+     * @Param problemId
+     * @Param outputStream
+     * @Description 写入测试数据zip
+     * @Return
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     @Override
     public void writeTestdataZip(Long problemId, OutputStream outputStream) {
         Path testdataDir = resolveProblemPath(problemId, TESTDATA_DIR);
@@ -205,6 +290,16 @@ public class ProblemFileStorageServiceImpl implements ProblemFileStorageService 
         }
     }
 
+    /**
+     * @MethodName writeTestdataCaseZip
+     * @Param problemId
+     * @Param caseNo
+     * @Param outputStream
+     * @Description 写入测试数据案例zip
+     * @Return
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     @Override
     public void writeTestdataCaseZip(Long problemId, Integer caseNo, OutputStream outputStream) {
         if (caseNo == null || caseNo <= 0) {
@@ -229,17 +324,41 @@ public class ProblemFileStorageServiceImpl implements ProblemFileStorageService 
         }
     }
 
+    /**
+     * @MethodName hasAvailableTestdata
+     * @Param problemId
+     * @Description 有可用测试数据
+     * @Return @return boolean
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     @Override
     public boolean hasAvailableTestdata(Long problemId) {
         return countAvailableTestdataCases(problemId) > 0;
     }
 
+    /**
+     * @MethodName countAvailableTestdataCases
+     * @Param problemId
+     * @Description 统计可用测试数据案例
+     * @Return @return int
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     @Override
     public int countAvailableTestdataCases(Long problemId) {
         Path testdataDir = resolveProblemPath(problemId, TESTDATA_DIR);
         return listTestdataPairs(testdataDir).size();
     }
 
+    /**
+     * @MethodName readAndValidateTestdataZip
+     * @Param file
+     * @Description 读取并验证测试数据压缩包
+     * @Return @return {@link Map }<{@link String }, {@link byte[] }>
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private Map<String, byte[]> readAndValidateTestdataZip(MultipartFile file) {
         Map<String, byte[]> fileMap = new TreeMap<>(Comparator.naturalOrder());
         Map<String, Set<String>> pairMap = new HashMap<>();
@@ -279,6 +398,14 @@ public class ProblemFileStorageServiceImpl implements ProblemFileStorageService 
         return fileMap;
     }
 
+    /**
+     * @MethodName validateZipEntryName
+     * @Param entryName
+     * @Description 验证zip条目名称
+     * @Return @return {@link String }
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private String validateZipEntryName(String entryName) {
         String filename = normalizeFilename(entryName);
         if (!filename.equals(entryName)) {
@@ -287,6 +414,14 @@ public class ProblemFileStorageServiceImpl implements ProblemFileStorageService 
         return filename;
     }
 
+    /**
+     * @MethodName readZipEntry
+     * @Param zipInputStream
+     * @Description 读取zip条目
+     * @Return @return {@link byte[] }
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private byte[] readZipEntry(ZipInputStream zipInputStream) throws IOException {
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
         byte[] buffer = new byte[BUFFER_SIZE];
@@ -297,6 +432,15 @@ public class ProblemFileStorageServiceImpl implements ProblemFileStorageService 
         return outputStream.toByteArray();
     }
 
+    /**
+     * @MethodName validateUtf8
+     * @Param filename
+     * @Param bytes
+     * @Description 验证utf8
+     * @Return
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private void validateUtf8(String filename, byte[] bytes) {
         try {
             StandardCharsets.UTF_8.newDecoder()
@@ -308,12 +452,29 @@ public class ProblemFileStorageServiceImpl implements ProblemFileStorageService 
         }
     }
 
+    /**
+     * @MethodName recordPair
+     * @Param pairMap
+     * @Param filename
+     * @Description 记录对
+     * @Return
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private void recordPair(Map<String, Set<String>> pairMap, String filename) {
         String baseName = filename.substring(0, filename.lastIndexOf('.'));
         String suffix = filename.endsWith(TESTDATA_IN_SUFFIX) ? TESTDATA_IN_SUFFIX : TESTDATA_OUT_SUFFIX;
         pairMap.computeIfAbsent(baseName, key -> new HashSet<>()).add(suffix);
     }
 
+    /**
+     * @MethodName validatePairs
+     * @Param pairMap
+     * @Description 验证配对
+     * @Return
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private void validatePairs(Map<String, Set<String>> pairMap) {
         for (Map.Entry<String, Set<String>> entry : pairMap.entrySet()) {
             if (!entry.getValue().contains(TESTDATA_IN_SUFFIX) || !entry.getValue().contains(TESTDATA_OUT_SUFFIX)) {
@@ -322,10 +483,27 @@ public class ProblemFileStorageServiceImpl implements ProblemFileStorageService 
         }
     }
 
+    /**
+     * @MethodName isTestdataFile
+     * @Param filename
+     * @Description 是测试数据文件
+     * @Return @return boolean
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private boolean isTestdataFile(String filename) {
         return filename.endsWith(TESTDATA_IN_SUFFIX) || filename.endsWith(TESTDATA_OUT_SUFFIX);
     }
 
+    /**
+     * @MethodName replaceDirectory
+     * @Param targetDir
+     * @Param newDir
+     * @Description 替换目录
+     * @Return
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private void replaceDirectory(Path targetDir, Path newDir) throws IOException {
         Path backupDir = ensureChildPath(targetDir.getParent(),
                 TESTDATA_DIR + ".backup." + UUID.randomUUID().toString().replace("-", ""));
@@ -344,6 +522,15 @@ public class ProblemFileStorageServiceImpl implements ProblemFileStorageService 
         }
     }
 
+    /**
+     * @MethodName moveDirectory
+     * @Param source
+     * @Param target
+     * @Description 移动目录
+     * @Return
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private void moveDirectory(Path source, Path target) throws IOException {
         try {
             Files.move(source, target, StandardCopyOption.ATOMIC_MOVE);
@@ -352,6 +539,14 @@ public class ProblemFileStorageServiceImpl implements ProblemFileStorageService 
         }
     }
 
+    /**
+     * @MethodName deleteDirectoryQuietly
+     * @Param directory
+     * @Description 悄悄删除目录
+     * @Return
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private void deleteDirectoryQuietly(Path directory) {
         try {
             deleteDirectory(directory);
@@ -360,6 +555,14 @@ public class ProblemFileStorageServiceImpl implements ProblemFileStorageService 
         }
     }
 
+    /**
+     * @MethodName deleteDirectory
+     * @Param directory
+     * @Description 删除目录
+     * @Return
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private void deleteDirectory(Path directory) throws IOException {
         if (!Files.exists(directory)) {
             return;
@@ -372,6 +575,14 @@ public class ProblemFileStorageServiceImpl implements ProblemFileStorageService 
         }
     }
 
+    /**
+     * @MethodName listTestdataFiles
+     * @Param testdataDir
+     * @Description 列出测试数据文件
+     * @Return @return {@link List }<{@link Path }>
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private List<Path> listTestdataFiles(Path testdataDir) {
         if (!Files.isDirectory(testdataDir)) {
             return List.of();
@@ -391,6 +602,14 @@ public class ProblemFileStorageServiceImpl implements ProblemFileStorageService 
         return files;
     }
 
+    /**
+     * @MethodName listTestdataPairs
+     * @Param testdataDir
+     * @Description 列出测试数据对
+     * @Return @return {@link List }<{@link TestdataPair }>
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private List<TestdataPair> listTestdataPairs(Path testdataDir) {
         List<Path> files = listTestdataFiles(testdataDir);
         if (files.isEmpty()) {
@@ -417,6 +636,15 @@ public class ProblemFileStorageServiceImpl implements ProblemFileStorageService 
         return pairs;
     }
 
+    /**
+     * @MethodName writeFileToZip
+     * @Param zipOutputStream
+     * @Param file
+     * @Description 将文件写入zip
+     * @Return
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private void writeFileToZip(ZipOutputStream zipOutputStream, Path file) throws IOException {
         ZipEntry entry = new ZipEntry(file.getFileName().toString());
         zipOutputStream.putNextEntry(entry);
@@ -430,10 +658,27 @@ public class ProblemFileStorageServiceImpl implements ProblemFileStorageService 
         zipOutputStream.closeEntry();
     }
 
+    /**
+     * @MethodName resolveProblemPath
+     * @Param problemId
+     * @Param relativePath
+     * @Description 解决问题路径
+     * @Return @return {@link Path }
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private Path resolveProblemPath(Long problemId, String relativePath) {
         return ensureChildPath(resolveProblemDir(problemId), relativePath);
     }
 
+    /**
+     * @MethodName resolveProblemDir
+     * @Param problemId
+     * @Description 解决问题目录
+     * @Return @return {@link Path }
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private Path resolveProblemDir(Long problemId) {
         if (problemId == null || problemId <= 0) {
             throw new BizException(ResultCode.BAD_REQUEST, "problemId 不合法");
@@ -445,6 +690,15 @@ public class ProblemFileStorageServiceImpl implements ProblemFileStorageService 
         return problemDir;
     }
 
+    /**
+     * @MethodName ensureChildPath
+     * @Param parent
+     * @Param filename
+     * @Description 确保 Child 路径
+     * @Return @return {@link Path }
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private Path ensureChildPath(Path parent, String filename) {
         Path targetPath = parent.resolve(filename).normalize();
         if (!targetPath.startsWith(parent.normalize())) {
@@ -453,6 +707,14 @@ public class ProblemFileStorageServiceImpl implements ProblemFileStorageService 
         return targetPath;
     }
 
+    /**
+     * @MethodName normalizeFilename
+     * @Param filename
+     * @Description 规范化文件名
+     * @Return @return {@link String }
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private String normalizeFilename(String filename) {
         String normalizedFilename = StringUtils.getFilename(StrUtil.nullToEmpty(filename).trim());
         if (StrUtil.isBlank(normalizedFilename) || ".".equals(normalizedFilename) || "..".equals(normalizedFilename)
@@ -462,6 +724,14 @@ public class ProblemFileStorageServiceImpl implements ProblemFileStorageService 
         return normalizedFilename;
     }
 
+    /**
+     * @MethodName rootPath
+     *
+     * @Description 根路径
+     * @Return @return {@link Path }
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private Path rootPath() {
         return Paths.get(storageProperties.getRootPath()).toAbsolutePath().normalize();
     }

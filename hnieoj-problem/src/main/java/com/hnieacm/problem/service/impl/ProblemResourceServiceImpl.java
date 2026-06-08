@@ -30,18 +30,45 @@ public class ProblemResourceServiceImpl implements ProblemResourceService {
     private final ProblemMapper problemMapper;
     private final ProblemFileStorageService fileStorageService;
 
+    /**
+     * @MethodName uploadImage
+     * @Param problemId
+     * @Param file
+     * @Description 上传图片
+     * @Return @return {@link String }
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     @Override
     public String uploadImage(Long problemId, MultipartFile file) {
         requireProblem(problemId);
         return fileStorageService.saveImage(problemId, file);
     }
 
+    /**
+     * @MethodName deleteImage
+     * @Param problemId
+     * @Param filename
+     * @Description 删除图像
+     * @Return
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     @Override
     public void deleteImage(Long problemId, String filename) {
         requireProblem(problemId);
         fileStorageService.deleteImage(problemId, filename);
     }
 
+    /**
+     * @MethodName replaceTestdata
+     * @Param problemId
+     * @Param file
+     * @Description 替换测试数据
+     * @Return
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void replaceTestdata(Long problemId, MultipartFile file) {
@@ -56,6 +83,15 @@ public class ProblemResourceServiceImpl implements ProblemResourceService {
         fileStorageService.replaceTestdata(problemId, file);
     }
 
+    /**
+     * @MethodName prepareTestdataDownload
+     * @Param problemId
+     * @Param version
+     * @Description 准备测试数据下载
+     * @Return @return {@link TestdataDownloadDecision }
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     @Override
     public TestdataDownloadDecision prepareTestdataDownload(Long problemId, Integer version) {
         Problem problem = requireProblem(problemId);
@@ -72,18 +108,45 @@ public class ProblemResourceServiceImpl implements ProblemResourceService {
         return new TestdataDownloadDecision(false, dataVersion);
     }
 
+    /**
+     * @MethodName writeTestdataZip
+     * @Param problemId
+     * @Param outputStream
+     * @Description 写入测试数据zip
+     * @Return
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     @Override
     public void writeTestdataZip(Long problemId, OutputStream outputStream) {
         requireProblem(problemId);
         fileStorageService.writeTestdataZip(problemId, outputStream);
     }
 
+    /**
+     * @MethodName writeTestdataCaseZip
+     * @Param problemId
+     * @Param caseNo
+     * @Param outputStream
+     * @Description 写入测试数据案例zip
+     * @Return
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     @Override
     public void writeTestdataCaseZip(Long problemId, Integer caseNo, OutputStream outputStream) {
         requireProblem(problemId);
         fileStorageService.writeTestdataCaseZip(problemId, caseNo, outputStream);
     }
 
+    /**
+     * @MethodName requireProblem
+     * @Param problemId
+     * @Description 校验题目ID并获取题目对象
+     * @Return @return {@link Problem }
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private Problem requireProblem(Long problemId) {
         if (problemId == null || problemId <= 0) {
             throw new BizException(ResultCode.BAD_REQUEST, "problemId 不合法");

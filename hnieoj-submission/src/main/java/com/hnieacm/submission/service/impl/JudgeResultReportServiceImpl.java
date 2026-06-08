@@ -23,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 
 /**
@@ -61,6 +62,15 @@ public class JudgeResultReportServiceImpl implements JudgeResultReportService {
     private final RejudgeTaskDetailMapper rejudgeTaskDetailMapper;
     private final SimpMessagingTemplate messagingTemplate;
 
+    /**
+     * @MethodName handleEvent
+     * @Param submissionId
+     * @Param request
+     * @Description 处理事件
+     * @Return
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void handleEvent(String submissionId, JudgeResultEventRequest request) {
@@ -108,6 +118,14 @@ public class JudgeResultReportServiceImpl implements JudgeResultReportService {
         messagingTemplate.convertAndSend(PROGRESS_TOPIC_PREFIX + normalizedSubmissionId + PROGRESS_TOPIC_SUFFIX, request);
     }
 
+    /**
+     * @MethodName queryJudge
+     * @Param submissionId
+     * @Description 查询判断
+     * @Return @return {@link Judge }
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private Judge queryJudge(String submissionId) {
         Judge judge = judgeMapper.selectOne(new LambdaQueryWrapper<Judge>()
                 .eq(Judge::getSubmitId, submissionId)
@@ -118,6 +136,15 @@ public class JudgeResultReportServiceImpl implements JudgeResultReportService {
         return judge;
     }
 
+    /**
+     * @MethodName handleCaseFinished
+     * @Param judge
+     * @Param request
+     * @Description 处理单个测试点完成事件
+     * @Return
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private void handleCaseFinished(Judge judge, JudgeResultEventRequest request) {
         JudgeResultEventRequest.CaseResult caseResult = request.getCaseResult();
         if (caseResult == null || StrUtil.isBlank(caseResult.getCaseId())) {
@@ -127,10 +154,28 @@ public class JudgeResultReportServiceImpl implements JudgeResultReportService {
         updateJudgeProgress(judge, request);
     }
 
+    /**
+     * @MethodName handleJudgeFinished
+     * @Param judge
+     * @Param request
+     * @Description 裁判结束
+     * @Return
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private void handleJudgeFinished(Judge judge, JudgeResultEventRequest request) {
         updateJudge(judge, request, request.getScore(), null, StrUtil.trimToNull(request.getDiagnosticMessage()));
     }
 
+    /**
+     * @MethodName handleJudgeFailed
+     * @Param judge
+     * @Param request
+     * @Description 处理判断失败
+     * @Return
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private void handleJudgeFailed(Judge judge, JudgeResultEventRequest request) {
         if (request.getStatus() == null) {
             request.setStatus(SubmissionStatusConstant.SYSTEM_ERROR);
@@ -139,10 +184,31 @@ public class JudgeResultReportServiceImpl implements JudgeResultReportService {
                 StrUtil.trimToNull(request.getDiagnosticMessage()));
     }
 
+    /**
+     * @MethodName updateJudgeProgress
+     * @Param judge
+     * @Param request
+     * @Description 更新裁判进度
+     * @Return
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private void updateJudgeProgress(Judge judge, JudgeResultEventRequest request) {
         updateJudge(judge, request, null, null, null);
     }
 
+    /**
+     * @MethodName updateJudge
+     * @Param judge
+     * @Param request
+     * @Param score
+     * @Param errorMessage
+     * @Param diagnosticMessage
+     * @Description 更新judge
+     * @Return
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private void updateJudge(Judge judge, JudgeResultEventRequest request, Integer score, String errorMessage,
                              String diagnosticMessage) {
         LambdaUpdateWrapper<Judge> wrapper = new LambdaUpdateWrapper<Judge>()
@@ -177,6 +243,15 @@ public class JudgeResultReportServiceImpl implements JudgeResultReportService {
         }
     }
 
+    /**
+     * @MethodName freezeRejudgeTaskDetail
+     * @Param judgeId
+     * @Param judgeTaskId
+     * @Description 冻结重新评估任务详细信息
+     * @Return
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private void freezeRejudgeTaskDetail(Long judgeId, String judgeTaskId) {
         String normalizedJudgeTaskId = StrUtil.trimToNull(judgeTaskId);
         if (judgeId == null || normalizedJudgeTaskId == null) {
@@ -196,6 +271,15 @@ public class JudgeResultReportServiceImpl implements JudgeResultReportService {
                 .set(RejudgeTaskDetail::getFinishedTime, LocalDateTime.now()));
     }
 
+    /**
+     * @MethodName upsertJudgeCase
+     * @Param judge
+     * @Param result
+     * @Description 持久化单个测试点结果
+     * @Return
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private void upsertJudgeCase(Judge judge, JudgeResultEventRequest.CaseResult result) {
         String caseId = StrUtil.trim(result.getCaseId());
         JudgeCase exist = judgeCaseMapper.selectOne(new LambdaQueryWrapper<JudgeCase>()
@@ -223,23 +307,41 @@ public class JudgeResultReportServiceImpl implements JudgeResultReportService {
         }
     }
 
+    /**
+     * @MethodName updateJudgeCase
+     * @Param judgeId
+     * @Param caseId
+     * @Param entity
+     * @Description 根据指定提交ID和用例ID更新判题案例记录
+     * @Return
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private void updateJudgeCase(Long judgeId, String caseId, JudgeCase entity) {
         judgeCaseMapper.update(entity, new LambdaUpdateWrapper<JudgeCase>()
                 .eq(JudgeCase::getSubmitId, judgeId)
                 .eq(JudgeCase::getCaseId, caseId));
     }
 
+    /**
+     * @MethodName refreshJudgeCaseMetrics
+     * @Param judge
+     * @Description 聚合所有测试点的最大耗时与内存
+     * @Return
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private void refreshJudgeCaseMetrics(Judge judge) {
         List<JudgeCase> cases = judgeCaseMapper.selectList(new LambdaQueryWrapper<JudgeCase>()
                 .eq(JudgeCase::getSubmitId, judge.getId()));
         Integer maxTime = cases.stream()
                 .map(JudgeCase::getTime)
-                .filter(item -> item != null)
+                .filter(Objects::nonNull)
                 .max(Integer::compareTo)
                 .orElse(null);
         Integer maxMemory = cases.stream()
                 .map(JudgeCase::getMemory)
-                .filter(item -> item != null)
+                .filter(Objects::nonNull)
                 .max(Integer::compareTo)
                 .orElse(null);
         LambdaUpdateWrapper<Judge> wrapper = new LambdaUpdateWrapper<Judge>()
@@ -254,6 +356,15 @@ public class JudgeResultReportServiceImpl implements JudgeResultReportService {
         judgeMapper.update(null, wrapper);
     }
 
+    /**
+     * @MethodName isCurrentJudgeTask
+     * @Param judge
+     * @Param request
+     * @Description 校验请求中的判题任务ID是否与当前记录一致
+     * @Return @return boolean
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private boolean isCurrentJudgeTask(Judge judge, JudgeResultEventRequest request) {
         String currentTaskId = StrUtil.trimToNull(judge.getJudgeTaskId());
         if (currentTaskId == null) {
@@ -264,6 +375,14 @@ public class JudgeResultReportServiceImpl implements JudgeResultReportService {
         return currentTaskId.equals(incomingTaskId);
     }
 
+    /**
+     * @MethodName validateEvent
+     * @Param request
+     * @Description 验证事件
+     * @Return
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private void validateEvent(JudgeResultEventRequest request) {
         validateStatus(request.getStatus(), "status");
         validateProgress(request.getTotalCase(), "totalCase");
@@ -298,6 +417,14 @@ public class JudgeResultReportServiceImpl implements JudgeResultReportService {
         }
     }
 
+    /**
+     * @MethodName validateCaseResult
+     * @Param caseResult
+     * @Description 验证案例结果
+     * @Return
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private void validateCaseResult(JudgeResultEventRequest.CaseResult caseResult) {
         if (caseResult == null) {
             throw new BizException(ResultCode.BAD_REQUEST, "caseResult 不能为空");
@@ -309,12 +436,30 @@ public class JudgeResultReportServiceImpl implements JudgeResultReportService {
         validateProgress(caseResult.getScore(), "caseResult.score");
     }
 
+    /**
+     * @MethodName validateStatus
+     * @Param status
+     * @Param fieldName
+     * @Description 验证状态
+     * @Return
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private void validateStatus(Integer status, String fieldName) {
         if (status != null && !VALID_STATUS_SET.contains(status)) {
             throw new BizException(ResultCode.BAD_REQUEST, fieldName + " 不合法");
         }
     }
 
+    /**
+     * @MethodName validateRequiredTerminalStatus
+     * @Param status
+     * @Param fieldName
+     * @Description 验证所需终端状态
+     * @Return
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private void validateRequiredTerminalStatus(Integer status, String fieldName) {
         if (status == null) {
             throw new BizException(ResultCode.BAD_REQUEST, fieldName + " 不能为空");
@@ -322,38 +467,99 @@ public class JudgeResultReportServiceImpl implements JudgeResultReportService {
         validateTerminalStatus(status, fieldName);
     }
 
+    /**
+     * @MethodName validateTerminalStatus
+     * @Param status
+     * @Param fieldName
+     * @Description 验证终端状态
+     * @Return
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private void validateTerminalStatus(Integer status, String fieldName) {
         if (status != null && !isTerminalStatus(status)) {
             throw new BizException(ResultCode.BAD_REQUEST, fieldName + " 必须为终态");
         }
     }
 
+    /**
+     * @MethodName validateNonTerminalStatus
+     * @Param status
+     * @Param fieldName
+     * @Description 验证非终端状态
+     * @Return
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private void validateNonTerminalStatus(Integer status, String fieldName) {
-        if (status != null && isTerminalStatus(status)) {
+        if (isTerminalStatus(status)) {
             throw new BizException(ResultCode.BAD_REQUEST, fieldName + " 不能为终态");
         }
     }
 
+    /**
+     * @MethodName validateProgress
+     * @Param value
+     * @Param fieldName
+     * @Description 验证进度
+     * @Return
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private void validateProgress(Integer value, String fieldName) {
         if (value != null && value < 0) {
             throw new BizException(ResultCode.BAD_REQUEST, fieldName + " 不能小于 0");
         }
     }
 
+    /**
+     * @MethodName validateNonNegative
+     * @Param value
+     * @Param fieldName
+     * @Description 校验数值非负
+     * @Return
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private void validateNonNegative(Long value, String fieldName) {
         if (value != null && value < 0) {
             throw new BizException(ResultCode.BAD_REQUEST, fieldName + " 不能小于 0");
         }
     }
 
+    /**
+     * @MethodName isTerminalStatus
+     * @Param status
+     * @Description 判断状态是否为终态
+     * @Return @return boolean
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private boolean isTerminalStatus(Integer status) {
         return status != null && status >= SubmissionStatusConstant.ACCEPTED;
     }
 
+    /**
+     * @MethodName defaultZero
+     * @Param value
+     * @Description 默认值为零
+     * @Return @return {@link Integer }
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private Integer defaultZero(Integer value) {
         return value == null ? 0 : value;
     }
 
+    /**
+     * @MethodName appendStatusUpdate
+     * @Param wrapper
+     * @Param status
+     * @Description 附加状态更新
+     * @Return
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private void appendStatusUpdate(LambdaUpdateWrapper<Judge> wrapper, Integer status) {
         if (status == null) {
             return;
@@ -366,6 +572,16 @@ public class JudgeResultReportServiceImpl implements JudgeResultReportService {
                 + SubmissionStatusConstant.PENDING + "), " + status + ")");
     }
 
+    /**
+     * @MethodName appendProgressUpdate
+     * @Param wrapper
+     * @Param columnName
+     * @Param value
+     * @Description 附加进度更新
+     * @Return
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private void appendProgressUpdate(LambdaUpdateWrapper<Judge> wrapper, String columnName, Integer value) {
         if (value == null) {
             return;
@@ -373,6 +589,15 @@ public class JudgeResultReportServiceImpl implements JudgeResultReportService {
         wrapper.setSql(columnName + " = GREATEST(COALESCE(" + columnName + ", 0), " + value + ")");
     }
 
+    /**
+     * @MethodName appendCaseMetricUpdate
+     * @Param wrapper
+     * @Param result
+     * @Description 附加案例指标更新
+     * @Return
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private void appendCaseMetricUpdate(LambdaUpdateWrapper<Judge> wrapper, JudgeResultEventRequest.CaseResult result) {
         if (result == null) {
             return;
@@ -387,6 +612,14 @@ public class JudgeResultReportServiceImpl implements JudgeResultReportService {
         }
     }
 
+    /**
+     * @MethodName toInteger
+     * @Param value
+     * @Description 转换为整数
+     * @Return @return {@link Integer }
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private Integer toInteger(Long value) {
         if (value == null) {
             return null;

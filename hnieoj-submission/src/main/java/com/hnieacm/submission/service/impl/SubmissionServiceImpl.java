@@ -157,6 +157,14 @@ public class SubmissionServiceImpl implements SubmissionService {
         return new SubmitCodeVo(submitId);
     }
 
+    /**
+     * @MethodName rejudgeSubmission
+     * @Param submissionId
+     * @Description 重判单个提交
+     * @Return @return {@link SubmitCodeVo }
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public SubmitCodeVo rejudgeSubmission(String submissionId) {
@@ -206,6 +214,14 @@ public class SubmissionServiceImpl implements SubmissionService {
         return new SubmitCodeVo(normalizedSubmissionId);
     }
 
+    /**
+     * @MethodName listSubmissions
+     * @Param request
+     * @Description 分页查询提交记录
+     * @Return @return {@link PageVo }<{@link SubmissionListItemVo }>
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     @Override
     public PageVo<SubmissionListItemVo> listSubmissions(SubmissionListQueryRequest request) {
         int page = normalizePage(request == null ? null : request.getPage());
@@ -257,12 +273,28 @@ public class SubmissionServiceImpl implements SubmissionService {
         return new PageVo<>(records.stream().map(this::toListItemVo).toList(), pageResult.getTotal());
     }
 
+    /**
+     * @MethodName getSubmissionDetail
+     * @Param submissionId
+     * @Description 查询提交详情
+     * @Return @return {@link SubmissionDetailVo }
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     @Override
     public SubmissionDetailVo getSubmissionDetail(String submissionId) {
         Judge judge = queryAccessibleJudge(submissionId);
         return toDetailVo(judge);
     }
 
+    /**
+     * @MethodName listSubmissionCases
+     * @Param submissionId
+     * @Description 查询提交的测试点结果
+     * @Return @return {@link List }<{@link SubmissionCaseVo }>
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     @Override
     public List<SubmissionCaseVo> listSubmissionCases(String submissionId) {
         Judge judge = queryAccessibleJudge(submissionId);
@@ -304,6 +336,14 @@ public class SubmissionServiceImpl implements SubmissionService {
         return result.getData();
     }
 
+    /**
+     * @MethodName queryAccessibleJudge
+     * @Param submissionId
+     * @Description 查询当前用户可访问的提交记录
+     * @Return @return {@link Judge }
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private Judge queryAccessibleJudge(String submissionId) {
         String normalizedSubmissionId = trimToNull(submissionId);
         if (normalizedSubmissionId == null) {
@@ -319,6 +359,14 @@ public class SubmissionServiceImpl implements SubmissionService {
         return judge;
     }
 
+    /**
+     * @MethodName queryJudge
+     * @Param submissionId
+     * @Description 根据提交展示 ID 查询提交记录
+     * @Return @return {@link Judge }
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private Judge queryJudge(String submissionId) {
         Judge judge = judgeMapper.selectOne(new LambdaQueryWrapper<Judge>()
                 .eq(Judge::getSubmitId, submissionId)
@@ -329,6 +377,14 @@ public class SubmissionServiceImpl implements SubmissionService {
         return judge;
     }
 
+    /**
+     * @MethodName toListItemVo
+     * @Param judge
+     * @Description 转换提交列表展示对象
+     * @Return @return {@link SubmissionListItemVo }
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private SubmissionListItemVo toListItemVo(Judge judge) {
         SubmissionListItemVo vo = new SubmissionListItemVo();
         vo.setSubmissionId(judge.getSubmitId());
@@ -349,6 +405,14 @@ public class SubmissionServiceImpl implements SubmissionService {
         return vo;
     }
 
+    /**
+     * @MethodName toDetailVo
+     * @Param judge
+     * @Description 转换提交详情展示对象
+     * @Return @return {@link SubmissionDetailVo }
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private SubmissionDetailVo toDetailVo(Judge judge) {
         SubmissionDetailVo vo = new SubmissionDetailVo();
         vo.setSubmissionId(judge.getSubmitId());
@@ -376,6 +440,15 @@ public class SubmissionServiceImpl implements SubmissionService {
         return vo;
     }
 
+    /**
+     * @MethodName toCaseVo
+     * @Param judgeCase
+     * @Param includeSensitiveData
+     * @Description 转换测试点结果展示对象
+     * @Return @return {@link SubmissionCaseVo }
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private SubmissionCaseVo toCaseVo(JudgeCase judgeCase, boolean includeSensitiveData) {
         SubmissionCaseVo vo = new SubmissionCaseVo();
         vo.setCaseId(judgeCase.getCaseId());
@@ -417,6 +490,14 @@ public class SubmissionServiceImpl implements SubmissionService {
         ensureJudgeModeSupported(problem);
     }
 
+    /**
+     * @MethodName ensureProblemHasTestdata
+     * @Param problem
+     * @Description 校验题目是否已配置测试数据
+     * @Return
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private void ensureProblemHasTestdata(ProblemBasicDto problem) {
         if (problem.getAuth() == null) {
             throw new BizException(ResultCode.PROBLEM_NOT_FOUND, "题目不存在");
@@ -427,6 +508,14 @@ public class SubmissionServiceImpl implements SubmissionService {
         ensureJudgeModeSupported(problem);
     }
 
+    /**
+     * @MethodName ensureJudgeModeSupported
+     * @Param problem
+     * @Description 校验当前判题节点能力是否支持题目判题模式
+     * @Return
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private void ensureJudgeModeSupported(ProblemBasicDto problem) {
         String judgeMode = StrUtil.blankToDefault(problem.getJudgeMode(), DEFAULT_JUDGE_MODE);
         List<String> supportedModes = submissionProperties.getSupportedJudgeModes();
@@ -445,6 +534,15 @@ public class SubmissionServiceImpl implements SubmissionService {
         }
     }
 
+    /**
+     * @MethodName ensureJudgeModeContract
+     * @Param problem
+     * @Param judgeMode
+     * @Description 校验特殊判题模式所需合约字段
+     * @Return
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private void ensureJudgeModeContract(ProblemBasicDto problem, String judgeMode) {
         if (DEFAULT_JUDGE_MODE.equalsIgnoreCase(judgeMode)) {
             return;
@@ -464,6 +562,14 @@ public class SubmissionServiceImpl implements SubmissionService {
         throw new BizException(ResultCode.BAD_REQUEST, "不支持的判题模式: " + judgeMode);
     }
 
+    /**
+     * @MethodName ensureSubmissionRejudgeAllowed
+     * @Param judge
+     * @Description 校验提交是否允许重判
+     * @Return
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private void ensureSubmissionRejudgeAllowed(Judge judge) {
         if (SubmissionStatusConstant.isJudging(judge.getStatus())) {
             throw new BizException(ResultCode.BAD_REQUEST, "提交正在判题中，暂不能重判");
@@ -497,15 +603,37 @@ public class SubmissionServiceImpl implements SubmissionService {
         return uid;
     }
 
+    /**
+     * @MethodName isAdmin
+     * @Description 判断当前用户是否为管理员
+     * @Return @return boolean
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private boolean isAdmin() {
         return StpUtil.hasRole(RoleConstant.ADMIN) || StpUtil.hasRole(RoleConstant.ROOT);
     }
 
+    /**
+     * @MethodName includeDiagnosticData
+     * @Description 判断当前用户是否允许查看诊断信息
+     * @Return @return boolean
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private boolean includeDiagnosticData() {
         return isAdmin() || StpUtil.hasRole(RoleConstant.TEACHER)
                 || StpUtil.hasPermission(PermissionConstant.PROBLEM_UPDATE);
     }
 
+    /**
+     * @MethodName normalizePage
+     * @Param page
+     * @Description 规范化页码
+     * @Return @return int
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private int normalizePage(Integer page) {
         if (page == null) {
             return DEFAULT_PAGE;
@@ -516,6 +644,14 @@ public class SubmissionServiceImpl implements SubmissionService {
         return page;
     }
 
+    /**
+     * @MethodName normalizePageSize
+     * @Param pageSize
+     * @Description 规范化每页数量
+     * @Return @return int
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private int normalizePageSize(Integer pageSize) {
         if (pageSize == null) {
             return DEFAULT_PAGE_SIZE;
@@ -529,14 +665,38 @@ public class SubmissionServiceImpl implements SubmissionService {
         return pageSize;
     }
 
+    /**
+     * @MethodName trimToNull
+     * @Param value
+     * @Description 去除字符串首尾空白，空字符串返回 null
+     * @Return @return {@link String }
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private String trimToNull(String value) {
         return StrUtil.trimToNull(value);
     }
 
+    /**
+     * @MethodName defaultZero
+     * @Param value
+     * @Description 空值转为 0
+     * @Return @return {@link Integer }
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private Integer defaultZero(Integer value) {
         return value == null ? 0 : value;
     }
 
+    /**
+     * @MethodName validateCodeFileSize
+     * @Param file
+     * @Description 校验上传代码文件大小
+     * @Return
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private void validateCodeFileSize(MultipartFile file) {
         long maxCodeBytes = maxCodeBytes();
         if (file.getSize() > maxCodeBytes) {
@@ -544,6 +704,14 @@ public class SubmissionServiceImpl implements SubmissionService {
         }
     }
 
+    /**
+     * @MethodName validateCodeSize
+     * @Param code
+     * @Description 校验提交源码大小
+     * @Return
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private void validateCodeSize(String code) {
         long maxCodeBytes = maxCodeBytes();
         int codeBytes = code.getBytes(StandardCharsets.UTF_8).length;
@@ -552,6 +720,13 @@ public class SubmissionServiceImpl implements SubmissionService {
         }
     }
 
+    /**
+     * @MethodName maxCodeBytes
+     * @Description 获取提交源码最大字节数
+     * @Return @return long
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private long maxCodeBytes() {
         Integer maxCodeBytes = submissionProperties.getMaxCodeBytes();
         if (maxCodeBytes == null || maxCodeBytes <= 0) {
@@ -560,6 +735,14 @@ public class SubmissionServiceImpl implements SubmissionService {
         return maxCodeBytes.longValue();
     }
 
+    /**
+     * @MethodName caseOrder
+     * @Param judgeCase
+     * @Description 解析测试点排序值
+     * @Return @return int
+     * @Author HaoRan_Lyu
+     * @Date 2026/06/08
+     */
     private int caseOrder(JudgeCase judgeCase) {
         String caseId = trimToNull(judgeCase.getCaseId());
         if (caseId == null) {

@@ -1,92 +1,92 @@
-# HNieOJ Judge Operations Runbook
+# HNieOJ 判题链路运维手册
 
-## Scope
+## 范围
 
-This document records the current operational checks for the HNieOJ judge pipeline:
+本文记录 HNieOJ 当前判题链路的运维检查方式：
 
 ```text
 submission -> judge_task_outbox -> RabbitMQ -> hnieoj-judge-node -> result callback
 ```
 
-## Backend Checks
+## 后端检查
 
-### Judge Operation Summary
+### 判题链路摘要
 
 ```http
 GET /api/admin/submissions/judge-ops/summary
 ```
 
-Permission: `problem:update`.
+权限：`problem:update`。
 
-The response summarizes:
+返回内容包括：
 
-- outbox counts by status: `pending`, `processing`, `sent`, `failed`, `exhausted`
-- retryable outbox count
-- abnormal outbox count
-- judging submission counts for `Pending`, `Compiling`, `Running`
-- stale pending submission count
-- stale active submission count
-- long pending warning count
-- warning codes for dashboard display
+- outbox 各状态数量：`pending`、`processing`、`sent`、`failed`、`exhausted`
+- 可重试 outbox 数量
+- 异常 outbox 数量
+- 正在判题的提交数量：`Pending`、`Compiling`、`Running`
+- 超时 Pending 提交数量
+- 超时活跃提交数量
+- 长时间 Pending 告警数量
+- dashboard 可直接展示的 warning code
 
-Suggested dashboard rule:
+建议 dashboard 规则：
 
-- `healthy = true`: no immediate action required.
-- `outbox_exhausted`: inspect outbox detail and retry manually after fixing RabbitMQ or routing issues.
-- `outbox_abnormal`: check RabbitMQ connectivity, exchange, queue, routing key, and publisher confirm logs.
-- `stale_pending_submission`: check queue backlog and judge-node consumers.
-- `stale_active_submission`: check judge-node execution and callback logs.
-- `long_pending_submission`: warning only; do not mark as failed without checking queue backlog.
+- `healthy = true`：暂无需要立即处理的问题。
+- `outbox_exhausted`：检查 outbox 详情，修复 RabbitMQ 或路由问题后手动重试。
+- `outbox_abnormal`：检查 RabbitMQ 连通性、exchange、queue、routing key 和 publisher confirm 日志。
+- `stale_pending_submission`：检查队列积压和 judge-node consumer。
+- `stale_active_submission`：检查 judge-node 执行和回调日志。
+- `long_pending_submission`：仅作告警，不要在未确认队列积压前直接标记失败。
 
-### Outbox Detail
+### Outbox 详情
 
 ```http
 GET /api/admin/submissions/judge-outbox
 POST /api/admin/submissions/judge-outbox/{id}/retry
 ```
 
-Use these endpoints when the summary shows `failed` or `exhausted` outbox records.
+当摘要中出现 `failed` 或 `exhausted` outbox 记录时，使用这些接口查看详情并重试。
 
-## RabbitMQ Checks
+## RabbitMQ 检查
 
-When using the project deployment scripts, run:
+使用项目部署脚本时执行：
 
 ```bash
 bash deploy/scripts/deploy-dev.sh rabbitmq-ps
 bash deploy/scripts/deploy-dev.sh rabbitmq-logs
 ```
 
-Check:
+需要检查：
 
-- task queue has consumers
-- task queue backlog is not continuously increasing
-- DLQ does not keep growing
-- RabbitMQ management UI is not exposed to the public internet
+- 任务队列存在消费者
+- 任务队列积压没有持续增长
+- 死信队列没有持续增长
+- RabbitMQ 管理后台没有暴露到公网
 
-## DLQ Requeue
+## 死信队列重放
 
-The deployment script provides DLQ requeue through RabbitMQ Management HTTP API:
+部署脚本通过 RabbitMQ Management HTTP API 提供死信重放：
 
 ```bash
 bash deploy/scripts/deploy-dev.sh judge-dlq-requeue
 bash deploy/scripts/deploy-dev.sh judge-dlq-requeue 20
 ```
 
-Before requeue:
+重放前必须确认：
 
-- verify the cause is fixed
-- check judge-node logs
-- check backend callback endpoint is reachable
-- avoid repeatedly requeueing non-retryable judge failures
+- 问题原因已经修复
+- judge-node 日志没有持续报错
+- 后端回调接口可访问
+- 不要反复重放不可重试的判题失败
 
-## Judge Node Checks
+## 判题节点检查
 
 ```http
 GET /api/admin/judge/nodes
 GET /api/admin/judge/nodes/summary
 ```
 
-Check:
+节点列表重点检查：
 
 - `online`
 - `lastHeartbeatTime`
@@ -97,23 +97,23 @@ Check:
 - `cacheProblemCount`
 - `diskFreeBytes`
 
-If SPJ or interactive tasks are enabled, only publish them to nodes whose `supportedJudgeModes` include the required mode.
+如果启用 SPJ 或交互题，只能把任务投递给 `supportedJudgeModes` 包含对应模式的节点。
 
-The node summary endpoint reports:
+节点摘要接口返回：
 
-- online and offline active node counts
-- formal and temporary node counts
-- total running tasks and online capacity
-- online node counts by judge mode
-- overloaded node count
-- low disk node count
-- expiring temporary token count
-- warning codes for dashboard display
+- 在线节点与离线 active 节点数量
+- 正式节点与临时节点数量
+- 总运行任务数与在线并发容量
+- 按 judge mode 统计的在线节点数量
+- 过载节点数量
+- 低磁盘节点数量
+- 即将过期的临时 token 数量
+- dashboard 可直接展示的 warning code
 
-## Deployment Notes
+## 部署注意事项
 
-- Keep RabbitMQ credentials in `.env`, not Nacos.
-- Keep judge JWT secret in environment variables.
-- Keep formal-node private key on the judge-node host only.
-- Keep Nacos for non-sensitive runtime config and encrypted formal token ciphertext.
-- Do not expose internal service ports, RabbitMQ AMQP, or RabbitMQ management to public networks.
+- RabbitMQ 凭证保存在 `.env`，不要写入 Nacos。
+- 判题 JWT secret 使用环境变量注入。
+- 正式节点私钥只保存在判题节点宿主机。
+- Nacos 只保存非敏感运行配置和正式节点 token 密文。
+- 不要向公网暴露内部服务端口、RabbitMQ AMQP 或 RabbitMQ 管理后台。

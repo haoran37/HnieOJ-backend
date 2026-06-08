@@ -119,6 +119,7 @@ mvn -s deploy/maven/settings.xml clean install -DskipTests
 - 可选 go-judge Compose 文件：`deploy/docker/docker-compose.gojudge.yml`
 - 环境变量示例：`deploy/docker/.env.example`
 - 一键部署脚本：`deploy/scripts/deploy-dev.sh`
+- 从零部署检查清单：`docs/deployment-readiness.md`
 - 默认拉取分支：`dev`
 - 默认部署目录：`/opt/hnieoj/backend`
 - 默认 Gateway 端口映射：`8800:8800`

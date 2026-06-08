@@ -217,7 +217,7 @@ hnieoj:
   formalToken:
     privateKeyPath: "/etc/hnieoj/judge-security/judge_formal_private.pem"
     nacos:
-      serverAddr: "http://106.54.177.244:8848"
+      serverAddr: "http://${NACOS_SERVER_ADDR}"
       namespace: "dev"
       group: "HNIEOJ_SECRET_GROUP"
       dataId: "hnieoj-judge-formal-token.yaml"

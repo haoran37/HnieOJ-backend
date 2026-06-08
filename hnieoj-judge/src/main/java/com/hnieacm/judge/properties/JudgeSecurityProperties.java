@@ -15,8 +15,7 @@ import org.springframework.stereotype.Component;
 @RefreshScope
 @ConfigurationProperties(prefix = "hnieoj.judge.security")
 public class JudgeSecurityProperties {
-    //TODO
-    private String jwtSecret = "replace_me_judge_jwt_secret";
+    private String jwtSecret;
 
     private long tempTokenTtlSeconds = 7200;
 

@@ -48,7 +48,6 @@ import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.security.SecureRandom;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -72,7 +71,7 @@ public class UserManageServiceImpl implements UserManageService {
     private final UserManageProperties userManageProperties;
     private final UserInfoManager userInfoManager;
 
-    private final SecureRandom secureRandom = new SecureRandom();
+    private static final String DEFAULT_CREATE_USER_PASSWORD = "HnieOJ@123456";
 
     /**
      * @MethodName createUser
@@ -884,29 +883,7 @@ public class UserManageServiceImpl implements UserManageService {
      * @Date 2026/02/15
      */
     private @NonNull String generatePassword() {
-//        int minLen = userManageProperties.getPasswordMinLength();
-//        int maxLen = userManageProperties.getPasswordMaxLength();
-//        int len = userManageProperties.getGeneratedPasswordLength();
-//        if (len < minLen) {
-//            len = minLen;
-//        }
-//        if (len > maxLen) {
-//            len = maxLen;
-//        }
-//
-//        String chars = userManageProperties.getPasswordChars();
-//        if (StrUtil.isBlank(chars)) {
-//            chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%^&*";
-//        }
-//
-//        char[] charArray = chars.toCharArray();
-//        StringBuilder sb = new StringBuilder(len);
-//        for (int i = 0; i < len; i++) {
-//            sb.append(charArray[secureRandom.nextInt(charArray.length)]);
-//        }
-//        return sb.toString();
-        //TODO: 提供固定密码和随机密码两种方法
-        return "$2a$10$IgytfIALeNqnwQCXnAdOAe4AfGEHqZOzCaLu6MDwMH78Bum4ZQSua";
+        return DEFAULT_CREATE_USER_PASSWORD;
     }
 
     /**

@@ -15,5 +15,5 @@ management:
 hnieoj:
   judge:
     security:
-      jwt-secret: ${HNIEOJ_JUDGE_JWT_SECRET:replace_me}
+      jwt-secret: ${HNIEOJ_JUDGE_JWT_SECRET}
       node-active-timeout-seconds: ${HNIEOJ_JUDGE_NODE_ACTIVE_TIMEOUT_SECONDS:90}

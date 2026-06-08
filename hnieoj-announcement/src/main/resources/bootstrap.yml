@@ -5,11 +5,11 @@ spring:
     active: ${SPRING_PROFILES_ACTIVE:dev}
   cloud:
     nacos:
-      server-addr: ${NACOS_SERVER_ADDR:106.54.177.244:8848}
+      server-addr: ${NACOS_SERVER_ADDR}
       discovery:
-        namespace: ${NACOS_NAMESPACE:dev}
+        namespace: ${NACOS_NAMESPACE}
       config:
-        namespace: ${NACOS_NAMESPACE:dev}
+        namespace: ${NACOS_NAMESPACE}
         file-extension: yaml
   config:
     import:

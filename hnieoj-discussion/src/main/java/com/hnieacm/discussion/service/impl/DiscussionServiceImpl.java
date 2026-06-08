@@ -144,12 +144,8 @@ public class DiscussionServiceImpl implements DiscussionService {
     public DiscussionDetailVo getDiscussionDetail(Long discussionId) {
         Discussion post = queryNormalDiscussion(discussionId);
 
-        Integer latestViewNum = (post.getViewNum() == null ? 0 : post.getViewNum()) + 1;
-        Discussion updateView = new Discussion();
-        updateView.setId(post.getId());
-        updateView.setViewNum(latestViewNum);
-        discussionMapper.updateById(updateView);
-        post.setViewNum(latestViewNum);
+        discussionMapper.incrementViewNum(post.getId());
+        post = queryNormalDiscussion(post.getId());
 
         List<DiscussionAnswer> answers = discussionAnswerMapper.selectList(new LambdaQueryWrapper<DiscussionAnswer>()
                 .eq(DiscussionAnswer::getDid, post.getId())
@@ -761,19 +757,9 @@ public class DiscussionServiceImpl implements DiscussionService {
      */
     private void updateLikeNum(String targetType, Long targetId, int delta) {
         if (DiscussionTargetTypeConstant.POST.equals(targetType)) {
-            Discussion discussion = queryNormalDiscussion(targetId);
-            Discussion update = new Discussion();
-            update.setId(discussion.getId());
-            int likeNum = discussion.getLikeNum() == null ? 0 : discussion.getLikeNum();
-            update.setLikeNum(Math.max(0, likeNum + delta));
-            discussionMapper.updateById(update);
+            discussionMapper.incrementLikeNum(targetId, delta);
         } else {
-            DiscussionAnswer answer = queryNormalAnswer(targetId);
-            DiscussionAnswer update = new DiscussionAnswer();
-            update.setId(answer.getId());
-            int likeNum = answer.getLikeNum() == null ? 0 : answer.getLikeNum();
-            update.setLikeNum(Math.max(0, likeNum + delta));
-            discussionAnswerMapper.updateById(update);
+            discussionAnswerMapper.incrementLikeNum(targetId, delta);
         }
     }
 

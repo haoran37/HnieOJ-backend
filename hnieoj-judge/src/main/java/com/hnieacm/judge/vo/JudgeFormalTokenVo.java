@@ -18,9 +18,5 @@ public class JudgeFormalTokenVo {
 
     private String status;
 
-    private String nacosDataId;
-
-    private String nacosGroup;
-
     private LocalDateTime rotatedTime;
 }

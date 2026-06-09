@@ -1,6 +1,9 @@
 package com.hnieacm.judge.service;
 
 import com.hnieacm.judge.dto.SystemConfigSaveRequest;
+import com.hnieacm.judge.dto.TestEmailRequest;
+import com.hnieacm.judge.vo.EmailCheckVo;
+import com.hnieacm.judge.vo.SystemClientConfigVo;
 import com.hnieacm.judge.vo.SystemConfigVo;
 import com.hnieacm.judge.vo.SystemPublicConfigVo;
 import com.hnieacm.judge.vo.SystemTimeVo;
@@ -16,7 +19,13 @@ public interface SystemConfigService {
 
     SystemTimeVo getSystemTime();
 
+    SystemClientConfigVo getClientConfig();
+
+    EmailCheckVo checkRegisterEmail(String email);
+
     SystemConfigVo getSystemConfig();
 
     void saveSystemConfig(SystemConfigSaveRequest request);
+
+    void sendTestEmail(TestEmailRequest request);
 }

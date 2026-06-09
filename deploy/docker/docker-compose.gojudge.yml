@@ -12,6 +12,7 @@ services:
       - -http-addr=:5050
       - -mount-conf=/opt/go-judge/mount.yaml
     ports:
+      # go-judge 沙箱 HTTP 端口通常只供后端或判题节点访问；生产环境请配合防火墙限制来源。
       - "${GOJUDGE_PUBLIC_PORT:-5050}:5050"
     networks:
       - hnieoj-backend

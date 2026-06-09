@@ -29,13 +29,13 @@ sa-token:
 hnieoj:
   user:
     manage:
+      # 管理端创建/编辑用户时使用的账号密码基础校验，前端校验规则应与这里保持一致。
       username-min-length: 2
       username-max-length: 20
       password-min-length: 6
       password-max-length: 32
-      generated-password-length: 12
       manageable-role-ids:
+        # 管理端允许分配的角色 ID 白名单，避免越权授予更高权限。
         - 1001
         - 1002
         - 1003
-      password-chars: "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%^&*"

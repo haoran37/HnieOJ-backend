@@ -1,7 +1,9 @@
 hnieoj:
   judge:
     formal-token:
+      # 这是正式判题节点 Token 的密文存储位置，Nacos 中应创建同名正式配置文件。
       # 由 hnieoj-judge 管理端轮换接口自动写入。不要手动填写正式 Token 明文。
       encrypted-token: ""
+      # 版本号和更新时间同样由轮换接口维护，用于区分最新 Token。
       version: 0
       updated-at: ""

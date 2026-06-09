@@ -20,7 +20,9 @@ sa-token:
 hnieoj:
   problem:
     storage:
+      # 题目资源在服务容器内的存储根目录；Docker 部署时由宿主机目录挂载进来。
       root-path: ${HNIEOJ_PROBLEM_STORAGE_ROOT:/data/oj/problems}
+      # 前端访问题面图片时使用的 URL 前缀，需要与网关或静态资源代理规则保持一致。
       image-url-prefix: ${HNIEOJ_PROBLEM_IMAGE_URL_PREFIX:/oj/images}
       # 题面图片最大上传大小。
       max-image-size: ${HNIEOJ_PROBLEM_MAX_IMAGE_SIZE:5MB}
@@ -28,8 +30,11 @@ hnieoj:
       allowed-image-extensions: ${HNIEOJ_PROBLEM_ALLOWED_IMAGE_EXTENSIONS:jpg,jpeg,png,gif,webp}
       # 题面图片允许的 Content-Type。
       allowed-image-content-types: ${HNIEOJ_PROBLEM_ALLOWED_IMAGE_CONTENT_TYPES:image/jpeg,image/png,image/gif,image/webp}
+      # 测试数据 ZIP 上传大小限制，防止一次上传压垮服务内存或磁盘。
       max-testdata-zip-size: 50MB
+      # ZIP 解压后的总大小限制，防止压缩炸弹。
       max-testdata-uncompressed-size: 200MB
+      # ZIP 内文件数量限制，避免大量小文件拖慢校验与落盘。
       max-testdata-file-count: 2000
     judge-asset:
       # SPJ checker 源码最大字节数，按 UTF-8 编码计算。

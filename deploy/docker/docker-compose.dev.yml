@@ -58,6 +58,7 @@ services:
       SERVER_PORT: ${GATEWAY_SERVER_PORT:-8800}
       JAVA_OPTS: ${JAVA_OPTS:--Xms256m -Xmx512m}
     ports:
+      # 网关默认映射到宿主机 8800，并监听所有网卡；外部访问仍需放行安全组和系统防火墙。
       - "${GATEWAY_PUBLIC_PORT:-8800}:${GATEWAY_SERVER_PORT:-8800}"
 
   hnieoj-auth:

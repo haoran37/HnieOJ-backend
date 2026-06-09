@@ -86,12 +86,15 @@ sa-token:
 
 hnieoj:
   gateway:
+    # 网关访问下游服务的超时配置。下游服务慢时优先排查服务健康和 Nacos 注册状态，不建议盲目调大。
     web-client:
       connect-timeout-ms: 3000
       read-timeout-seconds: 10
       write-timeout-seconds: 10
       response-timeout-seconds: 10
   auth-cache:
+    # 网关鉴权缓存 TTL。jitter 会给过期时间增加随机抖动，避免大量权限缓存同一时间失效。
+    # local-fallback 是 Redis 短暂抖动时的本地兜底时间，只适合短期保护，不应设置过长。
     ttl:
       roles: 24h
       permissions: 12h

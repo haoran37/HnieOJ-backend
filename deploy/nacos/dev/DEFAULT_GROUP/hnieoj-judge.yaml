@@ -15,8 +15,11 @@ sa-token:
 hnieoj:
   judge:
     security:
+      # 临时判题节点 JWT 有效期，单位秒。时间越长，被泄露后的可用窗口越大。
       temp-token-ttl-seconds: ${HNIEOJ_JUDGE_TEMP_TOKEN_TTL_SECONDS:7200}
+      # 临时授权码有效期，单位秒；过期后需要重新生成。
       auth-code-ttl-seconds: ${HNIEOJ_JUDGE_AUTH_CODE_TTL_SECONDS:1800}
+      # 单个临时授权码最多允许兑换次数。生产建议保持 1，避免授权码被重复使用。
       auth-code-max-exchange: ${HNIEOJ_JUDGE_AUTH_CODE_MAX_EXCHANGE:1}
       # 临时节点 Ed25519 请求签名允许的时间偏差，单位秒。
       temp-token-allowed-clock-skew-seconds: ${HNIEOJ_JUDGE_TEMP_TOKEN_ALLOWED_CLOCK_SKEW_SECONDS:300}
@@ -25,7 +28,9 @@ hnieoj:
       # 判题节点超过该时间未心跳时视为不可调度，单位秒。
       node-active-timeout-seconds: ${HNIEOJ_JUDGE_NODE_ACTIVE_TIMEOUT_SECONDS:90}
     formal-token:
+      # 正式节点 Token 使用公钥加密后写入 Nacos，私钥只保留在判题节点机器。
       cipher-algorithm: RSA/ECB/OAEPWithSHA-256AndMGF1Padding
+      # 可直接填写公钥内容；如果为空，则从 public-key-path 指向的文件读取。
       public-key: ${HNIEOJ_JUDGE_FORMAL_TOKEN_PUBLIC_KEY:}
       public-key-path: ${HNIEOJ_JUDGE_FORMAL_TOKEN_PUBLIC_KEY_PATH:/etc/hnieoj/judge-security/judge_formal_public.pem}
       nacos-data-id: ${HNIEOJ_JUDGE_FORMAL_TOKEN_NACOS_DATA_ID:hnieoj-judge-formal-token.yaml}

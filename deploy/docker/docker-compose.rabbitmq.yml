@@ -8,6 +8,7 @@ services:
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?RABBITMQ_PASSWORD is required}
       RABBITMQ_DEFAULT_VHOST: ${RABBITMQ_VHOST:-hnieoj}
     ports:
+      # 默认只绑定 127.0.0.1，避免 AMQP 与管理后台暴露到公网；如需外部访问请在 .env 中配置监听地址。
       - "${RABBITMQ_BIND_HOST:-127.0.0.1}:${RABBITMQ_PUBLIC_PORT:-5672}:5672"
       - "${RABBITMQ_MANAGEMENT_BIND_HOST:-127.0.0.1}:${RABBITMQ_MANAGEMENT_PUBLIC_PORT:-15672}:15672"
     volumes:

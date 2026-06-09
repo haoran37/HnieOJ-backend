@@ -27,5 +27,7 @@ sa-token:
 hnieoj:
   achievement:
     file:
+      # 成就附件上传目录。为空时使用服务默认目录；生产建议配置到持久化挂载目录。
       upload-dir: ${ACHIEVEMENT_UPLOAD_DIR:}
+      # 成就附件公开访问前缀。为空时由服务返回默认路径；如走 CDN 或静态资源代理请在这里配置。
       public-url-prefix: ${ACHIEVEMENT_PUBLIC_URL_PREFIX:}

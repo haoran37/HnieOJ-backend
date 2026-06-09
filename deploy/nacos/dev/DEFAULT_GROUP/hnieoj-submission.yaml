@@ -26,6 +26,7 @@ sa-token:
 hnieoj:
   judge:
     mq:
+      # 判题任务 MQ 命名。生产环境如果多套 HNieOJ 共用同一个 RabbitMQ，请使用独立 vhost 或独立命名前缀。
       exchange: ${HNIEOJ_JUDGE_MQ_EXCHANGE:hnieoj.judge.exchange}
       task-queue: ${HNIEOJ_JUDGE_MQ_TASK_QUEUE:hnieoj.judge.task}
       routing-key: ${HNIEOJ_JUDGE_MQ_ROUTING_KEY:judge.submission.created}
@@ -79,6 +80,7 @@ hnieoj:
       # 处理多少条提交后刷新一次租约。
       lease-renew-every: ${HNIEOJ_REJUDGE_TASK_LEASE_RENEW_EVERY:10}
     websocket:
+      # 允许订阅判题进度 WebSocket 的前端来源。生产部署后请改成真实前端域名。
       allowed-origins:
         - "http://localhost:3000"
         - "http://localhost:5173"

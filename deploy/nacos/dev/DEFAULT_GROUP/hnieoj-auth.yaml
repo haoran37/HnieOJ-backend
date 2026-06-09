@@ -29,6 +29,7 @@ sa-token:
 
 hnieoj:
   auth-cache:
+    # 登录后写入角色/权限缓存。jitter 用于错开缓存过期时间，避免同一时间大量请求回源。
     ttl:
       roles: 24h
       permissions: 12h
@@ -36,6 +37,7 @@ hnieoj:
       jitter: 10m
   auth:
     validation:
+      # 注册与登录入口的账号密码基础校验，前端校验规则应与这里保持一致。
       username-min-length: 2
       username-max-length: 20
       password-min-length: 6

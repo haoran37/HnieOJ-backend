@@ -28,4 +28,8 @@ public class JudgeSecurityProperties {
     private long nodeExpireWarnSeconds = 1800;
 
     private double nodeDiskFreeWarnRatio = 0.1D;
+
+    private long tempTokenAllowedClockSkewSeconds = 300;
+
+    private long tempTokenNonceTtlSeconds = 600;
 }

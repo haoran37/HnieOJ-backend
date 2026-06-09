@@ -31,11 +31,27 @@ public class JudgeNodeToken {
 
     private Long authCodeId;
 
+    private String instanceId;
+
+    private String fingerprintHash;
+
+    private String boundSourceIp;
+
+    private String proofType;
+
+    private String publicKey;
+
+    private String publicKeyHash;
+
     private LocalDateTime expireTime;
 
     private LocalDateTime lastUsedTime;
 
     private LocalDateTime lastHeartbeatTime;
+
+    private LocalDateTime lastSeenAt;
+
+    private String lastSeenIp;
 
     private Integer maxConcurrency;
 
@@ -46,6 +62,8 @@ public class JudgeNodeToken {
     private String version;
 
     private String supportedJudgeModes;
+
+    private String diagnosticMessage;
 
     private Long cacheUsedBytes;
 

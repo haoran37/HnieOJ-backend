@@ -1,18 +1,14 @@
-package com.hnieacm.submission.dto;
+package com.hnieacm.common.dto;
 
 import lombok.Data;
 
 /**
  * @Author: HaoRan_Lyu
- * @Date: 2026/06/07
- * @Description: 判题节点 Token 内部校验请求
+ * @Date: 2026/06/09
+ * @Description: 判题节点请求签名上下文
  */
 @Data
-public class ValidateJudgeNodeTokenRequest {
-
-    private String judgeToken;
-
-    private String bearerToken;
+public class JudgeNodeRequestContext {
 
     private String method;
 

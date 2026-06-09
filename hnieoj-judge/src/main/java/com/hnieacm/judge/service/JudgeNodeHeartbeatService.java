@@ -1,5 +1,6 @@
 package com.hnieacm.judge.service;
 
+import com.hnieacm.common.dto.JudgeNodeRequestContext;
 import com.hnieacm.judge.dto.JudgeNodeHeartbeatRequest;
 
 /**
@@ -9,7 +10,8 @@ import com.hnieacm.judge.dto.JudgeNodeHeartbeatRequest;
  */
 public interface JudgeNodeHeartbeatService {
 
-    void recordHeartbeat(String judgeToken, String authorizationHeader, JudgeNodeHeartbeatRequest request);
+    void recordHeartbeat(String judgeToken, String authorizationHeader,
+                         JudgeNodeRequestContext requestContext, JudgeNodeHeartbeatRequest request);
 
     boolean hasActiveNodeForMode(String judgeMode);
 }

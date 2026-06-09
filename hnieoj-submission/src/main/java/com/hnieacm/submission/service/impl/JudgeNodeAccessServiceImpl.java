@@ -1,9 +1,11 @@
 package com.hnieacm.submission.service.impl;
 
 import cn.hutool.core.util.StrUtil;
+import com.hnieacm.common.dto.JudgeNodeRequestContext;
 import com.hnieacm.common.exception.BizException;
 import com.hnieacm.common.result.Result;
 import com.hnieacm.common.result.ResultCode;
+import com.hnieacm.common.util.JudgeNodeRequestContextUtils;
 import com.hnieacm.submission.dto.ValidateJudgeNodeTokenRequest;
 import com.hnieacm.submission.feign.JudgeNodeTokenFeignClient;
 import com.hnieacm.submission.service.JudgeNodeAccessService;
@@ -22,8 +24,6 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class JudgeNodeAccessServiceImpl implements JudgeNodeAccessService {
 
-    private static final String BEARER_PREFIX = "Bearer ";
-
     private final JudgeNodeTokenFeignClient judgeNodeTokenFeignClient;
 
     /**
@@ -36,10 +36,11 @@ public class JudgeNodeAccessServiceImpl implements JudgeNodeAccessService {
      * @Date 2026/06/08
      */
     @Override
-    public void checkAccess(String judgeToken, String authorizationHeader) {
+    public void checkAccess(String judgeToken, String authorizationHeader, JudgeNodeRequestContext requestContext) {
         ValidateJudgeNodeTokenRequest request = new ValidateJudgeNodeTokenRequest();
         request.setJudgeToken(StrUtil.trimToNull(judgeToken));
-        request.setBearerToken(extractBearerToken(authorizationHeader));
+        request.setBearerToken(JudgeNodeRequestContextUtils.extractBearerToken(authorizationHeader));
+        fillSignatureContext(request, requestContext);
 
         Result<JudgeNodeTokenValidationVo> result = judgeNodeTokenFeignClient.validate(request);
         if (result == null || result.getCode() != ResultCode.SUCCESS || result.getData() == null
@@ -70,21 +71,30 @@ public class JudgeNodeAccessServiceImpl implements JudgeNodeAccessService {
     }
 
     /**
-     * @MethodName extractBearerToken
-     * @Param authorizationHeader
-     * @Description 提取BearerToken
-     * @Return @return {@link String }
+     * @MethodName fillSignatureContext
+     * @Param request
+     * @Param requestContext
+     * @Description 填充请求签名上下文
+     * @Return
      * @Author HaoRan_Lyu
-     * @Date 2026/06/08
+     * @Date 2026/06/09
      */
-    private String extractBearerToken(String authorizationHeader) {
-        String normalizedHeader = StrUtil.trimToNull(authorizationHeader);
-        if (normalizedHeader == null) {
-            return null;
+    private void fillSignatureContext(ValidateJudgeNodeTokenRequest request, JudgeNodeRequestContext requestContext) {
+        if (requestContext == null) {
+            return;
         }
-        if (normalizedHeader.regionMatches(true, 0, BEARER_PREFIX, 0, BEARER_PREFIX.length())) {
-            return StrUtil.trimToNull(normalizedHeader.substring(BEARER_PREFIX.length()));
-        }
-        return null;
+        request.setMethod(requestContext.getMethod());
+        request.setPathWithQuery(requestContext.getPathWithQuery());
+        request.setSourceIp(requestContext.getSourceIp());
+        request.setNodeIdHeader(requestContext.getNodeIdHeader());
+        request.setTokenIdHeader(requestContext.getTokenIdHeader());
+        request.setInstanceId(requestContext.getInstanceId());
+        request.setFingerprintHash(requestContext.getFingerprintHash());
+        request.setSignatureAlgorithm(requestContext.getSignatureAlgorithm());
+        request.setTimestamp(requestContext.getTimestamp());
+        request.setNonce(requestContext.getNonce());
+        request.setBodySha256(requestContext.getBodySha256());
+        request.setActualBodySha256(requestContext.getActualBodySha256());
+        request.setSignature(requestContext.getSignature());
     }
 }

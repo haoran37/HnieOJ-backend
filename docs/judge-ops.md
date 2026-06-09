@@ -99,6 +99,51 @@ GET /api/admin/judge/nodes/summary
 
 如果启用 SPJ 或交互题，只能把任务投递给 `supportedJudgeModes` 包含对应模式的节点。
 
+## 临时节点绑定式 JWT
+
+临时节点兑换 `/api/judge/temp-token` 时必须提交节点指纹和 Ed25519 公钥证明：
+
+- `fingerprint.instanceId`：部署脚本持久化生成的节点实例 ID。
+- `fingerprint.hostnameHash`、`fingerprint.machineIdHash`：节点环境摘要。
+- `fingerprint.macAddressHashes`、`fingerprint.ipAddressHashes`：本机网络信息摘要。
+- `fingerprint.supportedJudgeModes`：节点能力列表。
+- `proof.type`：固定为 `ed25519`。
+- `proof.publicKey`：Ed25519 公钥 Base64，可使用 X.509 公钥或 32 字节原始公钥。
+
+后端会规范化指纹并返回 `fingerprintHash`，同时保存 `nodeId`、`tokenId`、`instanceId`、`boundSourceIp`、`publicKeyHash` 和过期时间。临时节点后续访问后端接口时必须追加以下请求头：
+
+```http
+X-Judge-Node-Id: <nodeId>
+X-Judge-Token-Id: <tokenId>
+X-Judge-Instance-Id: <instanceId>
+X-Judge-Fingerprint: <fingerprintHash>
+X-Judge-Signature-Algorithm: ed25519
+X-Judge-Timestamp: <unixSeconds>
+X-Judge-Nonce: <random>
+X-Judge-Body-Sha256: <sha256Hex>
+X-Judge-Signature: <base64Ed25519Signature>
+```
+
+签名串固定为：
+
+```text
+METHOD + "\n" +
+PATH_WITH_QUERY + "\n" +
+X-Judge-Body-Sha256 + "\n" +
+X-Judge-Timestamp + "\n" +
+X-Judge-Nonce
+```
+
+校验规则：
+
+- JWT 必须有效、未过期，且 `tokenId` 未撤销。
+- 请求来源 IP 必须与兑换时后端观测到的来源 IP 一致。
+- `nodeId`、`tokenId`、`instanceId`、`fingerprintHash` 必须与 token 绑定记录一致。
+- `X-Judge-Timestamp` 默认允许 300 秒偏差，可通过 `HNIEOJ_JUDGE_TEMP_TOKEN_ALLOWED_CLOCK_SKEW_SECONDS` 调整。
+- `X-Judge-Nonce` 使用 Redis 做短期防重放，默认缓存 600 秒，可通过 `HNIEOJ_JUDGE_TEMP_TOKEN_NONCE_TTL_SECONDS` 调整。
+- `X-Judge-Body-Sha256` 必须等于后端按原始请求体计算的 SHA-256。
+- `X-Judge-Signature` 必须能通过绑定的 Ed25519 公钥验签。
+
 节点摘要接口返回：
 
 - 在线节点与离线 active 节点数量

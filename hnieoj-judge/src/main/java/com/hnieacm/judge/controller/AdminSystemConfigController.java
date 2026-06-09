@@ -5,6 +5,7 @@ import cn.dev33.satoken.annotation.SaMode;
 import com.hnieacm.common.constant.RoleConstant;
 import com.hnieacm.common.result.Result;
 import com.hnieacm.judge.dto.SystemConfigSaveRequest;
+import com.hnieacm.judge.dto.TestEmailRequest;
 import com.hnieacm.judge.service.SystemConfigService;
 import com.hnieacm.judge.vo.SystemConfigVo;
 import io.swagger.v3.oas.annotations.Operation;
@@ -13,6 +14,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -44,5 +46,12 @@ public class AdminSystemConfigController {
     public Result<Void> saveConfig(@Valid @RequestBody SystemConfigSaveRequest request) {
         systemConfigService.saveSystemConfig(request);
         return Result.success("配置保存成功", null);
+    }
+
+    @Operation(summary = "发送测试邮件")
+    @PostMapping("/test-email")
+    public Result<Void> sendTestEmail(@Valid @RequestBody TestEmailRequest request) {
+        systemConfigService.sendTestEmail(request);
+        return Result.success("测试邮件发送成功", null);
     }
 }

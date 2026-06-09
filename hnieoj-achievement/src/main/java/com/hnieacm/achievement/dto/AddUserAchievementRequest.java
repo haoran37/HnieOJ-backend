@@ -12,9 +12,9 @@ import lombok.Data;
 public class AddUserAchievementRequest {
 
     /**
-     * 成就标题（建议传入；若不传将默认使用 content 截断生成）
-     * TODO: 后期调整
+     * 成就标题。
      */
+    @NotBlank(message = "title 不能为空")
     private String title;
 
     @NotBlank(message = "content 不能为空")

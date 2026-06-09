@@ -181,7 +181,7 @@ bash deploy/scripts/deploy-dev.sh restart
 bash deploy/scripts/deploy-dev.sh gojudge-cache-status
 ```
 
-清理旧的 go-judge 题目缓存：
+清理 go-judge 题目缓存：
 
 ```bash
 bash deploy/scripts/deploy-dev.sh gojudge-cache-clean 7

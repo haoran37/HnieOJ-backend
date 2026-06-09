@@ -18,6 +18,10 @@ hnieoj:
       temp-token-ttl-seconds: ${HNIEOJ_JUDGE_TEMP_TOKEN_TTL_SECONDS:7200}
       auth-code-ttl-seconds: ${HNIEOJ_JUDGE_AUTH_CODE_TTL_SECONDS:1800}
       auth-code-max-exchange: ${HNIEOJ_JUDGE_AUTH_CODE_MAX_EXCHANGE:1}
+      # 临时节点 Ed25519 请求签名允许的时间偏差，单位秒。
+      temp-token-allowed-clock-skew-seconds: ${HNIEOJ_JUDGE_TEMP_TOKEN_ALLOWED_CLOCK_SKEW_SECONDS:300}
+      # 临时节点请求签名 nonce 防重放缓存时间，单位秒。
+      temp-token-nonce-ttl-seconds: ${HNIEOJ_JUDGE_TEMP_TOKEN_NONCE_TTL_SECONDS:600}
       # 判题节点超过该时间未心跳时视为不可调度，单位秒。
       node-active-timeout-seconds: ${HNIEOJ_JUDGE_NODE_ACTIVE_TIMEOUT_SECONDS:90}
     formal-token:

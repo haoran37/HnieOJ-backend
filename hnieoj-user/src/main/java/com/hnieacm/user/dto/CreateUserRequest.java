@@ -22,8 +22,7 @@ public class CreateUserRequest {
     private String email;
 
     /**
-     * 管理员可选传入密码；不传则后端生成随机初始密码并在响应中返回。
-     * TODO: 提供固定密码和随机密码两种方法
+     * 管理员可选传入密码；不传则使用系统默认初始密码。
      */
     private String password;
 

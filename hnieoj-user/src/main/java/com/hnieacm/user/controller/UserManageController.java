@@ -12,12 +12,14 @@ import com.hnieacm.user.dto.UpdateUserIpRestrictionRequest;
 import com.hnieacm.user.dto.UpdateUserPasswordRequest;
 import com.hnieacm.user.dto.UpdateUserRequest;
 import com.hnieacm.user.service.UserIpRestrictionService;
+import com.hnieacm.user.service.UserImportService;
 import com.hnieacm.user.service.UserManageService;
 import com.hnieacm.user.service.UserProfileChangeService;
 import com.hnieacm.user.service.UserSubmissionTransferService;
 import com.hnieacm.user.vo.BatchOperationResultVo;
 import com.hnieacm.user.vo.CreateUserVo;
 import com.hnieacm.user.vo.TransferUserSubmissionsVo;
+import com.hnieacm.user.vo.UserImportResultVo;
 import com.hnieacm.user.vo.UserProfileChangeApplyVo;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -25,6 +27,10 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import org.springframework.validation.annotation.Validated;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -34,6 +40,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 /**
  * @Author: HaoRan_Lyu
@@ -49,6 +56,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class UserManageController {
 
     private final UserManageService userManageService;
+    private final UserImportService userImportService;
     private final UserIpRestrictionService userIpRestrictionService;
     private final UserSubmissionTransferService userSubmissionTransferService;
     private final UserProfileChangeService userProfileChangeService;
@@ -99,6 +107,23 @@ public class UserManageController {
     public Result<Void> batchDelete(@Valid @RequestBody BatchUidsRequest request) {
         userManageService.batchDeleteUsers(request);
         return Result.success("批量删除成功", null);
+    }
+
+    @Operation(summary = "导入用户")
+    @PostMapping(value = "/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public Result<UserImportResultVo> importUsers(@RequestParam("file") MultipartFile file) {
+        return Result.success("导入完成", userImportService.importUsers(file));
+    }
+
+    @Operation(summary = "下载用户导入模板")
+    @GetMapping("/import/template")
+    public ResponseEntity<byte[]> downloadImportTemplate() {
+        byte[] content = userImportService.buildTemplate();
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        ContentDisposition.attachment().filename("hnieoj-user-import-template.xlsx").build().toString())
+                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .body(content);
     }
 
     @Operation(summary = "设置用户 IP 限制")

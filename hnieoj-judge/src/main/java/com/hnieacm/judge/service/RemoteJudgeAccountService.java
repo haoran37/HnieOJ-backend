@@ -1,5 +1,6 @@
 package com.hnieacm.judge.service;
 
+import com.hnieacm.judge.dto.RemoteJudgeAccountSaveRequest;
 import com.hnieacm.judge.vo.RemoteJudgeAccountVo;
 
 import java.util.List;
@@ -12,4 +13,10 @@ import java.util.List;
 public interface RemoteJudgeAccountService {
 
     List<RemoteJudgeAccountVo> listRemoteJudgeAccounts(String oj, Integer status);
+
+    void addRemoteJudgeAccount(RemoteJudgeAccountSaveRequest request);
+
+    void updateRemoteJudgeAccount(Integer id, RemoteJudgeAccountSaveRequest request);
+
+    void deleteRemoteJudgeAccount(Integer id);
 }

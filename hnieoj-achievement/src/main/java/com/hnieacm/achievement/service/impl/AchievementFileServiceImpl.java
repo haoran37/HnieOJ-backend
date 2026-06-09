@@ -27,7 +27,6 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class AchievementFileServiceImpl implements AchievementFileService {
 
-    //TODO: 使用 nacos 管理配置
     private static final long MAX_FILE_SIZE_BYTES = 10L * 1024 * 1024;
 
     private final AchievementFileProperties achievementFileProperties;

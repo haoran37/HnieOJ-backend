@@ -9,7 +9,6 @@ import java.util.List;
  * @Author: HaoRan_Lyu
  * @Date: 2026/02/15
  * @Description: 用户详情（公开字段，用于展示）
- * TODO: 后期调整文件名
  */
 @Data
 public class UserDetailVo {
@@ -41,4 +40,3 @@ public class UserDetailVo {
 
     private List<String> roles;
 }
-

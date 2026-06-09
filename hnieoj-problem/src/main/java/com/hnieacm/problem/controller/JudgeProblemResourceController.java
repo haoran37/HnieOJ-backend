@@ -7,6 +7,8 @@ import com.hnieacm.common.result.ResultCode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hnieacm.problem.service.JudgeNodeAccessService;
 import com.hnieacm.problem.service.ProblemResourceService;
+import com.hnieacm.common.util.JudgeNodeRequestContextUtils;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
@@ -46,9 +48,11 @@ public class JudgeProblemResourceController {
                                  @RequestParam(required = false) Integer version,
                                  @RequestHeader(value = HeaderConstant.JUDGE_TOKEN, required = false) String judgeToken,
                                  @RequestHeader(value = HeaderConstant.AUTHORIZATION, required = false) String authorization,
+                                 HttpServletRequest request,
                                  HttpServletResponse response) {
         try {
-            judgeNodeAccessService.checkAccess(judgeToken, authorization);
+            judgeNodeAccessService.checkAccess(judgeToken, authorization,
+                    JudgeNodeRequestContextUtils.build(request, new byte[0]));
             ProblemResourceService.TestdataDownloadDecision decision =
                     problemResourceService.prepareTestdataDownload(id, version);
             if (decision.notModified()) {

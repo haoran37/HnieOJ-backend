@@ -74,7 +74,6 @@ public class SaTokenConfig {
                     SaRouter.match("/api/problem/edit/**", r -> StpUtil.checkPermission(PermissionConstant.PROBLEM_UPDATE));
                     SaRouter.match("/api/problem/delete/**", r -> StpUtil.checkPermission(PermissionConstant.PROBLEM_DELETE));
 
-                    // TODO: 将成就模块与用户模块合并
                     // 用户管理权限校验
                     SaRouter.match("/api/users/**")
                             // /api/users/{uid}/achievements 为用户成就模块对外接口，不走用户管理权限

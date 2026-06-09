@@ -1,5 +1,7 @@
 package com.hnieacm.problem.service;
 
+import com.hnieacm.common.dto.JudgeNodeRequestContext;
+
 /**
  * @Author: HaoRan_Lyu
  * @Date: 2026/05/12
@@ -7,5 +9,5 @@ package com.hnieacm.problem.service;
  */
 public interface JudgeNodeAccessService {
 
-    void checkAccess(String judgeToken, String authorizationHeader);
+    void checkAccess(String judgeToken, String authorizationHeader, JudgeNodeRequestContext requestContext);
 }

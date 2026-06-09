@@ -4,8 +4,10 @@ import cn.hutool.core.util.StrUtil;
 import cn.hutool.crypto.SecureUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.hnieacm.common.dto.JudgeNodeRequestContext;
 import com.hnieacm.common.exception.BizException;
 import com.hnieacm.common.result.ResultCode;
+import com.hnieacm.common.util.JudgeNodeRequestContextUtils;
 import com.hnieacm.judge.constant.JudgeNodeConstant;
 import com.hnieacm.judge.dto.JudgeNodeHeartbeatRequest;
 import com.hnieacm.judge.dto.ValidateJudgeNodeTokenRequest;
@@ -34,7 +36,6 @@ import java.util.List;
 @RequiredArgsConstructor
 public class JudgeNodeHeartbeatServiceImpl implements JudgeNodeHeartbeatService {
 
-    private static final String BEARER_PREFIX = "Bearer ";
     private static final String DEFAULT_JUDGE_MODE = "default";
     private static final String MODE_SEPARATOR = ",";
     private static final int FORMAL_TOKEN_ID_HASH_LENGTH = 32;
@@ -50,11 +51,12 @@ public class JudgeNodeHeartbeatServiceImpl implements JudgeNodeHeartbeatService 
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void recordHeartbeat(String judgeToken, String authorizationHeader, JudgeNodeHeartbeatRequest request) {
+    public void recordHeartbeat(String judgeToken, String authorizationHeader,
+                                JudgeNodeRequestContext requestContext, JudgeNodeHeartbeatRequest request) {
         if (request == null) {
             throw new BizException(ResultCode.BAD_REQUEST, "心跳请求不能为空");
         }
-        JudgeNodeTokenValidationVo validation = validateAccess(judgeToken, authorizationHeader);
+        JudgeNodeTokenValidationVo validation = validateAccess(judgeToken, authorizationHeader, requestContext);
         if (!Boolean.TRUE.equals(validation.getValid())) {
             throw new BizException(ResultCode.FORBIDDEN, "判题节点凭证无效");
         }
@@ -78,11 +80,32 @@ public class JudgeNodeHeartbeatServiceImpl implements JudgeNodeHeartbeatService 
         return tokens.stream().anyMatch(token -> supportsMode(token.getSupportedJudgeModes(), normalizedJudgeMode));
     }
 
-    private JudgeNodeTokenValidationVo validateAccess(String judgeToken, String authorizationHeader) {
+    private JudgeNodeTokenValidationVo validateAccess(String judgeToken, String authorizationHeader,
+                                                     JudgeNodeRequestContext requestContext) {
         ValidateJudgeNodeTokenRequest validateRequest = new ValidateJudgeNodeTokenRequest();
         validateRequest.setJudgeToken(StrUtil.trimToNull(judgeToken));
-        validateRequest.setBearerToken(parseBearerToken(authorizationHeader));
+        validateRequest.setBearerToken(JudgeNodeRequestContextUtils.extractBearerToken(authorizationHeader));
+        fillSignatureContext(validateRequest, requestContext);
         return judgeNodeSecurityService.validateToken(validateRequest);
+    }
+
+    private void fillSignatureContext(ValidateJudgeNodeTokenRequest request, JudgeNodeRequestContext requestContext) {
+        if (requestContext == null) {
+            return;
+        }
+        request.setMethod(requestContext.getMethod());
+        request.setPathWithQuery(requestContext.getPathWithQuery());
+        request.setSourceIp(requestContext.getSourceIp());
+        request.setNodeIdHeader(requestContext.getNodeIdHeader());
+        request.setTokenIdHeader(requestContext.getTokenIdHeader());
+        request.setInstanceId(requestContext.getInstanceId());
+        request.setFingerprintHash(requestContext.getFingerprintHash());
+        request.setSignatureAlgorithm(requestContext.getSignatureAlgorithm());
+        request.setTimestamp(requestContext.getTimestamp());
+        request.setNonce(requestContext.getNonce());
+        request.setBodySha256(requestContext.getBodySha256());
+        request.setActualBodySha256(requestContext.getActualBodySha256());
+        request.setSignature(requestContext.getSignature());
     }
 
     private void validateRequest(JudgeNodeHeartbeatRequest request) {
@@ -199,17 +222,6 @@ public class JudgeNodeHeartbeatServiceImpl implements JudgeNodeHeartbeatService 
         token.setDiskTotalBytes(request.getDiskTotalBytes());
         token.setDiskFreeBytes(request.getDiskFreeBytes());
         token.setLastHeartbeatTime(LocalDateTime.now());
-    }
-
-    private String parseBearerToken(String authorizationHeader) {
-        String normalized = StrUtil.trimToNull(authorizationHeader);
-        if (normalized == null) {
-            return null;
-        }
-        if (normalized.regionMatches(true, 0, BEARER_PREFIX, 0, BEARER_PREFIX.length())) {
-            return StrUtil.trimToNull(normalized.substring(BEARER_PREFIX.length()));
-        }
-        return normalized;
     }
 
     private List<String> normalizeSupportedJudgeModes(List<String> supportedJudgeModes) {

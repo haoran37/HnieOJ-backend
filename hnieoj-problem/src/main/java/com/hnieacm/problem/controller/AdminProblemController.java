@@ -6,20 +6,27 @@ import com.hnieacm.common.dto.PageVo;
 import com.hnieacm.common.result.Result;
 import com.hnieacm.problem.dto.AddProblemRequest;
 import com.hnieacm.problem.dto.DeleteProblemRequest;
+import com.hnieacm.problem.dto.ExportProblemRequest;
 import com.hnieacm.problem.dto.UpdateProblemAuthRequest;
 import com.hnieacm.problem.dto.UpdateProblemRequest;
 import com.hnieacm.problem.service.AdminProblemService;
+import com.hnieacm.problem.service.ProblemExportService;
 import com.hnieacm.problem.service.ProblemResourceService;
 import com.hnieacm.problem.vo.AdminProblemListVo;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+
+import java.io.IOException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 
 /**
  * @Author: HaoRan_Lyu
@@ -35,6 +42,7 @@ public class AdminProblemController {
 
     private final AdminProblemService adminProblemService;
     private final ProblemResourceService problemResourceService;
+    private final ProblemExportService problemExportService;
 
     @Operation(summary = "获取题目列表")
     @SaCheckPermission(PermissionConstant.PROBLEM_UPDATE)
@@ -102,5 +110,17 @@ public class AdminProblemController {
                                     @PathVariable String filename) {
         problemResourceService.deleteImage(id, filename);
         return Result.success("删除成功", null);
+    }
+
+    @Operation(summary = "导出题目")
+    @SaCheckPermission(PermissionConstant.PROBLEM_UPDATE)
+    @PostMapping(value = "/export", produces = "application/zip")
+    public void exportProblems(@Valid @RequestBody ExportProblemRequest request,
+                               HttpServletResponse response) throws IOException {
+        String filename = URLEncoder.encode("hnieoj-problems.zip", StandardCharsets.UTF_8).replace("+", "%20");
+        response.setCharacterEncoding(StandardCharsets.UTF_8.name());
+        response.setContentType("application/zip");
+        response.setHeader("Content-Disposition", "attachment; filename*=UTF-8''" + filename);
+        problemExportService.exportProblems(request.getIds(), response.getOutputStream());
     }
 }

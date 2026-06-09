@@ -20,5 +20,7 @@ public class JudgeTempTokenVo {
 
     private String tokenId;
 
+    private String fingerprintHash;
+
     private LocalDateTime expireTime;
 }

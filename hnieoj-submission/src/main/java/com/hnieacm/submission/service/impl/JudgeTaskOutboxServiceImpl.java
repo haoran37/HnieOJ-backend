@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.hnieacm.common.dto.PageVo;
 import com.hnieacm.common.exception.BizException;
 import com.hnieacm.common.result.ResultCode;
+import com.hnieacm.common.util.PageParamUtils;
 import com.hnieacm.submission.constant.JudgeTaskOutboxStatusConstant;
 import com.hnieacm.submission.dto.JudgeTaskOutboxQueryRequest;
 import com.hnieacm.submission.entity.JudgeTaskOutbox;
@@ -28,9 +29,6 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class JudgeTaskOutboxServiceImpl implements JudgeTaskOutboxService {
 
-    private static final int DEFAULT_PAGE = 1;
-    private static final int DEFAULT_PAGE_SIZE = 20;
-    private static final int MAX_PAGE_SIZE = 100;
     private static final Set<String> STATUS_SET = Set.of(
             JudgeTaskOutboxStatusConstant.PENDING,
             JudgeTaskOutboxStatusConstant.PROCESSING,
@@ -159,13 +157,7 @@ public class JudgeTaskOutboxServiceImpl implements JudgeTaskOutboxService {
      * @Date 2026/06/08
      */
     private int normalizePage(Integer page) {
-        if (page == null) {
-            return DEFAULT_PAGE;
-        }
-        if (page <= 0) {
-            throw new BizException(ResultCode.BAD_REQUEST, "page 必须大于 0");
-        }
-        return page;
+        return PageParamUtils.normalizePage(page);
     }
 
     /**
@@ -177,15 +169,6 @@ public class JudgeTaskOutboxServiceImpl implements JudgeTaskOutboxService {
      * @Date 2026/06/08
      */
     private int normalizePageSize(Integer pageSize) {
-        if (pageSize == null) {
-            return DEFAULT_PAGE_SIZE;
-        }
-        if (pageSize <= 0) {
-            throw new BizException(ResultCode.BAD_REQUEST, "pageSize 必须大于 0");
-        }
-        if (pageSize > MAX_PAGE_SIZE) {
-            throw new BizException(ResultCode.BAD_REQUEST, "pageSize 不能大于 " + MAX_PAGE_SIZE);
-        }
-        return pageSize;
+        return PageParamUtils.normalizePageSize(pageSize);
     }
 }

@@ -7,6 +7,7 @@ import com.hnieacm.common.dto.PageVo;
 import com.hnieacm.common.exception.BizException;
 import com.hnieacm.common.result.Result;
 import com.hnieacm.common.result.ResultCode;
+import com.hnieacm.common.util.PageParamUtils;
 import com.hnieacm.discussion.constant.DiscussionCategoryConstant;
 import com.hnieacm.discussion.constant.DiscussionRoleConstant;
 import com.hnieacm.discussion.constant.DiscussionSortConstant;
@@ -87,9 +88,7 @@ public class DiscussionServiceImpl implements DiscussionService {
      */
     @Override
     public PageVo<DiscussionListVo> listDiscussions(int page, int pageSize, String category, String keyword, String sort) {
-        if (page <= 0 || pageSize <= 0) {
-            throw new BizException(ResultCode.BAD_REQUEST, "page 和 pageSize 必须大于 0");
-        }
+        PageParamUtils.validate(page, pageSize);
 
         String normalizedCategory = DiscussionCategoryConstant.normalizeWithAll(category);
         String normalizedSort = DiscussionSortConstant.normalize(sort);
@@ -403,9 +402,7 @@ public class DiscussionServiceImpl implements DiscussionService {
      */
     @Override
     public PageVo<AdminDiscussionListVo> listAdminDiscussions(int page, int pageSize, String keyword, String category, Integer status) {
-        if (page <= 0 || pageSize <= 0) {
-            throw new BizException(ResultCode.BAD_REQUEST, "page 和 pageSize 必须大于 0");
-        }
+        PageParamUtils.validate(page, pageSize);
         String normalizedKeyword = trimToNull(keyword);
         String normalizedCategory = category == null ? null : DiscussionCategoryConstant.normalizeWithAll(category);
         Integer normalizedStatus = status == null ? null : DiscussionStatusConstant.normalize(status);

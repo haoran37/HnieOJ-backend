@@ -9,6 +9,7 @@ import com.hnieacm.common.dto.PageVo;
 import com.hnieacm.common.exception.BizException;
 import com.hnieacm.common.result.Result;
 import com.hnieacm.common.result.ResultCode;
+import com.hnieacm.common.util.PageParamUtils;
 import com.hnieacm.submission.constant.RejudgeTaskStatusConstant;
 import com.hnieacm.submission.constant.SubmissionStatusConstant;
 import com.hnieacm.submission.dto.CreateRejudgeTaskRequest;
@@ -55,9 +56,6 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class RejudgeTaskServiceImpl implements RejudgeTaskService {
 
-    private static final int DEFAULT_PAGE = 1;
-    private static final int DEFAULT_PAGE_SIZE = 20;
-    private static final int MAX_PAGE_SIZE = 100;
     private static final int DEFAULT_BATCH_SIZE = 50;
     private static final long DEFAULT_LEASE_SECONDS = 300L;
     private static final int DEFAULT_LEASE_RENEW_EVERY = 10;
@@ -801,13 +799,7 @@ public class RejudgeTaskServiceImpl implements RejudgeTaskService {
      * @Date 2026/06/08
      */
     private int normalizePage(Integer page) {
-        if (page == null) {
-            return DEFAULT_PAGE;
-        }
-        if (page <= 0) {
-            throw new BizException(ResultCode.BAD_REQUEST, "page 必须大于 0");
-        }
-        return page;
+        return PageParamUtils.normalizePage(page);
     }
 
     /**
@@ -819,16 +811,7 @@ public class RejudgeTaskServiceImpl implements RejudgeTaskService {
      * @Date 2026/06/08
      */
     private int normalizePageSize(Integer pageSize) {
-        if (pageSize == null) {
-            return DEFAULT_PAGE_SIZE;
-        }
-        if (pageSize <= 0) {
-            throw new BizException(ResultCode.BAD_REQUEST, "pageSize 必须大于 0");
-        }
-        if (pageSize > MAX_PAGE_SIZE) {
-            throw new BizException(ResultCode.BAD_REQUEST, "pageSize 不能大于 " + MAX_PAGE_SIZE);
-        }
-        return pageSize;
+        return PageParamUtils.normalizePageSize(pageSize);
     }
 
     /**

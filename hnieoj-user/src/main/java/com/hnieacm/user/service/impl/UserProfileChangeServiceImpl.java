@@ -7,6 +7,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.hnieacm.common.dto.PageVo;
 import com.hnieacm.common.exception.BizException;
 import com.hnieacm.common.result.ResultCode;
+import com.hnieacm.common.util.PageParamUtils;
 import com.hnieacm.user.constant.UserProfileChangeStatus;
 import com.hnieacm.user.dto.BatchUidsRequest;
 import com.hnieacm.user.dto.UserProfileChangeApplyRequest;
@@ -39,10 +40,6 @@ import java.util.Objects;
 @Service
 @RequiredArgsConstructor
 public class UserProfileChangeServiceImpl implements UserProfileChangeService {
-
-    private static final int DEFAULT_PAGE = 1;
-    private static final int DEFAULT_PAGE_SIZE = 20;
-    private static final int MAX_PAGE_SIZE = 100;
 
     private final UserProfileChangeApplyMapper changeApplyMapper;
     private final UserInfoMapper userInfoMapper;
@@ -151,9 +148,8 @@ public class UserProfileChangeServiceImpl implements UserProfileChangeService {
 
     private PageVo<UserProfileChangeApplyVo> listByWrapper(int page, int pageSize,
                                                            LambdaQueryWrapper<UserProfileChangeApply> wrapper) {
-        int normalizedPage = page <= 0 ? DEFAULT_PAGE : page;
-        int normalizedPageSize = pageSize <= 0 ? DEFAULT_PAGE_SIZE : Math.min(pageSize, MAX_PAGE_SIZE);
-        Page<UserProfileChangeApply> mpPage = new Page<>(normalizedPage, normalizedPageSize);
+        PageParamUtils.validate(page, pageSize);
+        Page<UserProfileChangeApply> mpPage = new Page<>(page, pageSize);
         Page<UserProfileChangeApply> result = changeApplyMapper.selectPage(mpPage, wrapper);
         if (result.getRecords().isEmpty()) {
             return new PageVo<>(Collections.emptyList(), result.getTotal());

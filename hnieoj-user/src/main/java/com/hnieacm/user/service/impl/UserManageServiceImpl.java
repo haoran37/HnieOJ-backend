@@ -10,6 +10,7 @@ import com.hnieacm.common.constant.UserStatusConstant;
 import com.hnieacm.common.dto.PageVo;
 import com.hnieacm.common.exception.BizException;
 import com.hnieacm.common.result.ResultCode;
+import com.hnieacm.common.util.PageParamUtils;
 import com.hnieacm.user.dto.BatchUidsRequest;
 import com.hnieacm.user.dto.CreateUserRequest;
 import com.hnieacm.user.dto.GrantPermissionRequest;
@@ -364,9 +365,7 @@ public class UserManageServiceImpl implements UserManageService {
 
     @Override
     public PageVo<UserListVo> listUsers(String keyword, Long collegeId, String grade, Long classId, int page, int pageSize) {
-        if (page <= 0 || pageSize <= 0) {
-            throw new BizException(ResultCode.BAD_REQUEST, "page 和 pageSize 必须大于 0");
-        }
+        PageParamUtils.validate(page, pageSize);
 
         String normalizedKeyword = StrUtil.trimToNull(keyword);
         String normalizedGrade = StrUtil.trimToNull(grade);
@@ -462,6 +461,7 @@ public class UserManageServiceImpl implements UserManageService {
      */
     @Override
     public PageVo<PermissionUserVo> getPermissionUsers(int page, int pageSize) {
+        PageParamUtils.validate(page, pageSize);
         if (userManageProperties.getManageableRoleIds() == null || userManageProperties.getManageableRoleIds().isEmpty()) {
             return new PageVo<>(Collections.emptyList(), 0);
         }
@@ -485,6 +485,7 @@ public class UserManageServiceImpl implements UserManageService {
      */
     @Override
     public PageVo<UserSearchVo> searchUsers(String query, int page, int pageSize) {
+        PageParamUtils.validate(page, pageSize);
         if (StrUtil.isBlank(query)) {
             throw new BizException(ResultCode.BAD_REQUEST, "query 不能为空");
         }

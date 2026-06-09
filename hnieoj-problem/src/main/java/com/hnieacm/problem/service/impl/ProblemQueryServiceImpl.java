@@ -9,6 +9,7 @@ import com.hnieacm.common.constant.PermissionConstant;
 import com.hnieacm.common.dto.PageVo;
 import com.hnieacm.common.exception.BizException;
 import com.hnieacm.common.result.ResultCode;
+import com.hnieacm.common.util.PageParamUtils;
 import com.hnieacm.problem.constant.ProblemAuthConstant;
 import com.hnieacm.problem.constant.ProblemTypeConstant;
 import com.hnieacm.problem.entity.Problem;
@@ -60,9 +61,7 @@ public class ProblemQueryServiceImpl implements ProblemQueryService {
      */
     @Override
     public PageVo<ProblemListVo> listPublicProblems(int page, int pageSize, String keyword, List<String> tags, Integer difficulty) {
-        if (page <= 0 || pageSize <= 0) {
-            throw new BizException(ResultCode.BAD_REQUEST, "page和pageSize必须大于0");
-        }
+        PageParamUtils.validate(page, pageSize);
 
         String normalizedKeyword = StrUtil.trimToNull(keyword);
         List<String> normalizedTags = ProblemServiceSupport.normalizeTagNames(tags);

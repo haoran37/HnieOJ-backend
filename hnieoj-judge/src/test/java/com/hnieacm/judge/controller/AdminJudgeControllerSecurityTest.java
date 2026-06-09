@@ -20,7 +20,8 @@ class AdminJudgeControllerSecurityTest {
             AdminJudgeController.class,
             AdminJudgeNodeController.class,
             AdminJudgeServerController.class,
-            AdminSystemConfigController.class
+            AdminSystemConfigController.class,
+            AdminDashboardController.class
     })
     void shouldRequireAdminOrRootRole(Class<?> controllerClass) {
         SaCheckRole annotation = controllerClass.getAnnotation(SaCheckRole.class);

@@ -1,29 +1,28 @@
 ﻿# HnieOJ-backend
 
-> ⚠️ **项目状态：WIP**
-> 当前仓库已完成大部分业务接口，并已接入 RabbitMQ + 二开 go-judge 的基础判题链路；多判题机调度、心跳隔离和集成测试仍在完善中。
+> **项目状态：第一版联调阶段**
+> 当前仓库已完成核心业务接口，并已接入 RabbitMQ + 二开 go-judge 的判题链路；后续重点是接口联调、测试补强和部署验证。
 
 [API文档](https://s.apifox.cn/91edc2c6-6918-4179-9852-9ec3742377c8)、[前端仓库](https://github.com/haoran37/HnieOJ)
 
 ## 项目状态
 
-HnieOJ-backend 是一个基于 **Spring Cloud Alibaba** 的在线判题系统后端，采用微服务架构。  
-当前阶段目标：在公开仓库前，把现状、已完成内容和后续计划透明化，便于后续维护者接手。
+HNieOJ-backend 是一个基于 **Spring Cloud Alibaba** 的在线判题系统后端，采用微服务架构。
 
 ### 已完成
 
 - 基础微服务骨架与网关转发
 - 认证鉴权（Sa-Token）与内部服务调用约束（`/internal/**`）
-- 用户、题目、提交、比赛、训练、讨论、公告、成就等模块的大部分接口
-- submission -> RabbitMQ -> go-judge -> submission 的基础判题回调链路
+- 用户、题目、提交、比赛、训练、讨论、公告、成就等模块核心接口
+- submission -> RabbitMQ -> go-judge -> submission 的判题回调链路
 - Nacos 配置中心接入、MyBatis-Plus 持久层、统一返回结构（`Result/ResultCode`）
 
-### 未完成
+### 后续重点
 
-- 多判题机负载均衡与心跳/健康检查
+- 多判题机调度策略与故障摘除
 - 判题链路集成测试与回归测试
-- 本地题目资源存储的完整运维闭环（已改用 `/data/oj/problems`，仍需线上联调）
-- 等等
+- 本地题目资源存储与 Nginx 静态资源代理的线上联调
+- 前后端接口联调与错误提示打磨
 
 ## 模块概览
 
@@ -35,7 +34,7 @@ HnieOJ-backend/
 ├── hnieoj-user             # 用户服务
 ├── hnieoj-problem          # 题目服务
 ├── hnieoj-submission       # 提交服务
-├── hnieoj-judge            # 判题服务（WIP）
+├── hnieoj-judge            # 判题服务
 ├── hnieoj-contest          # 比赛服务
 ├── hnieoj-training         # 训练服务
 ├── hnieoj-discussion       # 讨论服务
@@ -164,8 +163,7 @@ bash deploy/scripts/deploy-dev.sh gojudge-up
 
 ## 贡献说明
 
-欢迎提交 Issue / PR。  
-但请注意：当前处于 WIP 且维护不稳定阶段，合并与反馈可能不及时。
+欢迎提交 Issue / PR。提交前请说明影响模块、验证方式和涉及的配置项。
 
 ## 许可证
 

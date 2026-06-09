@@ -104,8 +104,7 @@ public class UserAchievementServiceImpl implements UserAchievementService {
 
         String title = StrUtil.trim(request.getTitle());
         if (StrUtil.isBlank(title)) {
-            // 兼容旧模型：未传 title 时使用 content 截断生成
-            title = content.length() <= 50 ? content : content.substring(0, 50);
+            throw new BizException(ResultCode.BAD_REQUEST, "title 不能为空");
         }
 
         UserAchievement achievement = new UserAchievement();
@@ -118,7 +117,6 @@ public class UserAchievementServiceImpl implements UserAchievementService {
 
         userAchievementMapper.insert(achievement);
 
-        // TODO: 邮件通知（smtp 配置通过 Nacos 管理）
         log.info("Add user achievement, uid: {}, title: {}", uid, title);
     }
 

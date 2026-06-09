@@ -17,15 +17,12 @@ import org.springframework.stereotype.Component;
 public class AchievementFileProperties {
 
     /**
-     * 文件上传落盘目录
-     * TODO：通过 Nacos 配置到独立挂载盘
+     * 文件上传落盘目录。
      */
     private String uploadDir;
 
     /**
-     * 对外可访问的 URL 前缀
-     * TODO：混淆文件名，避免文件名被猜到
+     * 对外可访问的 URL 前缀。
      */
     private String publicUrlPrefix;
 }
-

@@ -130,7 +130,6 @@ public class RegistrationReviewServiceImpl implements RegistrationReviewService 
         // 通过后写入权限缓存，供网关鉴权读取
         userAuthCacheService.cacheUserAuth(uid);
 
-        // TODO: 发送邮件通知（smtp 配置通过 Nacos 管理）
         log.info("Register approved, uid: {}, email: {}", uid, apply.getEmail());
     }
 
@@ -169,7 +168,6 @@ public class RegistrationReviewServiceImpl implements RegistrationReviewService 
         apply.setReplyInfo(reason);
         userRegisterApplyMapper.updateById(apply);
 
-        // TODO: 发送邮件通知（smtp 配置通过 Nacos 管理）
         log.info("Register rejected, uid: {}, email: {}, reason: {}", uid, apply.getEmail(), reason);
     }
 

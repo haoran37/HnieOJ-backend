@@ -247,8 +247,6 @@ public class FormalJudgeTokenServiceImpl implements FormalJudgeTokenService {
         vo.setId(tokenRecord.getId());
         vo.setVersion(tokenRecord.getVersion());
         vo.setStatus(tokenRecord.getStatus());
-        vo.setNacosDataId(formalTokenProperties.getNacosDataId());
-        vo.setNacosGroup(formalTokenProperties.getNacosGroup());
         vo.setRotatedTime(tokenRecord.getGmtCreate() == null ? LocalDateTime.now() : tokenRecord.getGmtCreate());
         return vo;
     }

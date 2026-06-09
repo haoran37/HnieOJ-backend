@@ -12,8 +12,7 @@ import com.hnieacm.auth.mapper.UserRegisterApplyMapper;
 import com.hnieacm.auth.service.RegistrationApplyQueryService;
 import com.hnieacm.auth.vo.RegistrationApplyVo;
 import com.hnieacm.common.dto.PageVo;
-import com.hnieacm.common.exception.BizException;
-import com.hnieacm.common.result.ResultCode;
+import com.hnieacm.common.util.PageParamUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -49,9 +48,7 @@ public class RegistrationApplyQueryServiceImpl implements RegistrationApplyQuery
      */
     @Override
     public PageVo<RegistrationApplyVo> list(int page, int pageSize, Integer status, String keyword) {
-        if (page <= 0 || pageSize <= 0) {
-            throw new BizException(ResultCode.BAD_REQUEST, "page 和 pageSize 必须大于 0");
-        }
+        PageParamUtils.validate(page, pageSize);
 
         LambdaQueryWrapper<UserRegisterApply> queryWrapper = new LambdaQueryWrapper<>();
         if (status != null) {
@@ -124,4 +121,3 @@ public class RegistrationApplyQueryServiceImpl implements RegistrationApplyQuery
         return map.get(id);
     }
 }
-

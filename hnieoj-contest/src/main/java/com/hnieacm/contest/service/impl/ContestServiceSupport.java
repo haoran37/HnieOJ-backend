@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hnieacm.common.dto.PageVo;
 import com.hnieacm.common.exception.BizException;
 import com.hnieacm.common.result.ResultCode;
+import com.hnieacm.common.util.PageParamUtils;
 import com.hnieacm.contest.constant.ContestRuntimeStatusConstant;
 import com.hnieacm.contest.entity.Contest;
 import com.hnieacm.contest.entity.ContestProblem;
@@ -46,9 +47,7 @@ public final class ContestServiceSupport {
      * @Date 2026/02/28
      */
     public static void validatePageParams(int page, int pageSize) {
-        if (page <= 0 || pageSize <= 0) {
-            throw new BizException(ResultCode.BAD_REQUEST, "page 和 pageSize 必须大于 0");
-        }
+        PageParamUtils.validate(page, pageSize);
     }
 
     /**

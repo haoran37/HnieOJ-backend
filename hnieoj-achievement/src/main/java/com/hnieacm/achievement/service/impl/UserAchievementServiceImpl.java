@@ -14,6 +14,7 @@ import com.hnieacm.achievement.vo.UserAchievementVo;
 import com.hnieacm.common.dto.PageVo;
 import com.hnieacm.common.exception.BizException;
 import com.hnieacm.common.result.ResultCode;
+import com.hnieacm.common.util.PageParamUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -53,9 +54,7 @@ public class UserAchievementServiceImpl implements UserAchievementService {
         if (StrUtil.isBlank(uid)) {
             throw new BizException(ResultCode.BAD_REQUEST, "uid 不能为空");
         }
-        if (page <= 0 || pageSize <= 0) {
-            throw new BizException(ResultCode.BAD_REQUEST, "page 和 pageSize 必须大于 0");
-        }
+        PageParamUtils.validate(page, pageSize);
 
         Page<UserAchievement> mpPage = new Page<>(page, pageSize);
         Page<UserAchievement> result = userAchievementMapper.selectPage(

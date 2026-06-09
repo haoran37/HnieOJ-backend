@@ -18,6 +18,7 @@ import com.hnieacm.achievement.vo.BatchAchievementApplyResultVo;
 import com.hnieacm.common.dto.PageVo;
 import com.hnieacm.common.exception.BizException;
 import com.hnieacm.common.result.ResultCode;
+import com.hnieacm.common.util.PageParamUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -251,9 +252,7 @@ public class AchievementApplyServiceImpl implements AchievementApplyService {
      * @Date 2026/02/18
      */
     private void validateAdminListParams(int page, int pageSize, Long collegeId) {
-        if (page <= 0 || pageSize <= 0) {
-            throw new BizException(ResultCode.BAD_REQUEST, "page 和 pageSize 必须大于 0");
-        }
+        PageParamUtils.validate(page, pageSize);
         if (collegeId != null && collegeId <= 0) {
             throw new BizException(ResultCode.BAD_REQUEST, "collegeId 不合法");
         }

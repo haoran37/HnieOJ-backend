@@ -16,6 +16,7 @@ import com.hnieacm.announcement.vo.AnnouncementListVo;
 import com.hnieacm.common.dto.PageVo;
 import com.hnieacm.common.exception.BizException;
 import com.hnieacm.common.result.ResultCode;
+import com.hnieacm.common.util.PageParamUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -186,9 +187,7 @@ public class AnnouncementServiceImpl implements AnnouncementService {
             int pageSize,
             LambdaQueryWrapper<Announcement> wrapper
     ) {
-        if (page <= 0 || pageSize <= 0) {
-            throw new BizException(ResultCode.BAD_REQUEST, "page 和 pageSize 必须大于 0");
-        }
+        PageParamUtils.validate(page, pageSize);
 
         Page<Announcement> mpPage = new Page<>(page, pageSize);
         IPage<Announcement> result = announcementMapper.selectPage(mpPage, wrapper);

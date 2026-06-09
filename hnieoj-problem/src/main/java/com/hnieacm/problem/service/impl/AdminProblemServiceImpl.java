@@ -8,6 +8,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hnieacm.common.dto.PageVo;
 import com.hnieacm.common.exception.BizException;
 import com.hnieacm.common.result.ResultCode;
+import com.hnieacm.common.util.PageParamUtils;
 import com.hnieacm.problem.constant.ProblemAuthConstant;
 import com.hnieacm.problem.dto.AddProblemRequest;
 import com.hnieacm.problem.dto.ProblemRequest;
@@ -60,9 +61,7 @@ public class AdminProblemServiceImpl implements AdminProblemService {
      */
     @Override
     public PageVo<AdminProblemListVo> listProblems(int page, int pageSize, String keyword, Integer auth) {
-        if (page <= 0 || pageSize <= 0) {
-            throw new BizException(ResultCode.BAD_REQUEST, "page和pageSize必须大于0");
-        }
+        PageParamUtils.validate(page, pageSize);
 
         String normalizedKeyword = StrUtil.trimToNull(keyword);
 

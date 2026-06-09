@@ -31,6 +31,10 @@
             <groupId>cn.hutool</groupId>
             <artifactId>hutool-all</artifactId>
         </dependency>
+        <dependency>
+            <groupId>org.apache.poi</groupId>
+            <artifactId>poi-ooxml</artifactId>
+        </dependency>
 
         <!-- ==================== Sa-Token 核心（用于公共异常处理等） ==================== -->
         <dependency>

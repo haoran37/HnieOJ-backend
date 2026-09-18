@@ -1,9 +1,0 @@
-server:
-  port: ${SERVER_PORT:8100}
-
-hnieoj:
-  auth-cache:
-    ttl:
-      roles: 24h
-      permissions: 12h
-      empty: 5m

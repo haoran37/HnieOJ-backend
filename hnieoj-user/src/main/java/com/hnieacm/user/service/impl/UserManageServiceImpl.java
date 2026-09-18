@@ -10,8 +10,8 @@ import com.hnieacm.common.constant.RoleConstant;
 import com.hnieacm.common.constant.RoleIdConstant;
 import com.hnieacm.common.constant.UserStatusConstant;
 import com.hnieacm.common.dto.PageVo;
+import com.hnieacm.auth.service.UserAuthCacheService;
 import com.hnieacm.common.exception.BizException;
-import com.hnieacm.common.result.Result;
 import com.hnieacm.common.result.ResultCode;
 import com.hnieacm.user.dto.BatchUidsRequest;
 import com.hnieacm.user.dto.CreateUserRequest;
@@ -25,7 +25,6 @@ import com.hnieacm.user.entity.SysClass;
 import com.hnieacm.user.entity.SysCollege;
 import com.hnieacm.user.entity.UserInfo;
 import com.hnieacm.user.entity.UserRole;
-import com.hnieacm.user.feign.AuthInternalFeignClient;
 import com.hnieacm.user.mapper.RoleMapper;
 import com.hnieacm.user.mapper.SysClassMapper;
 import com.hnieacm.user.mapper.SysCollegeMapper;
@@ -47,6 +46,8 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.security.SecureRandom;
 import java.util.*;
@@ -67,7 +68,7 @@ public class UserManageServiceImpl implements UserManageService {
     private final SysClassMapper sysClassMapper;
     private final UserRoleMapper userRoleMapper;
     private final RoleMapper roleMapper;
-    private final AuthInternalFeignClient authInternalFeignClient;
+    private final UserAuthCacheService userAuthCacheService;
     private final StringRedisTemplate stringRedisTemplate;
     private final UserManageProperties userManageProperties;
     private final UserInfoManager userInfoManager;
@@ -974,16 +975,42 @@ public class UserManageServiceImpl implements UserManageService {
      * @MethodName refreshAuthCacheSafely
      * @Param uid
      * @Description 安全刷新身份验证缓存
+     * <p>
+     * 授权/改权类方法本身运行在事务中，角色与权限行此时尚未提交；若在同一事务内直接写 Redis，
+     * 一旦事务回滚就会把未生效的权限暴露给网关鉴权。因此事务内只登记 afterCommit 回调，
+     * 仅在提交成功后刷新；回滚不刷新；无事务调用仍然立即刷新。
      * @Return
      * @Author HaoRan_Lyu
      * @Date 2026/02/15
      */
     private void refreshAuthCacheSafely(String uid) {
+        if (StrUtil.isBlank(uid)) {
+            return;
+        }
+        if (TransactionSynchronizationManager.isActualTransactionActive()
+                && TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    cacheUserAuthSafely(uid);
+                }
+            });
+            return;
+        }
+        cacheUserAuthSafely(uid);
+    }
+
+    /**
+     * @MethodName cacheUserAuthSafely
+     * @Param uid
+     * @Description 静默刷新鉴权缓存，避免缓存故障影响主业务
+     * @Return
+     * @Author HaoRan_Lyu
+     * @Date 2026/02/15
+     */
+    private void cacheUserAuthSafely(String uid) {
         try {
-            Result<Void> result = authInternalFeignClient.refreshUserAuthCache(uid);
-            if (result == null || result.getCode() != ResultCode.SUCCESS) {
-                log.warn("Refresh auth cache failed, uid: {}, result: {}", uid, result);
-            }
+            userAuthCacheService.cacheUserAuth(uid);
         } catch (Exception e) {
             log.warn("Refresh auth cache failed, uid: {}", uid, e);
         }

@@ -234,7 +234,7 @@ heartbeat:
   interval: "30s"
 ```
 
-正式节点长期 Token 不在配置文件中填写。`hnieoj-judge` 启动后如果数据库中没有 active 正式 Token，会自动生成 Token、保存哈希、使用公钥加密并发布到 Nacos。
+正式节点长期 Token 不在配置文件中填写。`hnieoj-submission`（已合并原判题域）启动后如果数据库中没有 active 正式 Token，会自动生成 Token、保存哈希、使用公钥加密并发布到 Nacos。
 
 后续需要主动轮换时，管理员调用：
 
@@ -294,7 +294,7 @@ bash deploy/scripts/deploy-dev.sh down
 bash deploy/scripts/deploy-dev.sh rabbitmq-up
 ```
 
-服务名与 `deploy/docker/docker-compose.dev.yml` 中的服务一致，例如 `gateway`、`hnieoj-auth`、`hnieoj-user`、`hnieoj-problem`、`hnieoj-submission`、`hnieoj-judge`。
+服务名与 `deploy/docker/docker-compose.dev.yml` 中的 8 个服务一致：`gateway`、`hnieoj-user`、`hnieoj-problem`、`hnieoj-submission`、`hnieoj-contest`、`hnieoj-training`、`hnieoj-discussion`、`hnieoj-announcement`。`common` 只是公共依赖，不单独启动。
 
 go-judge 节点启用心跳后，会通过内部心跳上报节点运行状态和缓存状态。后台接口 `GET /api/admin/judge/nodes` 可查看 `online`、`runningTasks`、`maxConcurrency`、`cacheUsedBytes`、`cacheProblemCount`、`diskTotalBytes`、`diskFreeBytes` 等字段。缓存统计来自 `GOJUDGE_CACHE_DIR`，默认约 5 分钟采样一次，用于前端展示判题机负载、测试数据缓存占用和磁盘风险。
 

@@ -1,4 +1,4 @@
-﻿# HnieOJ-backend
+# HnieOJ-backend
 
 > ⚠️ **项目状态：WIP**
 > 当前仓库已完成大部分业务接口，并已接入 RabbitMQ + 二开 go-judge 的基础判题链路；多判题机调度、心跳隔离和集成测试仍在完善中。
@@ -31,17 +31,34 @@ HnieOJ-backend 是一个基于 **Spring Cloud Alibaba** 的在线判题系统后
 HnieOJ-backend/
 ├── common                  # 公共模块（工具、常量、异常、通用配置）
 ├── gateway                 # API 网关
-├── hnieoj-auth             # 认证服务
-├── hnieoj-user             # 用户服务
+├── hnieoj-user             # 用户服务（已合并原 hnieoj-auth 认证域与 hnieoj-achievement 成就域）
 ├── hnieoj-problem          # 题目服务
-├── hnieoj-submission       # 提交服务
-├── hnieoj-judge            # 判题服务（WIP）
+├── hnieoj-submission       # 提交服务（已合并原 hnieoj-judge 判题域）
 ├── hnieoj-contest          # 比赛服务
 ├── hnieoj-training         # 训练服务
 ├── hnieoj-discussion       # 讨论服务
-├── hnieoj-announcement     # 公告/新闻服务
-└── hnieoj-achievement      # 成就服务
+└── hnieoj-announcement     # 公告/新闻服务
 ```
+
+## 服务拓扑（8 个可执行服务 + 1 个公共依赖）
+
+阶段一将原有的 11 个可执行服务合并为 8 个，对外 API、请求/响应结构、权限规则与消息格式均保持不变：
+
+| 服务 | 默认端口 | 说明 |
+| --- | --- | --- |
+| gateway | 8800 | API 网关，统一路由与 Sa-Token 鉴权 |
+| hnieoj-user | 8101 | 用户服务，合并原认证（auth）与成就（achievement）域，共用 user DB |
+| hnieoj-problem | 8102 | 题目服务 |
+| hnieoj-submission | 8103 | 提交服务，合并原判题（judge）域，共用 judge DB |
+| hnieoj-contest | 8105 | 比赛服务 |
+| hnieoj-training | 8106 | 训练/作业服务 |
+| hnieoj-discussion | 8107 | 讨论区服务 |
+| hnieoj-announcement | 8109 | 公告/新闻服务 |
+
+- `common` 为公共依赖，不是可执行服务，也不计入 Docker Compose 的服务数量。
+- 合并后认证（`/api/auth/**`、`/api/registrations/**`）与成就（`/api/users/*/achievements`、`/api/achievements/**`）由 `hnieoj-user` 提供，判题（`/api/system/**`、`/api/judge/**`、`/api/admin/judge/**`、`/judge/nodes/**`）由 `hnieoj-submission` 提供。
+- 网关仍按原路径逐条路由，保留路由顺序与 `/ws/submissions/**` WebSocket 路由，不新增 `/api/admin/**` 单服务兜底路由。
+- 合并进程内的原服务间调用改为本地 Service 调用；跨进程调用继续使用 Feign/WebClient，并指向合并后的服务 ID（`hnieoj-user` / `hnieoj-submission`）。
 
 ## 技术栈
 
@@ -93,8 +110,8 @@ mvn clean install -DskipTests
 
 ```bash
 mvn -pl gateway spring-boot:run
-mvn -pl hnieoj-auth spring-boot:run
 mvn -pl hnieoj-user spring-boot:run
+mvn -pl hnieoj-submission spring-boot:run
 ```
 
 ### 常用命令
@@ -152,6 +169,26 @@ bash deploy/scripts/deploy-dev.sh gojudge-up
 仓库中的 Nacos 配置快照目录：`deploy/nacos`（详见 `deploy/nacos/README.md`）。
 
 > 注意：实际使用中敏感配置应当使用环境变量注入，当前使用 Nacos 配置仅便于开发环境
+
+## 手动发布 Nacos 配置与受控上线
+
+本仓库只保存 Nacos 配置快照（`deploy/nacos/dev`），仓库内容与脚本都不会连接或改写远程 Nacos，远程发布必须由运维人工完成。
+
+手动发布步骤：
+
+1. 在目标 namespace（如 `dev`）中，先导入 `deploy/nacos/dev/DEFAULT_GROUP/` 下的全部 `*.yaml`（Data ID 与文件名一致）。合并后只保留 8 个可执行服务对应的配置：`gateway`、`hnieoj-user`、`hnieoj-problem`、`hnieoj-submission`、`hnieoj-contest`、`hnieoj-training`、`hnieoj-discussion`、`hnieoj-announcement`，以及 `hnieoj-secrets.yaml`。
+2. 原 `hnieoj-auth.yaml`、`hnieoj-achievement.yaml`、`hnieoj-judge.yaml` 不再发布；它们的字段已分别合并进 `hnieoj-user.yaml` 与 `hnieoj-submission.yaml`。发布完成后在目标 namespace 手动下线这三个旧 Data ID，避免残留旧配置。
+3. 导入 `HNIEOJ_JUDGE_GROUP/hnieoj-judge-node.yaml`，并按 `HNIEOJ_SECRET_GROUP` 下的示例模板人工创建 `hnieoj-secrets.yaml`、`hnieoj-judge-formal-token.yaml`（只保留环境变量占位，不写真实密码/Token）。
+4. 人工逐项核对配置差异（数据库、Redis、RabbitMQ 地址与凭据保持环境变量占位），确认无误后再由运维手动发布到 Nacos。
+5. 受控滚动发布，顺序建议：
+   - 先发布 `hnieoj-user` 配置并重启该服务，确认 `/actuator/health`、`/api/auth/**`、`/api/users/*/achievements` 正常；
+   - 再发布 `hnieoj-submission` 配置并重启该服务，确认 `/actuator/health`、判题回调、`/judge/nodes/**`、`/ws/submissions/**` 正常；
+   - 最后发布 gateway 路由变更并重启 gateway，确认各业务路由与 WebSocket 路由转发正常；
+   - 其余 problem/contest/training/discussion/announcement 服务按需滚动重启。
+6. 如需回滚，按发布相反顺序执行：先回滚 gateway，再回滚 `hnieoj-submission` / `hnieoj-user` 及其配置。
+7. 上线后确认服务发现中不再存在 `hnieoj-auth`、`hnieoj-achievement`、`hnieoj-judge` 实例，所有发现目标均指向合并后的服务。
+
+> 以上为人工发布与受控上线流程说明；本仓库未在生产环境执行或验证该流程。
 
 ## 里程碑计划
 

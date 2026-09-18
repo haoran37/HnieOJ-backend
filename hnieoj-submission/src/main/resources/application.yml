@@ -6,6 +6,13 @@ sa-token:
   token-name: Authorization
   token-prefix: Bearer
 
+hnieoj:
+  judge:
+    security:
+      # 合并判题域后保留的正式节点 JWT 密钥环境变量入口
+      jwt-secret: ${HNIEOJ_JUDGE_JWT_SECRET:replace_me}
+      node-active-timeout-seconds: ${HNIEOJ_JUDGE_NODE_ACTIVE_TIMEOUT_SECONDS:90}
+
 management:
   endpoints:
     web:

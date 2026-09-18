@@ -72,7 +72,7 @@ public class AuthRemoteQueryService {
         try {
             WebClient.RequestHeadersSpec<?> spec = webClientBuilder.build()
                     .get()
-                    .uri("lb://hnieoj-auth" + path);
+                    .uri("lb://hnieoj-user" + path);
             if (internalToken != null && !internalToken.isBlank()) {
                 spec = spec.header(HeaderConstant.INTERNAL_TOKEN, internalToken);
             }

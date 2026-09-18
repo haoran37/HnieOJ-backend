@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.RequestBody;
  * @Date: 2026/05/12
  * @Description: 判题服务节点 Token 内部 API
  */
-@FeignClient(name = "hnieoj-judge")
+@FeignClient(name = "hnieoj-submission")
 public interface JudgeNodeTokenFeignClient {
 
     @PostMapping("/internal/judge/tokens/validate")

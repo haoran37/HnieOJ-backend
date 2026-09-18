@@ -10,12 +10,12 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 /**
  * @Author: HaoRan_Lyu
  * @Date: 2026/02/10
- * @Description: Submission Service 启动类
+ * @Description: Submission Service 启动类（合并判题域）
  */
 @SpringBootApplication(scanBasePackages = "com.hnieacm")
 @EnableDiscoveryClient
 @EnableFeignClients(basePackages = "com.hnieacm.submission.feign")
-@MapperScan("com.hnieacm.submission.mapper")
+@MapperScan({"com.hnieacm.submission.mapper", "com.hnieacm.judge.mapper"})
 @EnableScheduling
 public class SubmissionApplication {
     public static void main(String[] args) {

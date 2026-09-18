@@ -8,11 +8,8 @@
 deploy/nacos/
   dev/
     DEFAULT_GROUP/                 # 可公开配置
-    HNIEOJ_JUDGE_GROUP/            # 判题节点非敏感运行配置
-      hnieoj-judge-node.yaml
     HNIEOJ_SECRET_GROUP/           # 仅存放示例模板
       hnieoj-secrets.example.yaml
-      hnieoj-judge-formal-token.example.yaml
 ```
 
 ## 导入说明（dev namespace）
@@ -20,10 +17,9 @@ deploy/nacos/
 1. 登录 Nacos（namespace: `dev`）。
 2. 先导入 `DEFAULT_GROUP` 下所有 `*.yaml`（Data ID 与文件名一致）。合并后只保留 8 个可执行服务：`gateway`、`hnieoj-user`、`hnieoj-problem`、`hnieoj-submission`、`hnieoj-contest`、`hnieoj-training`、`hnieoj-discussion`、`hnieoj-announcement`，以及 `hnieoj-secrets.yaml`。
 3. 原 `hnieoj-auth.yaml`、`hnieoj-achievement.yaml` 的字段已合并进 `hnieoj-user.yaml`，`hnieoj-judge.yaml` 的字段已合并进 `hnieoj-submission.yaml`；发布后请手动下线这三个旧 Data ID。
-4. 导入 `HNIEOJ_JUDGE_GROUP/hnieoj-judge-node.yaml`。该文件只保存判题节点缓存清理、心跳间隔、MQ 重试等非敏感运行参数。
+4. 判题节点**不连接 Nacos**，也不再有 `HNIEOJ_JUDGE_GROUP` 快照：节点实际使用同级 `go-judge` 仓库的 `deploy/config.formal.example.yaml`（正式）或 `deploy/config.temp.example.yaml`（临时）生成本地 `config.yaml` 与逐节点凭证文件；不要上传旧 `hnieoj-judge-node.yaml` 模板。
 5. 在 `HNIEOJ_SECRET_GROUP` 新建 `hnieoj-secrets.yaml`，内容参考 `hnieoj-secrets.example.yaml`。该文件只允许保留环境变量占位，不要填写真实密码或 Token。
-6. 在 `HNIEOJ_SECRET_GROUP` 新建 `hnieoj-judge-formal-token.yaml`，内容可先参考 `hnieoj-judge-formal-token.example.yaml` 保持为空。
-7. 真实敏感值只保存在服务器 `.env` 或进程环境变量中，不写入 Nacos。正式判题节点长期 Token 的密文由后端启动初始化或轮换接口自动发布到 `hnieoj-judge-formal-token.yaml`。
+6. 真实敏感值只保存在服务器 `.env` 或进程环境变量中，不写入 Nacos。
 
 ## 手动发布与受控上线
 
@@ -36,9 +32,7 @@ deploy/nacos/
 
 - 禁止将真实 `hnieoj-secrets.yaml` 提交到仓库。
 - 如需新增配置，优先补充示例模板与字段说明。
-- `hnieoj-secrets.yaml` 只作为环境变量占位桥接，不保存真实 MySQL/Redis/RabbitMQ 密码、内部服务 Token 或 JWT Secret。
+- `hnieoj-secrets.yaml` 只作为环境变量占位桥接，不保存真实 MySQL/Redis 密码、内部服务 Token 或节点 JWT Secret。
 - `HNIEOJ_JUDGE_JWT_SECRET` 由 `hnieoj-submission` 容器环境变量直接注入，不再通过 Nacos Secret 分发。
-- 后端只持有正式节点公钥和 Token 哈希，不持有正式节点私钥。
-- 正式节点私钥只通过 `/etc/hnieoj/judge-security/judge_formal_private.pem` 文件挂载给 go-judge。
-- `hnieoj-judge-formal-token.yaml` 只保存 `{rsa}` 密文、版本号和更新时间，不保存明文 Token。
-- `hnieoj-judge-node.yaml` 不保存密码、私钥、节点私有路径和授权码；多判题机共享该配置，单节点差异用本地 `config.yaml` 或环境变量覆盖。
+- 不再存在共享正式主密钥/公钥机制：后端只校验逐节点短期 JWT，运维为每台正式节点签发独立凭证文件（0600），文件仅保存运行凭证，不含全局密钥。
+- 判题节点配置不在 Nacos 快照中维护：节点本地 `config.yaml`、凭证目录与授权码都不纳入仓库，示例模板见同级 `go-judge` 仓库的 `deploy/config.formal.example.yaml` / `deploy/config.temp.example.yaml`。

@@ -1,7 +1,7 @@
 # HnieOJ-backend
 
 > ⚠️ **项目状态：WIP**
-> 当前仓库已完成大部分业务接口，并已接入 RabbitMQ + 二开 go-judge 的基础判题链路；多判题机调度、心跳隔离和集成测试仍在完善中。
+> 当前仓库在合并服务的基础上，已将判题任务分发迁移为 Redis Streams + 内嵌认证 HTTP 网关，并接入二开 go-judge；多判题机调度、心跳隔离和集成测试仍在完善中。
 
 [API文档](https://s.apifox.cn/91edc2c6-6918-4179-9852-9ec3742377c8)、[前端仓库](https://github.com/haoran37/HnieOJ)
 
@@ -15,7 +15,7 @@ HnieOJ-backend 是一个基于 **Spring Cloud Alibaba** 的在线判题系统后
 - 基础微服务骨架与网关转发
 - 认证鉴权（Sa-Token）与内部服务调用约束（`/internal/**`）
 - 用户、题目、提交、比赛、训练、讨论、公告、成就等模块的大部分接口
-- submission -> RabbitMQ -> go-judge -> submission 的基础判题回调链路
+- submission -> Redis Streams 分发 + 认证任务网关 -> go-judge -> submission 的判题回调链路
 - Nacos 配置中心接入、MyBatis-Plus 持久层、统一返回结构（`Result/ResultCode`）
 
 ### 未完成
@@ -70,12 +70,22 @@ HnieOJ-backend/
 - Nacos 2.3.2（注册中心 / 配置中心）
 - Sa-Token（鉴权）
 - Spring Cloud LoadBalancer
-- RabbitMQ（判题异步链路）
+- Redis Streams（判题任务分发）
 - MyBatis / MyBatis-Plus / Druid
 - Redis
 - Hutool
 - Knife4j
 - Maven
+
+## 开发约定
+
+- 版本固定：JDK 17、Spring Boot 3.2.12、Spring Cloud 2023.0.2、Spring Cloud Alibaba 2023.0.1.2，不升级主版本。
+- 技术栈沿用 Sa-Token、MyBatis / MyBatis-Plus、Druid、Hutool、OpenFeign；不引入新的生产依赖。
+- 判题任务分发统一使用 Redis Streams（XADD / XREADGROUP / ACK）；旧 RabbitMQ / AMQP 约定已废弃，不再新增相关依赖、配置或脚本。
+- 代码风格：中文意图注释、英文日志 / 常量 / 语义命名；Controller 保持轻薄，业务集中在 Service；沿用现有 `Request` / `Vo` / `Dto` / `Mapper` / `Service` 命名与 `config` / `properties` / `exception` / `interceptor` / `feign` 目录布局；不新增顶层包或框架。
+- 路由约定：管理端接口按业务域分散在各服务（如 `/api/admin/judge/**`），网关不提供 `/api/admin/**` 单服务兜底路由。
+- 配置发布：仓库仅保存 `deploy/nacos/dev` 快照，远程 Nacos 由运维人工上传；仓库不再包含旧 `.idea` 配置目录与 Windows 判题机路径；判题机以同级 go-judge 当前源码为准。
+- 兼容性：除已批准的判题节点运行时协议迁移外，对外业务 API 及其请求 / 响应 JSON 保持不变。
 
 ## 启动方式（开发环境）
 
@@ -86,7 +96,7 @@ HnieOJ-backend/
 - MySQL 8.0
 - Redis
 - Nacos 2.3.2
-- RabbitMQ（判题链路开发时需要）
+- Redis 7.x（判题任务分发，需 AOF + noeviction）
 - 二开 go-judge（可通过部署脚本启动）
 - 本地文件系统目录 `/data/oj/problems`（题面、图片、测试数据）
 
@@ -117,8 +127,11 @@ mvn -pl hnieoj-submission spring-boot:run
 ### 常用命令
 
 ```bash
-# 全量测试
+# 全量测试（单元测试；依赖本机 MySQL8/Redis7.4 的真实集成测试默认跳过）
 mvn test
+
+# 显式运行真实集成测试（需要本机任务测试容器，见 deploy/MIGRATION-redis-gateway.md）
+mvn -pl hnieoj-submission -am test -Dit.enabled=true
 
 # 指定模块测试
 mvn -pl hnieoj-user test
@@ -129,10 +142,11 @@ mvn -s deploy/maven/settings.xml clean install -DskipTests
 
 ## Docker Compose 开发部署
 
-本仓库提供服务器 Shell 脚本 + Docker Compose 编排，默认管理后端服务；RabbitMQ 和二开 go-judge 提供可选 Compose 组件，MySQL、Redis、Nacos 继续使用外部已部署实例。
+本仓库提供服务器 Shell 脚本 + Docker Compose 编排，默认管理后端服务；本地 Redis 和二开 go-judge 提供可选 Compose 组件，MySQL、Nacos 继续使用外部已部署实例。
 
 - Compose 文件：`deploy/docker/docker-compose.dev.yml`
-- 可选 RabbitMQ Compose 文件：`deploy/docker/docker-compose.rabbitmq.yml`
+- 可选 Redis Compose 文件：`deploy/docker/docker-compose.redis.yml`
+- 迁移与部署说明：`deploy/MIGRATION-redis-gateway.md`
 - 可选 go-judge Compose 文件：`deploy/docker/docker-compose.gojudge.yml`
 - 环境变量示例：`deploy/docker/.env.example`
 - 一键部署脚本：`deploy/scripts/deploy-dev.sh`
@@ -154,7 +168,7 @@ mvn -s deploy/maven/settings.xml clean install -DskipTests
 bash deploy/scripts/deploy-dev.sh ps
 bash deploy/scripts/deploy-dev.sh logs gateway
 bash deploy/scripts/deploy-dev.sh restart hnieoj-user
-bash deploy/scripts/deploy-dev.sh rabbitmq-up
+bash deploy/scripts/deploy-dev.sh redis-up
 bash deploy/scripts/deploy-dev.sh gojudge-up
 ```
 
@@ -163,8 +177,9 @@ bash deploy/scripts/deploy-dev.sh gojudge-up
 当前项目配置依赖 Nacos，建议区分为：
 
 - `DEFAULT_GROUP`：可公开的业务配置（端口、开关、路由、非敏感参数）
-- `HNIEOJ_JUDGE_GROUP`：判题节点非敏感运行配置（缓存清理、心跳间隔、MQ 重试等）
-- `HNIEOJ_SECRET_GROUP`：敏感配置（数据库密码、Redis 密码、内部 token、MQ 凭证等）
+- `HNIEOJ_SECRET_GROUP`：敏感配置（数据库密码、Redis 密码、内部 token、节点 JWT Secret 等）
+
+判题节点不连接 Nacos，也没有节点专用 Nacos 分组：节点使用同级 `go-judge` 仓库的 `deploy/config.formal.example.yaml`（正式）或 `deploy/config.temp.example.yaml`（临时）生成本地 `config.yaml` 与逐节点凭证文件。
 
 仓库中的 Nacos 配置快照目录：`deploy/nacos`（详见 `deploy/nacos/README.md`）。
 
@@ -178,11 +193,11 @@ bash deploy/scripts/deploy-dev.sh gojudge-up
 
 1. 在目标 namespace（如 `dev`）中，先导入 `deploy/nacos/dev/DEFAULT_GROUP/` 下的全部 `*.yaml`（Data ID 与文件名一致）。合并后只保留 8 个可执行服务对应的配置：`gateway`、`hnieoj-user`、`hnieoj-problem`、`hnieoj-submission`、`hnieoj-contest`、`hnieoj-training`、`hnieoj-discussion`、`hnieoj-announcement`，以及 `hnieoj-secrets.yaml`。
 2. 原 `hnieoj-auth.yaml`、`hnieoj-achievement.yaml`、`hnieoj-judge.yaml` 不再发布；它们的字段已分别合并进 `hnieoj-user.yaml` 与 `hnieoj-submission.yaml`。发布完成后在目标 namespace 手动下线这三个旧 Data ID，避免残留旧配置。
-3. 导入 `HNIEOJ_JUDGE_GROUP/hnieoj-judge-node.yaml`，并按 `HNIEOJ_SECRET_GROUP` 下的示例模板人工创建 `hnieoj-secrets.yaml`、`hnieoj-judge-formal-token.yaml`（只保留环境变量占位，不写真实密码/Token）。
-4. 人工逐项核对配置差异（数据库、Redis、RabbitMQ 地址与凭据保持环境变量占位），确认无误后再由运维手动发布到 Nacos。
+3. 判题节点不使用 Nacos：正式节点参考同级 `go-judge` 仓库的 `deploy/config.formal.example.yaml`、临时节点参考 `deploy/config.temp.example.yaml`，各自生成本地 `config.yaml`，凭证由后端按节点签发。再按 `HNIEOJ_SECRET_GROUP` 下的示例模板人工创建 `hnieoj-secrets.yaml`（只保留环境变量占位，不写真实密码/Token）。原 `hnieoj-judge-formal-token.yaml`、`HNIEOJ_JUDGE_GROUP/hnieoj-judge-node.yaml` 不再使用，不要上传。
+4. 人工逐项核对配置差异（数据库、Redis 地址与凭据保持环境变量占位；`hnieoj.judge.stream.*` 使用固定 Stream key）。判题链路的增量 SQL、节点/后端协同切换与 HTTPS 要求见 `deploy/MIGRATION-redis-gateway.md`。
 5. 受控滚动发布，顺序建议：
    - 先发布 `hnieoj-user` 配置并重启该服务，确认 `/actuator/health`、`/api/auth/**`、`/api/users/*/achievements` 正常；
-   - 再发布 `hnieoj-submission` 配置并重启该服务，确认 `/actuator/health`、判题回调、`/judge/nodes/**`、`/ws/submissions/**` 正常；
+   - 再发布 `hnieoj-submission` 配置并重启该服务，确认 `/actuator/health`、判题回调、`/judge/nodes/**`、`/judge/tasks/**`、`/ws/submissions/**` 正常；
    - 最后发布 gateway 路由变更并重启 gateway，确认各业务路由与 WebSocket 路由转发正常；
    - 其余 problem/contest/training/discussion/announcement 服务按需滚动重启。
 6. 如需回滚，按发布相反顺序执行：先回滚 gateway，再回滚 `hnieoj-submission` / `hnieoj-user` 及其配置。
@@ -192,7 +207,7 @@ bash deploy/scripts/deploy-dev.sh gojudge-up
 
 ## 里程碑计划
 
-- [x] 完成 submission -> RabbitMQ -> go-judge 的基础异步判题链路
+- [x] 完成 submission -> Redis Streams 分发 + 认证任务网关 -> go-judge 的判题链路
 - [x] 完成 go-judge 请求封装与状态映射
 - [ ] 完成本地题目资源存储与 Nginx 静态图片代理的线上联调
 - [ ] 支持多判题机负载均衡（节点管理、健康检查、故障摘除）

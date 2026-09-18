@@ -35,7 +35,3 @@ metadata:
   dataId: hnieoj-secrets.yaml
   group: HNIEOJ_SECRET_GROUP
   type: yaml
-- appName: ''
-  dataId: hnieoj-judge-node.yaml
-  group: HNIEOJ_JUDGE_GROUP
-  type: yaml

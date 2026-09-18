@@ -38,9 +38,9 @@ class JudgeNodeHeartbeatServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        JudgeSecurityProperties properties = new JudgeSecurityProperties();
-        properties.setNodeActiveTimeoutSeconds(90);
-        service = new JudgeNodeHeartbeatServiceImpl(judgeNodeSecurityService, judgeNodeTokenMapper, properties);
+        JudgeSecurityProperties securityProperties = new JudgeSecurityProperties();
+        securityProperties.setNodeActiveTimeoutSeconds(90);
+        service = new JudgeNodeHeartbeatServiceImpl(judgeNodeSecurityService, judgeNodeTokenMapper, securityProperties);
     }
 
     @Test

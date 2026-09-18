@@ -1,4 +1,4 @@
-# 合并上下文启动测试使用哑元基础设施配置，不连接真实 MySQL/Redis/RabbitMQ。
+# 合并上下文启动测试使用哑元基础设施配置，不连接真实 MySQL/Redis。
 spring:
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
@@ -15,17 +15,6 @@ spring:
       host: 127.0.0.1
       port: 16379
       password: ""
-  rabbitmq:
-    host: 127.0.0.1
-    port: 5672
-    username: hnieoj_judge
-    password: ""
-    virtual-host: hnieoj
-    # 关闭 RabbitAdmin 自动声明，避免启动阶段尝试连接 MQ
-    dynamic: false
-    listener:
-      simple:
-        auto-startup: false
 
 mybatis-plus:
   configuration:
@@ -40,5 +29,8 @@ hnieoj:
     security:
       jwt-secret: test_judge_jwt_secret_value
       node-active-timeout-seconds: 90
-    formal-token:
-      public-key-path: /tmp/hnieoj-test/judge_formal_public.pem
+    stream:
+      recovery-scan-interval-ms: 3600000
+  submission:
+    judge-timeout:
+      enabled: false

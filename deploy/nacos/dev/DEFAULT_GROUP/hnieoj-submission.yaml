@@ -9,44 +9,40 @@ spring:
       host: ${hnieoj.redis.host}
       port: ${hnieoj.redis.port}
       password: ${hnieoj.redis.password}
-  rabbitmq:
-    host: ${hnieoj.rabbitmq.host}
-    port: ${hnieoj.rabbitmq.port}
-    username: ${hnieoj.rabbitmq.username}
-    password: ${hnieoj.rabbitmq.password}
-    virtual-host: ${hnieoj.rabbitmq.virtual-host}
-    publisher-confirm-type: correlated
-    publisher-returns: true
-    template:
-      mandatory: true
 
 sa-token:
   is-print: false
 
 hnieoj:
-  # 合并判题域后保留的判题安全参数
+  # 合并判题域后保留的判题安全参数；节点运行期只使用逐节点 Bearer JWT，不再有共享正式主密钥
   judge:
     security:
       temp-token-ttl-seconds: ${HNIEOJ_JUDGE_TEMP_TOKEN_TTL_SECONDS:7200}
+      formal-token-ttl-seconds: ${HNIEOJ_JUDGE_FORMAL_TOKEN_TTL_SECONDS:2592000}
       auth-code-ttl-seconds: ${HNIEOJ_JUDGE_AUTH_CODE_TTL_SECONDS:1800}
       auth-code-max-exchange: ${HNIEOJ_JUDGE_AUTH_CODE_MAX_EXCHANGE:1}
       # 判题节点超过该时间未心跳时视为不可调度，单位秒。
       node-active-timeout-seconds: ${HNIEOJ_JUDGE_NODE_ACTIVE_TIMEOUT_SECONDS:90}
-    formal-token:
-      cipher-algorithm: RSA/ECB/OAEPWithSHA-256AndMGF1Padding
-      public-key: ${HNIEOJ_JUDGE_FORMAL_TOKEN_PUBLIC_KEY:}
-      public-key-path: ${HNIEOJ_JUDGE_FORMAL_TOKEN_PUBLIC_KEY_PATH:/etc/hnieoj/judge-security/judge_formal_public.pem}
-      nacos-data-id: ${HNIEOJ_JUDGE_FORMAL_TOKEN_NACOS_DATA_ID:hnieoj-judge-formal-token.yaml}
-      nacos-group: ${HNIEOJ_JUDGE_FORMAL_TOKEN_NACOS_GROUP:HNIEOJ_SECRET_GROUP}
-    mq:
-      exchange: ${HNIEOJ_JUDGE_MQ_EXCHANGE:hnieoj.judge.exchange}
-      task-queue: ${HNIEOJ_JUDGE_MQ_TASK_QUEUE:hnieoj.judge.task}
-      routing-key: ${HNIEOJ_JUDGE_MQ_ROUTING_KEY:judge.submission.created}
-      spj-routing-key: ${HNIEOJ_JUDGE_MQ_SPJ_ROUTING_KEY:judge.submission.spj}
-      interactive-routing-key: ${HNIEOJ_JUDGE_MQ_INTERACTIVE_ROUTING_KEY:judge.submission.interactive}
-      dead-letter-exchange: ${HNIEOJ_JUDGE_MQ_DLX:hnieoj.judge.dlx}
-      dead-letter-queue: ${HNIEOJ_JUDGE_MQ_DLQ:hnieoj.judge.task.dlq}
-      dead-letter-routing-key: ${HNIEOJ_JUDGE_MQ_DLX_ROUTING_KEY:judge.submission.created.dlq}
+      # 临时节点由服务端签发时固定的核准并发与允许模式，节点心跳不能提高/扩大。
+      temp-node-default-max-concurrency: ${HNIEOJ_JUDGE_TEMP_NODE_MAX_CONCURRENCY:1}
+      temp-node-allowed-modes: ${HNIEOJ_JUDGE_TEMP_NODE_ALLOWED_MODES:default}
+    # 判题任务 Redis Streams 分发：固定 default/spj/interactive 三个 Stream key
+    stream:
+      default-stream-key: ${HNIEOJ_JUDGE_STREAM_DEFAULT:hnieoj:judge:task:default}
+      spj-stream-key: ${HNIEOJ_JUDGE_STREAM_SPJ:hnieoj:judge:task:spj}
+      interactive-stream-key: ${HNIEOJ_JUDGE_STREAM_INTERACTIVE:hnieoj:judge:task:interactive}
+      consumer-group: ${HNIEOJ_JUDGE_STREAM_GROUP:hnieoj-judge-gateway}
+      claim-batch-size: ${HNIEOJ_JUDGE_STREAM_CLAIM_BATCH:4}
+      claim-max-rounds: ${HNIEOJ_JUDGE_STREAM_CLAIM_MAX_ROUNDS:4}
+      lease-seconds: ${HNIEOJ_JUDGE_STREAM_LEASE_SECONDS:60}
+      renew-after-millis: ${HNIEOJ_JUDGE_STREAM_RENEW_AFTER_MILLIS:20000}
+      execution-deadline-seconds: ${HNIEOJ_JUDGE_STREAM_EXECUTION_DEADLINE_SECONDS:7200}
+      max-attempt-count: ${HNIEOJ_JUDGE_STREAM_MAX_ATTEMPT_COUNT:3}
+      orphan-pending-min-idle-millis: ${HNIEOJ_JUDGE_STREAM_ORPHAN_MIN_IDLE_MILLIS:300000}
+      recovery-batch-size: ${HNIEOJ_JUDGE_STREAM_RECOVERY_BATCH_SIZE:100}
+      recovery-lease-batch-size: ${HNIEOJ_JUDGE_STREAM_RECOVERY_LEASE_BATCH_SIZE:50}
+      stranded-queued-seconds: ${HNIEOJ_JUDGE_STREAM_STRANDED_QUEUED_SECONDS:3600}
+      recovery-scan-interval-ms: ${HNIEOJ_JUDGE_STREAM_RECOVERY_SCAN_INTERVAL_MS:60000}
   submission:
     # 单次提交代码最大字节数，按 UTF-8 编码计算。
     max-code-bytes: ${HNIEOJ_SUBMISSION_MAX_CODE_BYTES:65536}
@@ -54,9 +50,9 @@ hnieoj:
     max-checker-bytes: ${HNIEOJ_SUBMISSION_MAX_CHECKER_BYTES:262144}
     # 交互题 interactor 源码最大字节数，防止判题任务消息过大。
     max-interactor-bytes: ${HNIEOJ_SUBMISSION_MAX_INTERACTOR_BYTES:262144}
-    # 判题任务完整 MQ payload 最大字节数。
+    # 判题任务完整 payload 最大字节数。
     max-message-payload-bytes: ${HNIEOJ_SUBMISSION_MAX_MESSAGE_PAYLOAD_BYTES:1048576}
-    # 允许进入 MQ 的判题模式；生产启用 spj/interactive 前，判题节点必须通过心跳上报对应能力。
+    # 允许分发的判题模式固定集合；节点能力由服务端签发时授权，心跳上报不能扩大。
     supported-judge-modes: ${HNIEOJ_SUBMISSION_SUPPORTED_JUDGE_MODES:default}
     judge-outbox:
       # 判题任务 outbox 重试扫描间隔，单位毫秒。
@@ -70,7 +66,7 @@ hnieoj:
       # processing 状态超时时间，超过后允许重新投递，单位秒。
       processing-timeout-seconds: ${HNIEOJ_JUDGE_OUTBOX_PROCESSING_TIMEOUT_SECONDS:120}
     judge-timeout:
-      # 是否启用卡住提交扫描。
+      # 是否启用卡住提交扫描；执行租约存在时该扫描会退让给 Redis 恢复流程。
       enabled: ${HNIEOJ_JUDGE_TIMEOUT_ENABLED:true}
       # 扫描间隔，单位毫秒。
       scan-interval-ms: ${HNIEOJ_JUDGE_TIMEOUT_SCAN_INTERVAL_MS:60000}
@@ -80,7 +76,7 @@ hnieoj:
       pending-timeout-seconds: ${HNIEOJ_JUDGE_PENDING_TIMEOUT_SECONDS:1800}
       # Compiling/Running 状态超时时间，单位秒。
       active-timeout-seconds: ${HNIEOJ_JUDGE_ACTIVE_TIMEOUT_SECONDS:1800}
-      # 已投递到 RabbitMQ 但仍 Pending 的告警阈值，单位秒；不会直接终态化任务。
+      # 已投递到 Redis Streams 但仍 Pending 的告警阈值，单位秒；不会直接终态化任务。
       sent-pending-warn-seconds: ${HNIEOJ_JUDGE_SENT_PENDING_WARN_SECONDS:3600}
     rejudge-task:
       # 批量重判任务扫描间隔，单位毫秒。

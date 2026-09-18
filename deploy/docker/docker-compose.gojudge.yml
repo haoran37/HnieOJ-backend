@@ -11,8 +11,8 @@ services:
       - /usr/local/bin/go-judge
       - -http-addr=:5050
       - -mount-conf=/opt/go-judge/mount.yaml
-    ports:
-      - "${GOJUDGE_PUBLIC_PORT:-5050}:5050"
+    # 沙箱是未认证的特权执行环境，只允许内网判题节点访问（go-judge-sandbox:5050），
+    # 默认不向宿主机发布端口；本地调试请使用同级 go-judge 仓库的显式回环绑定脚本。
     networks:
       - hnieoj-backend
 
@@ -20,23 +20,19 @@ services:
     image: ${GOJUDGE_IMAGE:-hnieoj/go-judge:dev}
     restart: unless-stopped
     environment:
-      HNIEOJ_FORMAL_PRIVATE_KEY_PATH: ${HNIEOJ_JUDGE_FORMAL_TOKEN_PRIVATE_KEY_PATH:-/etc/hnieoj/judge-security/judge_formal_private.pem}
-      HNIEOJ_NACOS_SERVER_ADDR: ${NACOS_SERVER_ADDR:-106.54.177.244:8848}
-      HNIEOJ_NACOS_NAMESPACE: ${NACOS_NAMESPACE:-dev}
-      HNIEOJ_FORMAL_TOKEN_NACOS_GROUP: ${HNIEOJ_JUDGE_FORMAL_TOKEN_NACOS_GROUP:-HNIEOJ_SECRET_GROUP}
-      HNIEOJ_FORMAL_TOKEN_NACOS_DATA_ID: ${HNIEOJ_JUDGE_FORMAL_TOKEN_NACOS_DATA_ID:-hnieoj-judge-formal-token.yaml}
-      HNIEOJ_REMOTE_CONFIG_ENABLED: ${HNIEOJ_JUDGE_NODE_REMOTE_CONFIG_ENABLED:-true}
-      HNIEOJ_REMOTE_CONFIG_NACOS_SERVER_ADDR: ${NACOS_SERVER_ADDR:-106.54.177.244:8848}
-      HNIEOJ_REMOTE_CONFIG_NACOS_NAMESPACE: ${NACOS_NAMESPACE:-dev}
-      HNIEOJ_REMOTE_CONFIG_NACOS_GROUP: ${HNIEOJ_JUDGE_NODE_NACOS_GROUP:-HNIEOJ_JUDGE_GROUP}
-      HNIEOJ_REMOTE_CONFIG_NACOS_DATA_ID: ${HNIEOJ_JUDGE_NODE_NACOS_DATA_ID:-hnieoj-judge-node.yaml}
+      # 节点只访问后端 HTTPS 与本地沙箱：不连接 Redis/Nacos/RabbitMQ，也不持有共享主密钥。
+      # 环境变量名以同级 go-judge 当前源码为准（internal/hnieoj/config/config.go）。
+      HNIEOJ_BASE_URL: ${HNIEOJ_BASE_URL:-https://oj.example.com}
+      HNIEOJ_CREDENTIAL_TOKEN_FILE: ${HNIEOJ_CREDENTIAL_TOKEN_FILE:-/etc/hnieoj/judge-node/credential.json}
     command:
       - /usr/local/bin/hnieoj-judge-node
       - -config
       - /etc/hnieoj/go-judge/config.yaml
     volumes:
       - ${GOJUDGE_CONFIG_HOST_FILE:-/etc/hnieoj/go-judge/config.yaml}:/etc/hnieoj/go-judge/config.yaml:ro
-      - ${HNIEOJ_JUDGE_SECURITY_HOST_DIR:-/etc/hnieoj/judge-security}:/etc/hnieoj/judge-security:ro
+      # 凭证必须挂载为可写目录（宿主 0700）：续期成功后节点以 0600 原子替换目录内的 credential.json。
+      # 只读或可写的单文件 bind 都不行，rename 会替换 inode 且单文件挂载点无法被原子替换。
+      - ${HNIEOJ_JUDGE_CREDENTIAL_HOST_DIR:-/etc/hnieoj/judge-node}:/etc/hnieoj/judge-node:rw
       - ${GOJUDGE_CACHE_DIR:-/data/oj/judge-cache}:/data/oj/judge-cache
     networks:
       - hnieoj-backend

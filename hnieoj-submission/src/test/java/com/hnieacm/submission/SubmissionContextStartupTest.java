@@ -1,8 +1,6 @@
 package com.hnieacm.submission;
 
 import com.alibaba.cloud.nacos.NacosConfigManager;
-import com.hnieacm.judge.config.FormalJudgeTokenInitializer;
-import com.hnieacm.judge.mapper.JudgeFormalTokenMapper;
 import com.hnieacm.judge.mapper.JudgeNodeAuthCodeMapper;
 import com.hnieacm.judge.mapper.JudgeNodeTokenMapper;
 import com.hnieacm.judge.mapper.RemoteJudgeAccountMapper;
@@ -11,6 +9,7 @@ import com.hnieacm.judge.service.JudgeNodeHeartbeatService;
 import com.hnieacm.judge.service.JudgeNodeSecurityService;
 import com.hnieacm.submission.mapper.JudgeCaseMapper;
 import com.hnieacm.submission.mapper.JudgeMapper;
+import com.hnieacm.submission.mapper.JudgeTaskExecutionMapper;
 import com.hnieacm.submission.mapper.JudgeTaskOutboxMapper;
 import com.hnieacm.submission.mapper.RejudgeTaskDetailMapper;
 import com.hnieacm.submission.mapper.RejudgeTaskMapper;
@@ -41,7 +40,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * @Date: 2026/09/18
  * @Description: 合并 submission/judge 后的真实上下文启动测试。
  * <p>
- * 使用哑元 MySQL/Redis/RabbitMQ 配置，不连接任何远程服务，仅验证 Bean 与 Mapper 不产生重复定义，
+ * 使用哑元 MySQL/Redis 配置，不连接任何远程服务，仅验证 Bean 与 Mapper 不产生重复定义，
  * 判题域控制者与路由均被扫描注册，且提交/判题调用改为进程内本地服务而非自 Feign。
  */
 @SpringBootTest(classes = SubmissionApplication.class)
@@ -63,14 +62,6 @@ class SubmissionContextStartupTest {
      */
     @MockBean
     private NacosConfigManager nacosConfigManager;
-
-    /**
-     * 正式节点 Token 初始化器会在 ApplicationRunner 阶段通过事务访问数据库，
-     * 哑元数据源下会阻塞启动线程；这里仅替换该启动副作用 Bean，
-     * 其余 controller/service/mapper/配置仍使用真实注册以发现冲突。
-     */
-    @MockBean
-    private FormalJudgeTokenInitializer formalJudgeTokenInitializer;
 
     /**
      * 屏蔽真实定时任务调度，避免启动后异步访问哑元数据库；
@@ -104,6 +95,7 @@ class SubmissionContextStartupTest {
                 "com.hnieacm.submission.controller.AdminRejudgeController",
                 "com.hnieacm.submission.controller.AdminSubmissionController",
                 "com.hnieacm.submission.controller.JudgeSubmissionEventController",
+                "com.hnieacm.submission.controller.JudgeTaskGatewayController",
                 "com.hnieacm.submission.controller.SubmissionController"
         );
     }
@@ -119,6 +111,11 @@ class SubmissionContextStartupTest {
                 "/api/admin/submissions/{submissionId}/rejudge",
                 "/api/admin/rejudge/list",
                 "/judge/submissions/{submissionId}/events",
+                "/judge/tasks/claim",
+                "/judge/tasks/{submissionId}/lease",
+                "/judge/nodes/token/renew",
+                "/internal/judge/tasks/access",
+                "/api/admin/judge/nodes/formal-tokens",
                 "/internal/judge/tokens/validate",
                 "/internal/judge/nodes/capabilities/{judgeMode}/available",
                 "/api/judge/temp-token",
@@ -136,9 +133,9 @@ class SubmissionContextStartupTest {
                 JudgeMapper.class,
                 JudgeCaseMapper.class,
                 JudgeTaskOutboxMapper.class,
+                JudgeTaskExecutionMapper.class,
                 RejudgeTaskMapper.class,
                 RejudgeTaskDetailMapper.class,
-                JudgeFormalTokenMapper.class,
                 JudgeNodeAuthCodeMapper.class,
                 JudgeNodeTokenMapper.class,
                 RemoteJudgeAccountMapper.class,

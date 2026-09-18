@@ -51,5 +51,11 @@ public class JudgeNodeTokenVo {
 
     private Long diskFreeBytes;
 
+    private LocalDateTime authorizationUntil;
+
+    private Integer approvedMaxConcurrency;
+
+    private Boolean draining;
+
     private LocalDateTime gmtCreate;
 }

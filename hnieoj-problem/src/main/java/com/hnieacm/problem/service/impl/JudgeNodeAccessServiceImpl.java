@@ -4,6 +4,7 @@ import cn.hutool.core.util.StrUtil;
 import com.hnieacm.common.exception.BizException;
 import com.hnieacm.common.result.Result;
 import com.hnieacm.common.result.ResultCode;
+import com.hnieacm.problem.dto.JudgeTaskAccessRequest;
 import com.hnieacm.problem.dto.ValidateJudgeNodeTokenRequest;
 import com.hnieacm.problem.feign.JudgeNodeTokenFeignClient;
 import com.hnieacm.problem.service.JudgeNodeAccessService;
@@ -46,6 +47,23 @@ public class JudgeNodeAccessServiceImpl implements JudgeNodeAccessService {
                 || !Boolean.TRUE.equals(result.getData().getValid())) {
             log.warn("Judge node token validation failed");
             throw new BizException(ResultCode.FORBIDDEN, "判题节点凭证无效");
+        }
+    }
+
+    @Override
+    public void checkTaskAccess(Long problemId, String submissionId, String judgeTaskId, String attemptId,
+                                String judgeToken, String authorizationHeader) {
+        JudgeTaskAccessRequest request = new JudgeTaskAccessRequest();
+        request.setProblemId(problemId);
+        request.setSubmissionId(submissionId);
+        request.setJudgeTaskId(judgeTaskId);
+        request.setAttemptId(attemptId);
+        Result<Boolean> result = judgeNodeTokenFeignClient.validateTaskAccess(request,
+                StrUtil.trimToEmpty(authorizationHeader), StrUtil.trimToEmpty(judgeToken));
+        if (result == null || result.getCode() != ResultCode.SUCCESS || !Boolean.TRUE.equals(result.getData())) {
+            log.warn("Judge task access validation failed, submissionId: {}, judgeTaskId: {}, problemId: {}",
+                    submissionId, judgeTaskId, problemId);
+            throw new BizException(ResultCode.FORBIDDEN, "判题任务资格校验失败");
         }
     }
 

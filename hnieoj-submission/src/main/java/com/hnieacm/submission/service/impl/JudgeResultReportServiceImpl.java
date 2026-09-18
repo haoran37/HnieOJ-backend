@@ -5,23 +5,33 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.hnieacm.common.exception.BizException;
 import com.hnieacm.common.result.ResultCode;
+import com.hnieacm.judge.vo.JudgeNodeIdentity;
+import com.hnieacm.submission.constant.JudgeTaskExecutionStatusConstant;
 import com.hnieacm.submission.constant.SubmissionStatusConstant;
 import com.hnieacm.submission.dto.JudgeResultEventRequest;
 import com.hnieacm.submission.entity.Judge;
 import com.hnieacm.submission.entity.JudgeCase;
+import com.hnieacm.submission.entity.JudgeTaskExecution;
 import com.hnieacm.submission.entity.RejudgeTaskDetail;
 import com.hnieacm.submission.mapper.JudgeCaseMapper;
 import com.hnieacm.submission.mapper.JudgeMapper;
 import com.hnieacm.submission.mapper.RejudgeTaskDetailMapper;
 import com.hnieacm.submission.service.JudgeResultReportService;
+import com.hnieacm.submission.service.JudgeTaskStreamService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -61,19 +71,22 @@ public class JudgeResultReportServiceImpl implements JudgeResultReportService {
     private final JudgeCaseMapper judgeCaseMapper;
     private final RejudgeTaskDetailMapper rejudgeTaskDetailMapper;
     private final SimpMessagingTemplate messagingTemplate;
+    private final JudgeTaskLeaseManager leaseManager;
+    private final JudgeTaskStreamService streamService;
 
     /**
      * @MethodName handleEvent
      * @Param submissionId
      * @Param request
-     * @Description 处理事件
+     * @Param identity
+     * @Description 处理事件：先在事务内校验身份/轮次/尝试/租约所有权，终态落库后才 ACK Redis
      * @Return
      * @Author HaoRan_Lyu
      * @Date 2026/06/08
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void handleEvent(String submissionId, JudgeResultEventRequest request) {
+    public void handleEvent(String submissionId, JudgeResultEventRequest request, JudgeNodeIdentity identity) {
         if (request == null) {
             throw new BizException(ResultCode.BAD_REQUEST, "判题事件不能为空");
         }
@@ -87,24 +100,44 @@ public class JudgeResultReportServiceImpl implements JudgeResultReportService {
         }
         request.setSubmissionId(normalizedSubmissionId);
 
-        Judge judge = queryJudge(normalizedSubmissionId);
         String eventType = StrUtil.trimToNull(request.getEventType());
         if (eventType == null) {
             throw new BizException(ResultCode.BAD_REQUEST, "eventType 不能为空");
         }
         request.setEventType(eventType);
+        // JUDGE_FAILED 允许省略 status，落库语义为 SYSTEM_ERROR；归一化后终态重报才能一致比较
+        if (EVENT_JUDGE_FAILED.equals(eventType) && request.getStatus() == null) {
+            request.setStatus(SubmissionStatusConstant.SYSTEM_ERROR);
+        }
         validateEvent(request);
 
-        if (!isCurrentJudgeTask(judge, request)) {
-            log.info("Judge event ignored because task id mismatch, submissionId: {}, eventType: {}, currentTaskId: {}, incomingTaskId: {}",
-                    normalizedSubmissionId, eventType, judge.getJudgeTaskId(), request.getJudgeTaskId());
-            return;
+        String judgeTaskId = StrUtil.trimToNull(request.getJudgeTaskId());
+        String attemptId = StrUtil.trimToNull(request.getAttemptId());
+        if (judgeTaskId == null || attemptId == null) {
+            throw new BizException(ResultCode.BAD_REQUEST, "judgeTaskId/attemptId 不能为空");
+        }
+        request.setJudgeTaskId(judgeTaskId);
+        request.setAttemptId(attemptId);
+        boolean terminalEvent = EVENT_JUDGE_FINISHED.equals(eventType) || EVENT_JUDGE_FAILED.equals(eventType);
+
+        JudgeTaskExecution execution = leaseManager.validateEventOwnership(
+                normalizedSubmissionId, identity, judgeTaskId, attemptId, terminalEvent);
+
+        Judge judge = queryJudge(normalizedSubmissionId);
+        if (!judgeTaskId.equals(StrUtil.trimToNull(judge.getJudgeTaskId()))) {
+            throw new BizException(ResultCode.FORBIDDEN, "判题任务轮次不匹配");
         }
 
-        // 已进入终态的提交不再接收进度类回写，避免乱序重试事件污染最终结果。
-        if (isTerminalStatus(judge.getStatus())) {
-            log.info("Judge event ignored because submission is terminal, submissionId: {}, eventType: {}, currentStatus: {}",
-                    normalizedSubmissionId, eventType, judge.getStatus());
+        // 终态同身份同 attempt 同最终业务内容重报幂等成功，不重写；仅比较落库的终态业务指纹，忽略纯传输时间戳
+        if (JudgeTaskExecutionStatusConstant.COMPLETED.equals(execution.getStatus())
+                || isTerminalStatus(judge.getStatus())) {
+            String incomingFingerprint = terminalEvent ? terminalFingerprint(request, eventType) : null;
+            if (!terminalEvent || incomingFingerprint == null
+                    || !incomingFingerprint.equals(execution.getTerminalFingerprint())) {
+                throw new BizException(ResultCode.FORBIDDEN, "判题结果已提交且不一致");
+            }
+            // 首次终态已写入指纹、释放租约并完成状态；同内容重报只 ACK，禁止再次写已完成状态
+            ackAfterCommit(execution);
             return;
         }
 
@@ -115,7 +148,65 @@ public class JudgeResultReportServiceImpl implements JudgeResultReportService {
             case EVENT_JUDGE_FAILED -> handleJudgeFailed(judge, request);
             default -> throw new BizException(ResultCode.BAD_REQUEST, "不支持的判题事件类型");
         }
-        messagingTemplate.convertAndSend(PROGRESS_TOPIC_PREFIX + normalizedSubmissionId + PROGRESS_TOPIC_SUFFIX, request);
+
+        if (terminalEvent) {
+            leaseManager.complete(execution, terminalFingerprint(request, eventType));
+            ackAfterCommit(execution);
+        } else {
+            leaseManager.markRunning(execution);
+        }
+        pushAfterCommit(normalizedSubmissionId, request);
+    }
+
+    /**
+     * @MethodName ackAfterCommit
+     * @Param execution
+     * @Description 仅在 MySQL 事务提交后 XACK；Redis 失败不影响已落库结果
+     * @Return
+     * @Author HaoRan_Lyu
+     * @Date 2026/09/18
+     */
+    private void ackAfterCommit(JudgeTaskExecution execution) {
+        if (execution == null) {
+            return;
+        }
+        String streamKey = execution.getStreamKey();
+        String recordId = execution.getStreamId();
+        if (streamKey == null || recordId == null) {
+            return;
+        }
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    streamService.ack(streamKey, recordId);
+                }
+            });
+            return;
+        }
+        streamService.ack(streamKey, recordId);
+    }
+
+    /**
+     * @MethodName pushAfterCommit
+     * @Param submissionId
+     * @Param request
+     * @Description 事务提交后再推送进度，避免前端看到未提交事件
+     * @Return
+     * @Author HaoRan_Lyu
+     * @Date 2026/09/18
+     */
+    private void pushAfterCommit(String submissionId, JudgeResultEventRequest request) {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    messagingTemplate.convertAndSend(PROGRESS_TOPIC_PREFIX + submissionId + PROGRESS_TOPIC_SUFFIX, request);
+                }
+            });
+            return;
+        }
+        messagingTemplate.convertAndSend(PROGRESS_TOPIC_PREFIX + submissionId + PROGRESS_TOPIC_SUFFIX, request);
     }
 
     /**
@@ -357,22 +448,77 @@ public class JudgeResultReportServiceImpl implements JudgeResultReportService {
     }
 
     /**
-     * @MethodName isCurrentJudgeTask
-     * @Param judge
+     * @MethodName terminalFingerprint
      * @Param request
-     * @Description 校验请求中的判题任务ID是否与当前记录一致
-     * @Return @return boolean
+     * @Param eventType
+     * @Description 计算终态业务内容指纹：包含事件类型、状态、分数、进度、消息、诊断与测试点等业务字段；
+     * 仅忽略纯传输时间戳 eventTime，空值按已定义默认值归一化（不能用“省略字段”通配任意值）。
+     * 指纹在首次终态落库的同一事务写入执行记录，重报时按同一规范重新计算比较。
+     * @Return @return {@link String }
      * @Author HaoRan_Lyu
-     * @Date 2026/06/08
+     * @Date 2026/09/18
      */
-    private boolean isCurrentJudgeTask(Judge judge, JudgeResultEventRequest request) {
-        String currentTaskId = StrUtil.trimToNull(judge.getJudgeTaskId());
-        if (currentTaskId == null) {
-            return true;
+    private String terminalFingerprint(JudgeResultEventRequest request, String eventType) {
+        StringBuilder canonical = new StringBuilder(256);
+        appendCanonical(canonical, "eventType", eventType);
+        appendCanonical(canonical, "status", request.getStatus());
+        appendCanonical(canonical, "statusText", StrUtil.trimToNull(request.getStatusText()));
+        appendCanonical(canonical, "totalCase", defaultZero(request.getTotalCase()));
+        appendCanonical(canonical, "judgedCase", defaultZero(request.getJudgedCase()));
+        appendCanonical(canonical, "currentCase", defaultZero(request.getCurrentCase()));
+        appendCanonical(canonical, "score", defaultZero(request.getScore()));
+        appendCanonical(canonical, "message", StrUtil.trimToNull(request.getMessage()));
+        appendCanonical(canonical, "diagnosticMessage", StrUtil.trimToNull(request.getDiagnosticMessage()));
+        JudgeResultEventRequest.CaseResult caseResult = request.getCaseResult();
+        if (caseResult == null) {
+            appendCanonical(canonical, "caseResult", null);
+        } else {
+            appendCanonical(canonical, "caseId", StrUtil.trimToNull(caseResult.getCaseId()));
+            appendCanonical(canonical, "caseStatus", caseResult.getStatus());
+            appendCanonical(canonical, "caseStatusText", StrUtil.trimToNull(caseResult.getStatusText()));
+            appendCanonical(canonical, "caseTime", caseResult.getTime());
+            appendCanonical(canonical, "caseMemory", caseResult.getMemory());
+            appendCanonical(canonical, "caseScore", defaultZero(caseResult.getScore()));
+            appendCanonical(canonical, "caseUserOutput", StrUtil.trimToNull(caseResult.getUserOutput()));
         }
-        String incomingTaskId = StrUtil.trimToNull(request.getJudgeTaskId());
-        request.setJudgeTaskId(incomingTaskId);
-        return currentTaskId.equals(incomingTaskId);
+        return sha256Hex(canonical.toString());
+    }
+
+    /**
+     * @MethodName appendCanonical
+     * @Param canonical
+     * @Param name
+     * @Param value
+     * @Description 逐行追加“字段名=长度:值”，长度前缀避免分隔符歧义；null 使用不可能的长度 -1 编码，
+     * 与非空值的任意字面量（包括 "<null>"）结构上区分，避免缺省与字面量哨兵碰撞，保证同一业务内容得到稳定规范串
+     * @Return
+     * @Author HaoRan_Lyu
+     * @Date 2026/09/18
+     */
+    private void appendCanonical(StringBuilder canonical, String name, Object value) {
+        if (value == null) {
+            canonical.append(name).append("=-1:\n");
+            return;
+        }
+        String text = String.valueOf(value);
+        canonical.append(name).append('=').append(text.length()).append(':').append(text).append('\n');
+    }
+
+    /**
+     * @MethodName sha256Hex
+     * @Param value
+     * @Description JDK 内置 SHA-256 十六进制摘要，供终态幂等指纹比较
+     * @Return @return {@link String }
+     * @Author HaoRan_Lyu
+     * @Date 2026/09/18
+     */
+    private String sha256Hex(String value) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            return HexFormat.of().formatHex(digest.digest(value.getBytes(StandardCharsets.UTF_8)));
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 不可用", e);
+        }
     }
 
     /**

@@ -1,12 +1,13 @@
 package com.hnieacm.judge.controller;
 
 import com.hnieacm.common.result.Result;
+import com.hnieacm.judge.dto.CreateFormalJudgeTokenRequest;
 import com.hnieacm.judge.dto.CreateJudgeAuthCodeRequest;
-import com.hnieacm.judge.service.FormalJudgeTokenService;
+import com.hnieacm.judge.dto.JudgeNodeDrainingRequest;
 import com.hnieacm.judge.service.JudgeNodeSecurityService;
 import com.hnieacm.judge.vo.JudgeAuthCodeVo;
-import com.hnieacm.judge.vo.JudgeFormalTokenVo;
 import com.hnieacm.judge.vo.JudgeNodeTokenVo;
+import com.hnieacm.judge.vo.JudgeTempTokenVo;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -24,7 +25,7 @@ import java.util.List;
 
 /**
  * @Author: HaoRan_Lyu
- * @Date: 2026/05/12
+ * @Date 2026/05/12
  * @Description: 判题节点凭证管理接口
  */
 @Tag(name = "判题节点凭证管理模块")
@@ -35,12 +36,17 @@ import java.util.List;
 public class AdminJudgeNodeController {
 
     private final JudgeNodeSecurityService judgeNodeSecurityService;
-    private final FormalJudgeTokenService formalJudgeTokenService;
 
     @Operation(summary = "创建临时判题节点授权码")
     @PostMapping("/auth-codes")
     public Result<JudgeAuthCodeVo> createAuthCode(@Valid @RequestBody CreateJudgeAuthCodeRequest request) {
         return Result.success(judgeNodeSecurityService.createAuthCode(request));
+    }
+
+    @Operation(summary = "签发正式判题节点独立凭证")
+    @PostMapping("/formal-tokens")
+    public Result<JudgeTempTokenVo> issueFormalToken(@Valid @RequestBody CreateFormalJudgeTokenRequest request) {
+        return Result.success(judgeNodeSecurityService.issueFormalToken(request));
     }
 
     @Operation(summary = "查询判题节点状态")
@@ -55,16 +61,18 @@ public class AdminJudgeNodeController {
         return Result.success(judgeNodeSecurityService.listTokens(status));
     }
 
-    @Operation(summary = "吊销判题节点短期 Token")
+    @Operation(summary = "吊销判题节点凭证")
     @PostMapping("/tokens/{tokenId}/revoke")
     public Result<Void> revokeToken(@PathVariable String tokenId) {
         judgeNodeSecurityService.revokeToken(tokenId);
         return Result.success("吊销成功", null);
     }
 
-    @Operation(summary = "轮换正式判题节点长期 Token")
-    @PostMapping("/formal-token/rotate")
-    public Result<JudgeFormalTokenVo> rotateFormalToken() {
-        return Result.success(formalJudgeTokenService.rotate());
+    @Operation(summary = "设置判题节点排空状态")
+    @PostMapping("/tokens/{tokenId}/draining")
+    public Result<Void> updateDraining(@PathVariable String tokenId,
+                                       @Valid @RequestBody JudgeNodeDrainingRequest request) {
+        judgeNodeSecurityService.updateDraining(tokenId, request.getDraining());
+        return Result.success(null);
     }
 }

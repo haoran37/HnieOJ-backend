@@ -9,6 +9,7 @@ import com.hnieacm.submission.entity.Judge;
 import com.hnieacm.submission.entity.JudgeTaskOutbox;
 import com.hnieacm.submission.entity.RejudgeTaskDetail;
 import com.hnieacm.submission.mapper.JudgeMapper;
+import com.hnieacm.submission.mapper.JudgeTaskExecutionMapper;
 import com.hnieacm.submission.mapper.JudgeTaskOutboxMapper;
 import com.hnieacm.submission.mapper.RejudgeTaskDetailMapper;
 import com.hnieacm.submission.properties.SubmissionProperties;
@@ -48,6 +49,9 @@ class SubmissionJudgeTimeoutScannerTest {
     private RejudgeTaskDetailMapper rejudgeTaskDetailMapper;
 
     @Mock
+    private JudgeTaskExecutionMapper executionMapper;
+
+    @Mock
     private SimpMessagingTemplate messagingTemplate;
 
     private SubmissionJudgeTimeoutScanner scanner;
@@ -58,7 +62,7 @@ class SubmissionJudgeTimeoutScannerTest {
         initTableInfo(JudgeTaskOutbox.class);
         initTableInfo(RejudgeTaskDetail.class);
         scanner = new SubmissionJudgeTimeoutScanner(
-                judgeMapper, outboxMapper, rejudgeTaskDetailMapper, new SubmissionProperties(), messagingTemplate);
+                judgeMapper, outboxMapper, executionMapper, rejudgeTaskDetailMapper, new SubmissionProperties(), messagingTemplate);
     }
 
     @Test

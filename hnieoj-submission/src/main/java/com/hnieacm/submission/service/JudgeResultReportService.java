@@ -1,5 +1,6 @@
 package com.hnieacm.submission.service;
 
+import com.hnieacm.judge.vo.JudgeNodeIdentity;
 import com.hnieacm.submission.dto.JudgeResultEventRequest;
 
 /**
@@ -9,5 +10,5 @@ import com.hnieacm.submission.dto.JudgeResultEventRequest;
  */
 public interface JudgeResultReportService {
 
-    void handleEvent(String submissionId, JudgeResultEventRequest request);
+    void handleEvent(String submissionId, JudgeResultEventRequest request, JudgeNodeIdentity identity);
 }

@@ -361,6 +361,9 @@ CREATE TABLE `judge_node_token` (
   `disk_free_bytes` bigint(20) DEFAULT NULL COMMENT '缓存挂载磁盘可用字节数',
   `revoked_time` datetime DEFAULT NULL COMMENT '吊销时间',
   `revoked_by` varchar(50) DEFAULT NULL COMMENT '吊销管理员',
+  `approved_max_concurrency` int(11) DEFAULT NULL COMMENT '服务端核准的最大并发额度，心跳上报不能提高',
+  `authorization_until` datetime DEFAULT NULL COMMENT '临时节点首次接入授予的最晚授权期限，续期不得超过',
+  `draining` tinyint(1) NOT NULL DEFAULT '0' COMMENT '是否排空：停止领取新任务但仍可完成在途任务',
   `gmt_create` datetime DEFAULT CURRENT_TIMESTAMP,
   `gmt_modified` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
@@ -446,19 +449,21 @@ CREATE TABLE `judge_case` (
   UNIQUE KEY `uk_submit_case` (`submit_id`, `case_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 判题任务 outbox，用于提交事务成功但 MQ 投递失败时自动补偿
+-- 判题任务 outbox，用于提交事务成功但 Redis Streams 投递失败时自动补偿
 DROP TABLE IF EXISTS `judge_task_outbox`;
 CREATE TABLE `judge_task_outbox` (
   `id` bigint(20) NOT NULL AUTO_INCREMENT,
-  `message_id` varchar(64) NOT NULL COMMENT 'RabbitMQ 消息 ID',
+  `message_id` varchar(64) NOT NULL COMMENT '判题任务消息 ID',
   `judge_task_id` varchar(64) NOT NULL COMMENT '判题任务 ID',
   `submission_id` varchar(64) NOT NULL COMMENT '提交展示 ID',
-  `exchange_name` varchar(128) NOT NULL COMMENT 'RabbitMQ exchange',
-  `routing_key` varchar(128) NOT NULL COMMENT 'RabbitMQ routing key',
+  `exchange_name` varchar(128) NOT NULL COMMENT '【遗留 NOT NULL 列】代码写固定标记以满足约束，不参与路由',
+  `routing_key` varchar(128) NOT NULL COMMENT '【遗留 NOT NULL 列】代码写 Stream key 以满足约束，真实路由使用 stream_key',
+  `stream_key` varchar(128) DEFAULT NULL COMMENT 'Redis Streams 固定 Stream key',
+  `stream_id` varchar(64) DEFAULT NULL COMMENT 'XADD 返回的消息 ID，用于终态 ACK',
   `payload` longtext NOT NULL COMMENT '判题任务消息 JSON',
   `status` varchar(20) NOT NULL DEFAULT 'pending' COMMENT 'pending, processing, sent, failed, exhausted',
   `retry_count` int(11) NOT NULL DEFAULT '0',
-  `publish_attempt` int(11) NOT NULL DEFAULT '0' COMMENT 'MQ 投递尝试版本，用于隔离迟到 confirm/return',
+  `publish_attempt` int(11) NOT NULL DEFAULT '0' COMMENT '投递尝试版本，用于隔离迟到的投递回调',
   `max_retry_count` int(11) NOT NULL DEFAULT '10',
   `next_retry_time` datetime DEFAULT CURRENT_TIMESTAMP,
   `sent_time` datetime DEFAULT NULL,
@@ -471,6 +476,38 @@ CREATE TABLE `judge_task_outbox` (
   KEY `idx_submission_id` (`submission_id`),
   KEY `idx_judge_task_id` (`judge_task_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='判题任务 outbox';
+
+-- 判题任务执行租约：MySQL 是任务所有权与执行资格的权威状态
+DROP TABLE IF EXISTS `judge_task_execution`;
+CREATE TABLE `judge_task_execution` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `submission_id` varchar(64) NOT NULL COMMENT '提交展示 ID',
+  `judge_id` bigint(20) NOT NULL COMMENT 'judge 表主键',
+  `judge_task_id` varchar(64) NOT NULL COMMENT '当前判题任务 ID，重判后更新',
+  `problem_id` bigint(20) NOT NULL COMMENT '题目 DB ID',
+  `problem_code` varchar(50) DEFAULT NULL COMMENT '题目展示 ID',
+  `judge_mode` varchar(20) NOT NULL DEFAULT 'default' COMMENT 'default, spj, interactive',
+  `stream_key` varchar(128) NOT NULL COMMENT 'Redis Streams key',
+  `stream_id` varchar(64) DEFAULT NULL COMMENT '最近一次 XADD 的消息 ID',
+  `node_id` varchar(64) DEFAULT NULL COMMENT '当前租约持有节点 ID',
+  `token_id` varchar(64) DEFAULT NULL COMMENT '当前租约持有 Token ID',
+  `attempt_id` varchar(64) DEFAULT NULL COMMENT '当前执行尝试 UUID',
+  `attempt_count` int(11) NOT NULL DEFAULT '0' COMMENT '实际领取执行次数；恢复/Redis 丢消息不增加',
+  `max_attempt_count` int(11) NOT NULL DEFAULT '3' COMMENT '最大实际执行次数，超出置 SYSTEM_ERROR',
+  `status` varchar(20) NOT NULL DEFAULT 'queued' COMMENT 'queued, leased, running, completed, failed',
+  `lease_until` bigint(20) DEFAULT NULL COMMENT '租约到期时间，Unix 毫秒',
+  `renew_after_millis` int(11) DEFAULT NULL COMMENT '建议续期间隔毫秒',
+  `execution_deadline` bigint(20) DEFAULT NULL COMMENT '硬执行截止时间，Unix 毫秒；到期不可续租',
+  `last_error` varchar(512) DEFAULT NULL COMMENT '最近一次失败/恢复原因',
+  `terminal_fingerprint` varchar(64) DEFAULT NULL COMMENT '终态业务内容 SHA-256 指纹，用于同身份同 attempt 重报幂等校验；重判/重派时清空',
+  `gmt_create` datetime DEFAULT CURRENT_TIMESTAMP,
+  `gmt_modified` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_submission_id` (`submission_id`),
+  KEY `idx_status_lease` (`status`, `lease_until`),
+  KEY `idx_node_status` (`node_id`, `status`),
+  KEY `idx_judge_task_id` (`judge_task_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='判题任务执行租约（权威所有权状态）';
 
 -- 重判任务表
 DROP TABLE IF EXISTS `rejudge_task`;

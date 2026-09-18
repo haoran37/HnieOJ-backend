@@ -6,6 +6,7 @@ import com.hnieacm.common.result.ResultCode;
 import com.hnieacm.judge.dto.ValidateJudgeNodeTokenRequest;
 import com.hnieacm.judge.service.JudgeNodeHeartbeatService;
 import com.hnieacm.judge.service.JudgeNodeSecurityService;
+import com.hnieacm.judge.vo.JudgeNodeIdentity;
 import com.hnieacm.judge.vo.JudgeNodeTokenValidationVo;
 import com.hnieacm.submission.service.JudgeNodeAccessService;
 import lombok.RequiredArgsConstructor;
@@ -50,6 +51,11 @@ public class JudgeNodeAccessServiceImpl implements JudgeNodeAccessService {
         }
     }
 
+    @Override
+    public JudgeNodeIdentity resolveIdentity(String judgeToken, String authorizationHeader) {
+        return judgeNodeSecurityService.resolveIdentity(judgeToken, extractAuthorization(authorizationHeader));
+    }
+
     /**
      * @MethodName hasActiveNodeForMode
      * @Param judgeMode
@@ -69,14 +75,6 @@ public class JudgeNodeAccessServiceImpl implements JudgeNodeAccessService {
         }
     }
 
-    /**
-     * @MethodName extractBearerToken
-     * @Param authorizationHeader
-     * @Description 提取BearerToken
-     * @Return @return {@link String }
-     * @Author HaoRan_Lyu
-     * @Date 2026/06/08
-     */
     private String extractBearerToken(String authorizationHeader) {
         String normalizedHeader = StrUtil.trimToNull(authorizationHeader);
         if (normalizedHeader == null) {
@@ -86,5 +84,9 @@ public class JudgeNodeAccessServiceImpl implements JudgeNodeAccessService {
             return StrUtil.trimToNull(normalizedHeader.substring(BEARER_PREFIX.length()));
         }
         return null;
+    }
+
+    private String extractAuthorization(String authorizationHeader) {
+        return StrUtil.trimToNull(authorizationHeader);
     }
 }

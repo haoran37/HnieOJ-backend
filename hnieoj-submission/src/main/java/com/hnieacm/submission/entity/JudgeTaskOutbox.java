@@ -35,6 +35,12 @@ public class JudgeTaskOutbox {
     @TableField("routing_key")
     private String routingKey;
 
+    @TableField("stream_key")
+    private String streamKey;
+
+    @TableField("stream_id")
+    private String streamId;
+
     private String payload;
 
     private String status;

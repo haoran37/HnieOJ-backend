@@ -18,6 +18,8 @@ public class JudgeResultEventRequest {
 
     private String judgeTaskId;
 
+    private String attemptId;
+
     private Integer status;
 
     private String statusText;

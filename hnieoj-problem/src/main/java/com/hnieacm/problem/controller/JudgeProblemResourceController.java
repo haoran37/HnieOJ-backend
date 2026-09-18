@@ -44,11 +44,14 @@ public class JudgeProblemResourceController {
     @GetMapping("/{id}/testdata")
     public void downloadTestdata(@PathVariable @Min(value = 1, message = "id 必须大于 0") Long id,
                                  @RequestParam(required = false) Integer version,
+                                 @RequestParam(required = false) String submissionId,
+                                 @RequestParam(required = false) String judgeTaskId,
+                                 @RequestParam(required = false) String attemptId,
                                  @RequestHeader(value = HeaderConstant.JUDGE_TOKEN, required = false) String judgeToken,
                                  @RequestHeader(value = HeaderConstant.AUTHORIZATION, required = false) String authorization,
                                  HttpServletResponse response) {
         try {
-            judgeNodeAccessService.checkAccess(judgeToken, authorization);
+            judgeNodeAccessService.checkTaskAccess(id, submissionId, judgeTaskId, attemptId, judgeToken, authorization);
             ProblemResourceService.TestdataDownloadDecision decision =
                     problemResourceService.prepareTestdataDownload(id, version);
             if (decision.notModified()) {

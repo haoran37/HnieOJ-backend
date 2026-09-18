@@ -2,6 +2,7 @@ package com.hnieacm.submission.controller;
 
 import com.hnieacm.common.constant.HeaderConstant;
 import com.hnieacm.common.result.Result;
+import com.hnieacm.judge.vo.JudgeNodeIdentity;
 import com.hnieacm.submission.dto.JudgeResultEventRequest;
 import com.hnieacm.submission.service.JudgeNodeAccessService;
 import com.hnieacm.submission.service.JudgeResultReportService;
@@ -33,8 +34,8 @@ public class JudgeSubmissionEventController {
                                     @RequestBody JudgeResultEventRequest request,
                                     @RequestHeader(value = HeaderConstant.JUDGE_TOKEN, required = false) String judgeToken,
                                     @RequestHeader(value = HeaderConstant.AUTHORIZATION, required = false) String authorization) {
-        judgeNodeAccessService.checkAccess(judgeToken, authorization);
-        judgeResultReportService.handleEvent(submissionId, request);
+        JudgeNodeIdentity identity = judgeNodeAccessService.resolveIdentity(judgeToken, authorization);
+        judgeResultReportService.handleEvent(submissionId, request, identity);
         return Result.success(null);
     }
 }

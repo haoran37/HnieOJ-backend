@@ -25,19 +25,17 @@ COMPOSE_PARALLEL_LIMIT="${COMPOSE_PARALLEL_LIMIT:-2}"
 DISCARD_LOCAL_CHANGES="${DISCARD_LOCAL_CHANGES:-true}"
 
 PROBLEM_STORAGE_DIR="${PROBLEM_STORAGE_DIR:-/data/oj/problems}"
-JUDGE_SECURITY_DIR="${JUDGE_SECURITY_DIR:-/etc/hnieoj/judge-security}"
-JUDGE_FORMAL_PRIVATE_KEY_PATH="${JUDGE_FORMAL_PRIVATE_KEY_PATH:-${JUDGE_SECURITY_DIR}/judge_formal_private.pem}"
-JUDGE_FORMAL_PUBLIC_KEY_PATH="${JUDGE_FORMAL_PUBLIC_KEY_PATH:-${JUDGE_SECURITY_DIR}/judge_formal_public.pem}"
 GOJUDGE_DEPLOY_DIR="${GOJUDGE_DEPLOY_DIR:-/opt/hnieoj/go-judge}"
 GOJUDGE_SOURCE_DIR="${GOJUDGE_SOURCE_DIR:-${GOJUDGE_DEPLOY_DIR}/source}"
 GOJUDGE_CONFIG_DIR="${GOJUDGE_CONFIG_DIR:-/etc/hnieoj/go-judge}"
 GOJUDGE_CONFIG_FILE="${GOJUDGE_CONFIG_FILE:-${GOJUDGE_CONFIG_DIR}/config.yaml}"
+GOJUDGE_CREDENTIAL_DIR="${GOJUDGE_CREDENTIAL_DIR:-/etc/hnieoj/judge-node}"
 GOJUDGE_CACHE_DIR="${GOJUDGE_CACHE_DIR:-/data/oj/judge-cache}"
 
 MAVEN_SETTINGS_FILE="deploy/maven/settings.xml"
 MAVEN_COMMAND="${MAVEN_COMMAND:-mvn -s ${MAVEN_SETTINGS_FILE} clean package -DskipTests}"
 COMPOSE_FILE="deploy/docker/docker-compose.dev.yml"
-RABBITMQ_COMPOSE_FILE="deploy/docker/docker-compose.rabbitmq.yml"
+REDIS_COMPOSE_FILE="deploy/docker/docker-compose.redis.yml"
 GOJUDGE_COMPOSE_FILE="deploy/docker/docker-compose.gojudge.yml"
 ENV_TEMPLATE_FILE="deploy/docker/.env.example"
 LOG_TAIL="${LOG_TAIL:-200}"
@@ -76,24 +74,24 @@ usage() {
   restart [服务名...] 重启服务，不传服务名则重启全部服务
   stop [服务名...]    停止服务，不传服务名则停止全部服务
   down                停止并移除 Compose 容器
-  rabbitmq-up         启动 RabbitMQ 容器
-  rabbitmq-ps         查看 RabbitMQ 容器状态
-  rabbitmq-logs       查看 RabbitMQ 容器日志
-  rabbitmq-down       停止并移除 RabbitMQ 容器
+  redis-up            启动本地 Redis 容器（AOF + noeviction，仅绑定 127.0.0.1）
+  redis-ps            查看 Redis 容器状态
+  redis-logs          查看 Redis 容器日志
+  redis-down          停止并移除 Redis 容器
   gojudge-up          拉取、构建并启动 go-judge 沙箱与判题节点
   gojudge-ps          查看 go-judge 容器状态
   gojudge-logs        查看 go-judge 日志
   gojudge-cache-status 查看 go-judge 测试数据缓存占用
   gojudge-cache-clean [天数] 清理 N 天未修改的 go-judge 测试数据缓存，默认 7 天
   gojudge-down        停止并移除 go-judge 容器
-  security-init       只生成/补齐 JWT Secret 与正式节点 RSA 公私钥
+  security-init       只生成/补齐判题节点 JWT Secret 与内部服务 Token
   help                显示帮助
 
 常用示例：
   bash deploy/scripts/deploy-dev.sh
   bash deploy/scripts/deploy-dev.sh logs gateway
   bash deploy/scripts/deploy-dev.sh restart hnieoj-user
-  bash deploy/scripts/deploy-dev.sh rabbitmq-up
+  bash deploy/scripts/deploy-dev.sh redis-up
   bash deploy/scripts/deploy-dev.sh gojudge-up
 EOF
 }
@@ -180,20 +178,7 @@ openssl_random_urlsafe() {
 
 ensure_judge_security_materials() {
   require_command openssl
-  mkdir -p "${JUDGE_SECURITY_DIR}"
-  chmod 700 "${JUDGE_SECURITY_DIR}"
-
-  if [[ ! -f "${JUDGE_FORMAL_PRIVATE_KEY_PATH}" ]]; then
-    log "生成正式判题节点 RSA 私钥：${JUDGE_FORMAL_PRIVATE_KEY_PATH}"
-    openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out "${JUDGE_FORMAL_PRIVATE_KEY_PATH}"
-    chmod 600 "${JUDGE_FORMAL_PRIVATE_KEY_PATH}"
-  fi
-
-  if [[ ! -f "${JUDGE_FORMAL_PUBLIC_KEY_PATH}" ]]; then
-    log "从私钥导出正式判题节点 RSA 公钥：${JUDGE_FORMAL_PUBLIC_KEY_PATH}"
-    openssl rsa -pubout -in "${JUDGE_FORMAL_PRIVATE_KEY_PATH}" -out "${JUDGE_FORMAL_PUBLIC_KEY_PATH}"
-    chmod 644 "${JUDGE_FORMAL_PUBLIC_KEY_PATH}"
-  fi
+  mkdir -p "${DEPLOY_DIR}"
 
   if [[ -f "${ENV_FILE}" ]]; then
     local jwt_secret
@@ -209,11 +194,6 @@ ensure_judge_security_materials() {
       upsert_env_value "HNIEOJ_INTERNAL_TOKEN" "$(openssl_random_urlsafe 48)"
       log "已写入 HNIEOJ_INTERNAL_TOKEN"
     fi
-    upsert_env_value "HNIEOJ_JUDGE_SECURITY_HOST_DIR" "${JUDGE_SECURITY_DIR}"
-    upsert_env_value "HNIEOJ_JUDGE_FORMAL_TOKEN_PUBLIC_KEY_PATH" "/etc/hnieoj/judge-security/$(basename "${JUDGE_FORMAL_PUBLIC_KEY_PATH}")"
-    upsert_env_value "HNIEOJ_JUDGE_FORMAL_TOKEN_PRIVATE_KEY_PATH" "/etc/hnieoj/judge-security/$(basename "${JUDGE_FORMAL_PRIVATE_KEY_PATH}")"
-    upsert_env_value "HNIEOJ_JUDGE_FORMAL_TOKEN_NACOS_DATA_ID" "hnieoj-judge-formal-token.yaml"
-    upsert_env_value "HNIEOJ_JUDGE_FORMAL_TOKEN_NACOS_GROUP" "HNIEOJ_SECRET_GROUP"
   fi
 }
 
@@ -251,9 +231,8 @@ check_runtime_environment() {
   docker compose version >/dev/null 2>&1 || fail "Docker Compose v2 不可用"
   docker info >/dev/null 2>&1 || fail "当前用户无法访问 Docker daemon"
 
-  mkdir -p "${DEPLOY_DIR}" "${PROBLEM_STORAGE_DIR}" "${JUDGE_SECURITY_DIR}" "${GOJUDGE_CACHE_DIR}"
+  mkdir -p "${DEPLOY_DIR}" "${PROBLEM_STORAGE_DIR}" "${GOJUDGE_CACHE_DIR}"
   log "目录检查通过：${PROBLEM_STORAGE_DIR}"
-  log "目录检查通过：${JUDGE_SECURITY_DIR}"
 }
 
 check_docker_environment() {
@@ -323,8 +302,8 @@ prepare_environment_file() {
   upsert_env_value "JAVA_BASE_IMAGE" "${JAVA_BASE_IMAGE}"
   ensure_judge_security_materials
 
-  if grep -Eq '^(MYSQL_PASSWORD|REDIS_PASSWORD|RABBITMQ_PASSWORD)=($|replace_me)' "${ENV_FILE}"; then
-    fail "${ENV_FILE} 仍包含未填写的 MySQL/Redis/RabbitMQ 密码，请填写后重试。"
+  if grep -Eq '^(MYSQL_PASSWORD|REDIS_PASSWORD)=($|replace_me)' "${ENV_FILE}"; then
+    fail "${ENV_FILE} 仍包含未填写的 MySQL/Redis 密码，请填写后重试。"
   fi
 }
 
@@ -339,8 +318,8 @@ compose() {
   docker compose -p "${COMPOSE_PROJECT_NAME}" --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" "$@"
 }
 
-rabbitmq_compose() {
-  docker compose -p "${COMPOSE_PROJECT_NAME}" --env-file "${ENV_FILE}" -f "${RABBITMQ_COMPOSE_FILE}" "$@"
+redis_compose() {
+  docker compose -p "${COMPOSE_PROJECT_NAME}" --env-file "${ENV_FILE}" -f "${REDIS_COMPOSE_FILE}" "$@"
 }
 
 gojudge_compose() {
@@ -355,6 +334,7 @@ export_gojudge_variables() {
   export GOJUDGE_SOURCE_DIR
   export GOJUDGE_CONFIG_HOST_FILE="${GOJUDGE_CONFIG_FILE}"
   export GOJUDGE_CACHE_DIR
+  export HNIEOJ_JUDGE_CREDENTIAL_HOST_DIR="${GOJUDGE_CREDENTIAL_DIR}"
 }
 
 deploy_compose() {
@@ -402,15 +382,14 @@ down_services() {
   compose down
 }
 
-start_rabbitmq() {
+start_redis() {
   check_docker_environment
   ensure_source_ready
   cd "${SOURCE_DIR}"
-  require_file "${RABBITMQ_COMPOSE_FILE}"
-  rabbitmq_compose up -d
-  rabbitmq_compose ps
-  log "RabbitMQ AMQP 地址：127.0.0.1:${RABBITMQ_PUBLIC_PORT:-5672}"
-  log "RabbitMQ 管理后台：http://127.0.0.1:${RABBITMQ_MANAGEMENT_PUBLIC_PORT:-15672}"
+  require_file "${REDIS_COMPOSE_FILE}"
+  redis_compose up -d
+  redis_compose ps
+  log "Redis 地址（仅本机）：127.0.0.1:${REDIS_PUBLIC_PORT:-6379}（AOF + noeviction）"
 }
 
 prepare_gojudge_config_file() {
@@ -419,7 +398,7 @@ prepare_gojudge_config_file() {
     require_file "${GOJUDGE_SOURCE_DIR}/deploy/config.formal.example.yaml"
     cp "${GOJUDGE_SOURCE_DIR}/deploy/config.formal.example.yaml" "${GOJUDGE_CONFIG_FILE}"
     chmod 600 "${GOJUDGE_CONFIG_FILE}"
-    fail "已创建 ${GOJUDGE_CONFIG_FILE}，请填写 RabbitMQ 密码与 Nacos 信息后重新执行 gojudge-up。"
+    fail "已创建 ${GOJUDGE_CONFIG_FILE}，请填写后端网关信息与节点凭证路径后重新执行 gojudge-up。"
   fi
   require_file "${GOJUDGE_CONFIG_FILE}"
   if grep -Eq 'replace_me|password: ""' "${GOJUDGE_CONFIG_FILE}"; then
@@ -433,13 +412,17 @@ start_gojudge() {
   ensure_judge_security_materials
   sync_gojudge_source_code
   prepare_gojudge_config_file
+  # 凭证目录必须存在且仅本节点可读写：节点续期后会在该目录内原子替换 credential.json。
+  mkdir -p "${GOJUDGE_CREDENTIAL_DIR}"
+  chmod 700 "${GOJUDGE_CREDENTIAL_DIR}" 2>/dev/null || true
   cd "${SOURCE_DIR}"
   require_file "${GOJUDGE_COMPOSE_FILE}"
   export_gojudge_variables
   gojudge_compose up -d --build
   gojudge_compose ps
-  log "go-judge 沙箱地址：http://127.0.0.1:${GOJUDGE_PUBLIC_PORT:-5050}"
+  log "go-judge 沙箱仅在内网 Compose 网络可达：http://go-judge-sandbox:5050"
   log "go-judge 判题节点配置：${GOJUDGE_CONFIG_FILE}"
+  log "go-judge 逐节点凭证目录（宿主 0700，容器内 /etc/hnieoj/judge-node 可写）：${GOJUDGE_CREDENTIAL_DIR}"
 }
 
 gojudge_cache_status() {
@@ -473,157 +456,6 @@ gojudge_cache_clean() {
   log "开始清理 ${keep_days} 天未修改的 go-judge 测试数据缓存：${resolved_problem_dir}"
   find "${resolved_problem_dir}" -mindepth 1 -maxdepth 1 -type d -mtime "+${keep_days}" -print -exec rm -rf {} +
   gojudge_cache_status
-}
-
-rabbitmq_management_command() {
-  local action="$1"
-  local limit="${2:-10}"
-  local management_port
-  local management_url
-  local username
-  local password
-  local vhost
-  local task_queue
-  local dlq
-  local exchange
-  local routing_key
-
-  check_docker_environment
-  ensure_source_ready
-  require_command python3
-
-  if ! [[ "${limit}" =~ ^[0-9]+$ ]] || [[ "${limit}" -le 0 ]]; then
-    fail "limit 必须为正整数"
-  fi
-
-  management_port="$(env_or_default RABBITMQ_MANAGEMENT_PUBLIC_PORT 15672)"
-  management_url="$(env_or_default RABBITMQ_MANAGEMENT_URL "http://127.0.0.1:${management_port}")"
-  username="$(env_or_default RABBITMQ_MANAGEMENT_USERNAME "")"
-  if [[ -z "${username}" || "${username}" == "replace_me" ]]; then
-    username="$(env_or_default RABBITMQ_USERNAME hnieoj_judge)"
-  fi
-  password="$(env_or_default RABBITMQ_MANAGEMENT_PASSWORD "")"
-  if [[ -z "${password}" || "${password}" == "replace_me" ]]; then
-    password="$(env_or_default RABBITMQ_PASSWORD "")"
-  fi
-  vhost="$(env_or_default RABBITMQ_VHOST hnieoj)"
-  task_queue="$(env_or_default HNIEOJ_JUDGE_MQ_TASK_QUEUE hnieoj.judge.task)"
-  dlq="$(env_or_default HNIEOJ_JUDGE_MQ_DLQ hnieoj.judge.task.dlq)"
-  exchange="$(env_or_default HNIEOJ_JUDGE_MQ_EXCHANGE hnieoj.judge.exchange)"
-  routing_key="$(env_or_default HNIEOJ_JUDGE_MQ_ROUTING_KEY judge.submission.created)"
-
-  if [[ -z "${password}" || "${password}" == "replace_me" ]]; then
-    fail "RabbitMQ 管理密码未配置，请检查 ${ENV_FILE}"
-  fi
-
-  RABBITMQ_MANAGEMENT_URL="${management_url}" \
-  RABBITMQ_MANAGEMENT_USERNAME="${username}" \
-  RABBITMQ_MANAGEMENT_PASSWORD="${password}" \
-  RABBITMQ_VHOST="${vhost}" \
-  RABBITMQ_TASK_QUEUE="${task_queue}" \
-  RABBITMQ_DLQ="${dlq}" \
-  RABBITMQ_EXCHANGE="${exchange}" \
-  RABBITMQ_ROUTING_KEY="${routing_key}" \
-  python3 - "${action}" "${limit}" <<'PY'
-import base64
-import json
-import os
-import sys
-import urllib.error
-import urllib.parse
-import urllib.request
-
-action = sys.argv[1]
-limit = int(sys.argv[2])
-base_url = os.environ["RABBITMQ_MANAGEMENT_URL"].rstrip("/")
-username = os.environ["RABBITMQ_MANAGEMENT_USERNAME"]
-password = os.environ["RABBITMQ_MANAGEMENT_PASSWORD"]
-vhost = os.environ["RABBITMQ_VHOST"]
-task_queue = os.environ["RABBITMQ_TASK_QUEUE"]
-dlq = os.environ["RABBITMQ_DLQ"]
-exchange = os.environ["RABBITMQ_EXCHANGE"]
-routing_key = os.environ["RABBITMQ_ROUTING_KEY"]
-auth = base64.b64encode(f"{username}:{password}".encode("utf-8")).decode("ascii")
-
-def quote(value):
-    return urllib.parse.quote(value, safe="")
-
-def request(method, path, body=None):
-    data = None if body is None else json.dumps(body).encode("utf-8")
-    req = urllib.request.Request(base_url + path, data=data, method=method)
-    req.add_header("Authorization", "Basic " + auth)
-    req.add_header("Accept", "application/json")
-    if body is not None:
-        req.add_header("Content-Type", "application/json")
-    try:
-        with urllib.request.urlopen(req, timeout=20) as resp:
-            raw = resp.read().decode("utf-8")
-            return json.loads(raw) if raw else None
-    except urllib.error.HTTPError as exc:
-        detail = exc.read().decode("utf-8", errors="replace")
-        raise SystemExit(f"RabbitMQ HTTP {exc.code}: {detail}") from exc
-
-def queue_info(name):
-    return request("GET", f"/api/queues/{quote(vhost)}/{quote(name)}")
-
-def print_status():
-    for name in (task_queue, dlq):
-        info = queue_info(name)
-        print(
-            f"{name}: ready={info.get('messages_ready', 0)}, "
-            f"unacked={info.get('messages_unacknowledged', 0)}, "
-            f"total={info.get('messages', 0)}, consumers={info.get('consumers', 0)}"
-        )
-
-def get_one_from_dlq():
-    body = {
-        "count": 1,
-        "ackmode": "ack_requeue_false",
-        "encoding": "auto",
-        "truncate": 50000,
-    }
-    messages = request("POST", f"/api/queues/{quote(vhost)}/{quote(dlq)}/get", body)
-    return messages[0] if messages else None
-
-def sanitize_properties(properties):
-    result = dict(properties or {})
-    headers = dict(result.get("headers") or {})
-    headers.pop("x-hnieoj-retry-count", None)
-    headers.pop("x-death", None)
-    headers.pop("x-first-death-exchange", None)
-    headers.pop("x-first-death-queue", None)
-    headers.pop("x-first-death-reason", None)
-    result["headers"] = headers
-    return result
-
-def publish_to_task_queue(message):
-    body = {
-        "properties": sanitize_properties(message.get("properties")),
-        "routing_key": routing_key,
-        "payload": message.get("payload", ""),
-        "payload_encoding": message.get("payload_encoding", "string"),
-    }
-    result = request("POST", f"/api/exchanges/{quote(vhost)}/{quote(exchange)}/publish", body)
-    return bool(result and result.get("routed"))
-
-def requeue():
-    moved = 0
-    for _ in range(limit):
-        message = get_one_from_dlq()
-        if message is None:
-            break
-        if not publish_to_task_queue(message):
-            raise SystemExit("Republish failed: message was not routed to task queue")
-        moved += 1
-    print(f"requeued={moved}, limit={limit}, dlq={dlq}, exchange={exchange}, routingKey={routing_key}")
-
-if action == "status":
-    print_status()
-elif action == "requeue":
-    requeue()
-else:
-    raise SystemExit(f"Unsupported action: {action}")
-PY
 }
 
 deploy_all() {
@@ -671,12 +503,10 @@ main() {
     restart) restart_services "$@" ;;
     stop) stop_services "$@" ;;
     down) down_services ;;
-    rabbitmq-up) start_rabbitmq ;;
-    rabbitmq-ps) check_docker_environment; ensure_source_ready; rabbitmq_compose ps ;;
-    rabbitmq-logs) check_docker_environment; ensure_source_ready; rabbitmq_compose logs -f --tail="${LOG_TAIL}" rabbitmq ;;
-    rabbitmq-down) check_docker_environment; ensure_source_ready; rabbitmq_compose down ;;
-    judge-dlq-status) rabbitmq_management_command status 1 ;;
-    judge-dlq-requeue) rabbitmq_management_command requeue "${1:-10}" ;;
+    redis-up) start_redis ;;
+    redis-ps) check_docker_environment; ensure_source_ready; redis_compose ps ;;
+    redis-logs) check_docker_environment; ensure_source_ready; redis_compose logs -f --tail="${LOG_TAIL}" redis ;;
+    redis-down) check_docker_environment; ensure_source_ready; redis_compose down ;;
     gojudge-up) start_gojudge ;;
     gojudge-ps) check_docker_environment; ensure_source_ready; export_gojudge_variables; gojudge_compose ps ;;
     gojudge-logs) check_docker_environment; ensure_source_ready; export_gojudge_variables; gojudge_compose logs -f --tail="${LOG_TAIL}" "$@" ;;

@@ -1,0 +1,27 @@
+name: hnieoj-redis
+
+# 判题任务 Redis Streams 依赖：仅后端内网可达，AOF 持久化 + noeviction。
+# 不要把 Redis 暴露给判题节点或公网；生产请配合私网/安全组与访问控制。
+services:
+  redis:
+    image: ${REDIS_IMAGE:-redis:7.4-alpine}
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --appendfsync
+      - everysec
+      # 任务消息不允许被内存淘汰策略悄悄丢弃
+      - --maxmemory-policy
+      - noeviction
+    ports:
+      # 默认只绑定本机回环地址，供本机后端访问或调试
+      - "${REDIS_BIND_HOST:-127.0.0.1}:${REDIS_PUBLIC_PORT:-6379}:6379"
+    volumes:
+      - ${REDIS_DATA_DIR:-/opt/hnieoj/redis/data}:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep -q PONG"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped

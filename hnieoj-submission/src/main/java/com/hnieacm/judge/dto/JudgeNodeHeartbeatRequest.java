@@ -28,6 +28,8 @@ public class JudgeNodeHeartbeatRequest {
 
     private List<String> supportedJudgeModes;
 
+    private Boolean draining;
+
     private Long cacheUsedBytes;
 
     private Integer cacheProblemCount;

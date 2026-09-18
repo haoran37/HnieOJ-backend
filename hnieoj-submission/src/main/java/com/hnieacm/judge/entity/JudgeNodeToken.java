@@ -59,6 +59,12 @@ public class JudgeNodeToken {
 
     private String revokedBy;
 
+    private Integer approvedMaxConcurrency;
+
+    private LocalDateTime authorizationUntil;
+
+    private Boolean draining;
+
     private LocalDateTime gmtCreate;
 
     private LocalDateTime gmtModified;

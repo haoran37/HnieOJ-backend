@@ -86,12 +86,6 @@
             <scope>runtime</scope>
         </dependency>
 
-        <!-- ==================== 消息队列 (RabbitMQ) ==================== -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-amqp</artifactId>
-        </dependency>
-
         <!-- ==================== WebSocket (STOMP 判题进度订阅) ==================== -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -131,7 +125,40 @@
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
             </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <!-- 依赖本机 MySQL8/Redis7.4 容器；普通 mvn test 默认跳过，使用 -Dit.enabled=true 显式运行 -->
+                    <excludes>
+                        <exclude>**/integration/**</exclude>
+                    </excludes>
+                </configuration>
+            </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <profile>
+            <id>integration-it</id>
+            <activation>
+                <property>
+                    <name>it.enabled</name>
+                    <value>true</value>
+                </property>
+            </activation>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-surefire-plugin</artifactId>
+                        <configuration>
+                            <excludes combine.self="override"/>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 
 </project>

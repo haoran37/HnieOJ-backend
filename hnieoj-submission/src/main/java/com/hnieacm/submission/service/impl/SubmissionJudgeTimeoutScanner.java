@@ -7,9 +7,11 @@ import com.hnieacm.submission.constant.JudgeTaskOutboxStatusConstant;
 import com.hnieacm.submission.constant.SubmissionStatusConstant;
 import com.hnieacm.submission.dto.JudgeResultEventRequest;
 import com.hnieacm.submission.entity.Judge;
+import com.hnieacm.submission.entity.JudgeTaskExecution;
 import com.hnieacm.submission.entity.JudgeTaskOutbox;
 import com.hnieacm.submission.entity.RejudgeTaskDetail;
 import com.hnieacm.submission.mapper.JudgeMapper;
+import com.hnieacm.submission.mapper.JudgeTaskExecutionMapper;
 import com.hnieacm.submission.mapper.JudgeTaskOutboxMapper;
 import com.hnieacm.submission.mapper.RejudgeTaskDetailMapper;
 import com.hnieacm.submission.properties.SubmissionProperties;
@@ -43,6 +45,7 @@ public class SubmissionJudgeTimeoutScanner {
 
     private final JudgeMapper judgeMapper;
     private final JudgeTaskOutboxMapper outboxMapper;
+    private final JudgeTaskExecutionMapper executionMapper;
     private final RejudgeTaskDetailMapper rejudgeTaskDetailMapper;
     private final SubmissionProperties submissionProperties;
     private final SimpMessagingTemplate messagingTemplate;
@@ -97,6 +100,15 @@ public class SubmissionJudgeTimeoutScanner {
      * @Date 2026/06/08
      */
     private void handleTimeoutJudge(Judge judge, Integer expectedStatus, String message) {
+        // 执行租约已接管重试与终态：不再让旧的超时扫描提前终止可恢复任务
+        JudgeTaskExecution execution = executionMapper.selectOne(new LambdaQueryWrapper<JudgeTaskExecution>()
+                .eq(JudgeTaskExecution::getSubmissionId, judge.getSubmitId())
+                .last("limit 1"));
+        if (execution != null) {
+            log.info("Submission timeout deferred to judge task recovery, submissionId: {}, executionStatus: {}",
+                    judge.getSubmitId(), execution.getStatus());
+            return;
+        }
         if (expectedStatus != null && expectedStatus == SubmissionStatusConstant.PENDING
                 && hasSentOutbox(judge.getJudgeTaskId())) {
             warnSentPendingIfNeeded(judge);
@@ -172,7 +184,7 @@ public class SubmissionJudgeTimeoutScanner {
     /**
      * @MethodName hasSentOutbox
      * @Param judgeTaskId
-     * @Description 判断判题任务是否已成功投递到 RabbitMQ
+     * @Description 判断判题任务是否已成功投递到 Redis Streams
      * @Return @return boolean
      * @Author HaoRan_Lyu
      * @Date 2026/06/08
@@ -207,7 +219,7 @@ public class SubmissionJudgeTimeoutScanner {
                     judge.getSubmitId(), judge.getJudgeTaskId());
             return;
         }
-        log.warn("Submission pending after RabbitMQ sent, submissionId: {}, judgeTaskId: {}, warnSeconds: {}",
+        log.warn("Submission pending after Redis Streams sent, submissionId: {}, judgeTaskId: {}, warnSeconds: {}",
                 judge.getSubmitId(), judge.getJudgeTaskId(), sentPendingWarnSeconds());
     }
 

@@ -5,12 +5,14 @@ import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hnieacm.common.dto.JudgeTaskMessage;
 import com.hnieacm.common.exception.BizException;
-import com.hnieacm.common.properties.JudgeMqProperties;
+import com.hnieacm.common.properties.JudgeStreamProperties;
 import com.hnieacm.submission.dto.ProblemBasicDto;
 import com.hnieacm.submission.entity.Judge;
 import com.hnieacm.submission.entity.JudgeTaskOutbox;
+import com.hnieacm.submission.mapper.JudgeTaskExecutionMapper;
 import com.hnieacm.submission.mapper.JudgeTaskOutboxMapper;
 import com.hnieacm.submission.properties.SubmissionProperties;
+import com.hnieacm.submission.service.JudgeTaskStreamService;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -18,31 +20,30 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.amqp.rabbit.connection.CorrelationData;
-import org.springframework.amqp.rabbit.core.RabbitTemplate;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.isNull;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /**
  * @Author: HaoRan_Lyu
- * @Date: 2026/06/08
- * @Description: RabbitMQ 判题任务消息发布测试
+ * @Date: 2026/09/18
+ * @Description: Redis Streams 判题任务发布测试：迁移原 Rabbit 发布器的 payload/SPJ/交互/大小/模式校验
  */
 @ExtendWith(MockitoExtension.class)
-class RabbitJudgeTaskMessagePublisherTest {
+class RedisJudgeTaskMessagePublisherTest {
 
     @Mock
-    private RabbitTemplate rabbitTemplate;
+    private JudgeTaskStreamService streamService;
 
     @Mock
     private JudgeTaskOutboxMapper outboxMapper;
+
+    @Mock
+    private JudgeTaskExecutionMapper executionMapper;
 
     @BeforeEach
     void setUp() {
@@ -51,15 +52,13 @@ class RabbitJudgeTaskMessagePublisherTest {
 
     @Test
     void shouldWriteSpjCheckerIntoOutboxPayload() throws Exception {
+        when(streamService.resolveStreamKey("spj")).thenReturn("hnieoj:judge:task:spj");
         ObjectMapper objectMapper = new ObjectMapper();
-        RabbitJudgeTaskMessagePublisher publisher = new RabbitJudgeTaskMessagePublisher(
-                rabbitTemplate, new JudgeMqProperties(), outboxMapper, objectMapper, new SubmissionProperties());
+        RedisJudgeTaskMessagePublisher publisher = newPublisher(objectMapper, new SubmissionProperties());
 
         publisher.publishAfterCommit(buildJudge(), buildSpjProblem());
 
-        ArgumentCaptor<JudgeTaskOutbox> outboxCaptor = ArgumentCaptor.forClass(JudgeTaskOutbox.class);
-        verify(outboxMapper).insert(outboxCaptor.capture());
-        JudgeTaskMessage message = objectMapper.readValue(outboxCaptor.getValue().getPayload(), JudgeTaskMessage.class);
+        JudgeTaskMessage message = capturedMessage(objectMapper, publisher);
         assertThat(message.getSchemaVersion()).isEqualTo(2);
         assertThat(message.getJudgeMode()).isEqualTo("spj");
         assertThat(message.getChecker()).isNotNull();
@@ -71,36 +70,17 @@ class RabbitJudgeTaskMessagePublisherTest {
         assertThat(message.getChecker().getOutputLimit()).isEqualTo(1048576);
         assertThat(message.getChecker().getProtocol()).isEqualTo("hnieoj-result-json-v1");
         assertThat(message.getChecker().getArgumentTemplate()).isEqualTo("{input} {expected} {actual} {result}");
-        assertThat(outboxCaptor.getValue().getRoutingKey()).isEqualTo("judge.submission.spj");
-    }
-
-    @Test
-    void shouldRejectOutboxWhenCheckerSourceTooLarge() {
-        ObjectMapper objectMapper = new ObjectMapper();
-        SubmissionProperties submissionProperties = new SubmissionProperties();
-        submissionProperties.setMaxCheckerBytes(4);
-        RabbitJudgeTaskMessagePublisher publisher = new RabbitJudgeTaskMessagePublisher(
-                rabbitTemplate, new JudgeMqProperties(), outboxMapper, objectMapper, submissionProperties);
-
-        assertThatThrownBy(() -> publisher.publishAfterCommit(buildJudge(), buildSpjProblem()))
-                .isInstanceOf(BizException.class)
-                .hasMessageContaining("SPJ checker");
-        verifyNoInteractions(outboxMapper);
     }
 
     @Test
     void shouldWriteInteractiveContractIntoOutboxPayload() throws Exception {
+        when(streamService.resolveStreamKey("interactive")).thenReturn("hnieoj:judge:task:interactive");
         ObjectMapper objectMapper = new ObjectMapper();
-        JudgeMqProperties mqProperties = new JudgeMqProperties();
-        mqProperties.setInteractiveRoutingKey("judge.submission.interactive");
-        RabbitJudgeTaskMessagePublisher publisher = new RabbitJudgeTaskMessagePublisher(
-                rabbitTemplate, mqProperties, outboxMapper, objectMapper, new SubmissionProperties());
+        RedisJudgeTaskMessagePublisher publisher = newPublisher(objectMapper, new SubmissionProperties());
 
         publisher.publishAfterCommit(buildJudge(), buildInteractiveProblem());
 
-        ArgumentCaptor<JudgeTaskOutbox> outboxCaptor = ArgumentCaptor.forClass(JudgeTaskOutbox.class);
-        verify(outboxMapper).insert(outboxCaptor.capture());
-        JudgeTaskMessage message = objectMapper.readValue(outboxCaptor.getValue().getPayload(), JudgeTaskMessage.class);
+        JudgeTaskMessage message = capturedMessage(objectMapper, publisher);
         assertThat(message.getJudgeMode()).isEqualTo("interactive");
         assertThat(message.getInteractor()).isNotNull();
         assertThat(message.getInteractor().getProtocol()).isEqualTo("hnieoj-result-json-v1");
@@ -109,40 +89,44 @@ class RabbitJudgeTaskMessagePublisherTest {
         assertThat(message.getInteraction().getProtocol()).isEqualTo("stdio");
         assertThat(message.getInteraction().getWiring()).isEqualTo("bidirectional-stdio");
         assertThat(message.getInteraction().getScoreMode()).isEqualTo("interactor");
-        assertThat(outboxCaptor.getValue().getRoutingKey()).isEqualTo("judge.submission.interactive");
     }
 
     @Test
-    void shouldMarkCurrentAttemptSentWhenRabbitAckArrives() {
-        RabbitJudgeTaskMessagePublisher publisher = new RabbitJudgeTaskMessagePublisher(
-                rabbitTemplate, new JudgeMqProperties(), outboxMapper, new ObjectMapper(), new SubmissionProperties());
-        publisher.initRabbitCallbacks();
-        ArgumentCaptor<RabbitTemplate.ConfirmCallback> callbackCaptor =
-                ArgumentCaptor.forClass(RabbitTemplate.ConfirmCallback.class);
-        verify(rabbitTemplate).setConfirmCallback(callbackCaptor.capture());
+    void shouldRejectOutboxWhenCheckerSourceTooLarge() {
+        when(streamService.resolveStreamKey("spj")).thenReturn("hnieoj:judge:task:spj");
+        SubmissionProperties submissionProperties = new SubmissionProperties();
+        submissionProperties.setMaxCheckerBytes(4);
+        RedisJudgeTaskMessagePublisher publisher = newPublisher(new ObjectMapper(), submissionProperties);
 
-        callbackCaptor.getValue().confirm(new CorrelationData("10:2"), true, null);
-
-        verify(outboxMapper).update(isNull(), any());
+        assertThatThrownBy(() -> publisher.publishAfterCommit(buildJudge(), buildSpjProblem()))
+                .isInstanceOf(BizException.class)
+                .hasMessageContaining("SPJ checker");
+        verifyNoInteractions(outboxMapper);
     }
 
     @Test
-    void shouldIgnoreStaleAttemptNack() {
-        JudgeTaskOutbox outbox = new JudgeTaskOutbox();
-        outbox.setId(10L);
-        outbox.setPublishAttempt(2);
-        outbox.setRetryCount(0);
-        RabbitJudgeTaskMessagePublisher publisher = new RabbitJudgeTaskMessagePublisher(
-                rabbitTemplate, new JudgeMqProperties(), outboxMapper, new ObjectMapper(), new SubmissionProperties());
-        publisher.initRabbitCallbacks();
-        ArgumentCaptor<RabbitTemplate.ConfirmCallback> callbackCaptor =
-                ArgumentCaptor.forClass(RabbitTemplate.ConfirmCallback.class);
-        verify(rabbitTemplate).setConfirmCallback(callbackCaptor.capture());
-        when(outboxMapper.selectById(10L)).thenReturn(outbox);
+    void shouldRejectUnsupportedJudgeMode() {
+        RedisJudgeTaskMessagePublisher publisher = newPublisher(new ObjectMapper(), new SubmissionProperties());
+        ProblemBasicDto problem = new ProblemBasicDto();
+        problem.setJudgeMode("go");
 
-        callbackCaptor.getValue().confirm(new CorrelationData("10:1"), false, "late nack");
+        assertThatThrownBy(() -> publisher.publishAfterCommit(buildJudge(), problem))
+                .isInstanceOf(BizException.class)
+                .hasMessageContaining("不支持的判题模式");
+        verifyNoInteractions(outboxMapper);
+    }
 
-        verify(outboxMapper, never()).update(isNull(), any());
+    private RedisJudgeTaskMessagePublisher newPublisher(ObjectMapper objectMapper,
+                                                        SubmissionProperties submissionProperties) {
+        return new RedisJudgeTaskMessagePublisher(streamService, new JudgeStreamProperties(), outboxMapper,
+                executionMapper, objectMapper, submissionProperties);
+    }
+
+    private JudgeTaskMessage capturedMessage(ObjectMapper objectMapper, RedisJudgeTaskMessagePublisher publisher)
+            throws Exception {
+        ArgumentCaptor<JudgeTaskOutbox> captor = ArgumentCaptor.forClass(JudgeTaskOutbox.class);
+        verify(outboxMapper).insert(captor.capture());
+        return objectMapper.readValue(captor.getValue().getPayload(), JudgeTaskMessage.class);
     }
 
     private Judge buildJudge() {

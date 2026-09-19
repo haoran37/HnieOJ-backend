@@ -75,7 +75,6 @@ public class JudgeNodeSecurityServiceImpl implements JudgeNodeSecurityService {
     private static final String CLAIM_EXPIRE_TIME = "exp";
     private static final String CLAIM_ISSUED_AT = "iat";
     private static final String DEFAULT_SECRET_MARK = "replace_me";
-    private static final long HEARTBEAT_ONLINE_TIMEOUT_SECONDS = 90;
     private static final String PROOF_TYPE_ED25519 = "ed25519";
     private static final String NONCE_KEY_PREFIX = "hnieoj:judge:temp-token:nonce:";
     private static final byte[] ED25519_X509_PREFIX = HexFormat.of().parseHex("302a300506032b6570032100");
@@ -143,73 +142,9 @@ public class JudgeNodeSecurityServiceImpl implements JudgeNodeSecurityService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public JudgeTempTokenVo exchangeTempToken(ExchangeJudgeTempTokenRequest request) {
-        if (request == null || StrUtil.isBlank(request.getAuthCode())) {
-            throw new BizException(ResultCode.BAD_REQUEST, "authCode 不能为空");
-        }
-        validateExchangeBindingRequest(request);
-
-        String codeHash = hash(request.getAuthCode().trim());
-        JudgeNodeAuthCode authCode = authCodeMapper.selectOne(new LambdaQueryWrapper<JudgeNodeAuthCode>()
-                .eq(JudgeNodeAuthCode::getCodeHash, codeHash)
-                .last("limit 1"));
-        if (authCode == null || !JudgeNodeConstant.AUTH_CODE_ENABLED.equals(authCode.getStatus())) {
-            throw new BizException(ResultCode.FORBIDDEN, "授权码无效");
-        }
-        LocalDateTime now = LocalDateTime.now();
-        if (authCode.getExpireTime() == null || authCode.getExpireTime().isBefore(now)) {
-            markAuthCodeExpired(authCode);
-            throw new BizException(ResultCode.FORBIDDEN, "授权码已过期");
-        }
-        int usedCount = authCode.getUsedCount() == null ? 0 : authCode.getUsedCount();
-        int maxExchangeCount = authCode.getMaxExchangeCount() == null ? 1 : authCode.getMaxExchangeCount();
-        if (usedCount >= maxExchangeCount) {
-            throw new BizException(ResultCode.FORBIDDEN, "授权码已达到最大兑换次数");
-        }
-
-        int occupied = authCodeMapper.update(null, new LambdaUpdateWrapper<JudgeNodeAuthCode>()
-                .eq(JudgeNodeAuthCode::getId, authCode.getId())
-                .eq(JudgeNodeAuthCode::getStatus, JudgeNodeConstant.AUTH_CODE_ENABLED)
-                .gt(JudgeNodeAuthCode::getExpireTime, now)
-                .lt(JudgeNodeAuthCode::getUsedCount, maxExchangeCount)
-                .setSql("used_count = used_count + 1"));
-        if (occupied <= 0) {
-            throw new BizException(ResultCode.FORBIDDEN, "授权码已失效");
-        }
-
-        String nodeId = UUID.randomUUID().toString().replace("-", "");
-        String tokenId = UUID.randomUUID().toString().replace("-", "");
-        LocalDateTime expireTime = now.plusSeconds(securityProperties.getTempTokenTtlSeconds());
-        String nodeName = resolveNodeName(request, authCode);
-        String fingerprintHash = calculateFingerprintHash(request.getFingerprint(), nodeName);
-        String publicKey = trimToNull(request.getProof().getPublicKey());
-        String sourceIp = currentRequestSourceIp();
-
-        JudgeNodeToken tokenRecord = new JudgeNodeToken();
-        tokenRecord.setTokenId(tokenId);
-        tokenRecord.setNodeId(nodeId);
-        tokenRecord.setNodeName(nodeName);
-        tokenRecord.setNodeType(JudgeNodeConstant.NODE_TYPE_TEMP);
-        tokenRecord.setStatus(JudgeNodeConstant.TOKEN_ACTIVE);
-        tokenRecord.setAuthCodeId(authCode.getId());
-        tokenRecord.setInstanceId(trimToNull(request.getFingerprint().getInstanceId()));
-        tokenRecord.setFingerprintHash(fingerprintHash);
-        tokenRecord.setBoundSourceIp(sourceIp);
-        tokenRecord.setProofType(PROOF_TYPE_ED25519);
-        tokenRecord.setPublicKey(publicKey);
-        tokenRecord.setPublicKeyHash(hash(publicKey));
-        tokenRecord.setSupportedJudgeModes(toCsv(request.getFingerprint().getSupportedJudgeModes()));
-        tokenRecord.setExpireTime(expireTime);
-        tokenMapper.insert(tokenRecord);
-
-        String jwt = createJwt(tokenRecord, expireTime);
-        JudgeTempTokenVo vo = new JudgeTempTokenVo();
-        vo.setToken(jwt);
-        vo.setTokenType(TOKEN_TYPE);
-        vo.setNodeId(nodeId);
-        vo.setTokenId(tokenId);
-        vo.setFingerprintHash(fingerprintHash);
-        vo.setExpireTime(expireTime);
-        return vo;
+        // 旧 bearer 临时令牌兑换已退休：正式与临时节点统一走 Bootstrap + Ed25519。
+        throw new BizException(ResultCode.FORBIDDEN,
+                "临时令牌兑换已退休，请使用 Bootstrap + Ed25519 注册与 /ws/judge/node");
     }
 
     /**
@@ -247,9 +182,15 @@ public class JudgeNodeSecurityServiceImpl implements JudgeNodeSecurityService {
         if (normalizedTokenId == null) {
             throw new BizException(ResultCode.BAD_REQUEST, "tokenId 不能为空");
         }
+        // 先锁节点行，与认证/轮换/生命周期保持同一锁顺序；吊销提升 accessVersion
+        // 使旧短期授权立即失效，且 revoke 为终态，enable 不得复活。
+        if (tokenMapper.lockNode(normalizedTokenId) == null) {
+            throw new BizException(ResultCode.NOT_FOUND, "Token 不存在");
+        }
         int updated = tokenMapper.update(null, new LambdaUpdateWrapper<JudgeNodeToken>()
                 .eq(JudgeNodeToken::getTokenId, normalizedTokenId)
                 .set(JudgeNodeToken::getStatus, JudgeNodeConstant.TOKEN_REVOKED)
+                .setSql("access_version = access_version + 1")
                 .set(JudgeNodeToken::getRevokedBy, StpUtil.getLoginIdAsString())
                 .set(JudgeNodeToken::getRevokedTime, LocalDateTime.now()));
         if (updated <= 0) {
@@ -268,16 +209,10 @@ public class JudgeNodeSecurityServiceImpl implements JudgeNodeSecurityService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public JudgeNodeTokenValidationVo validateToken(ValidateJudgeNodeTokenRequest request) {
-        String judgeToken = trimToNull(request == null ? null : request.getJudgeToken());
-        if (judgeToken != null && validateFormalToken(judgeToken)) {
-            return validationResult(true, JudgeNodeConstant.NODE_TYPE_FORMAL, "formal", null);
-        }
-
-        String bearerToken = trimToNull(request == null ? null : request.getBearerToken());
-        if (bearerToken == null) {
-            return validationResult(false, null, null, null);
-        }
-        return validateTempJwt(bearerToken, request);
+        // 旧 bearer/共享 formalToken 校验通路已退休：不再接受任何此类凭据，
+        // 节点访问统一由 NODE_ACCESS + Ed25519 签名在同一事务内校验。
+        log.warn("Retired bearer/temp judge token validation invoked; rejecting");
+        return validationResult(false, null, null, null);
     }
 
     /**
@@ -644,35 +579,7 @@ public class JudgeNodeSecurityServiceImpl implements JudgeNodeSecurityService {
      * @Date 2026/06/05
      */
     private JudgeNodeTokenVo toTokenVo(JudgeNodeToken token) {
-        JudgeNodeTokenVo vo = new JudgeNodeTokenVo();
-        vo.setId(token.getId());
-        vo.setTokenId(token.getTokenId());
-        vo.setNodeId(token.getNodeId());
-        vo.setNodeName(token.getNodeName());
-        vo.setNodeType(token.getNodeType());
-        vo.setStatus(token.getStatus());
-        vo.setExpireTime(token.getExpireTime());
-        vo.setLastUsedTime(token.getLastUsedTime());
-        vo.setLastHeartbeatTime(token.getLastHeartbeatTime());
-        vo.setOnline(isOnline(token));
-        vo.setMaxConcurrency(token.getMaxConcurrency());
-        vo.setRunningTasks(token.getRunningTasks());
-        vo.setCpuCore(token.getCpuCore());
-        vo.setVersion(token.getVersion());
-        vo.setSupportedJudgeModes(splitSupportedJudgeModes(token.getSupportedJudgeModes()));
-        vo.setCacheUsedBytes(token.getCacheUsedBytes());
-        vo.setCacheProblemCount(token.getCacheProblemCount());
-        vo.setDiskTotalBytes(token.getDiskTotalBytes());
-        vo.setDiskFreeBytes(token.getDiskFreeBytes());
-        vo.setGmtCreate(token.getGmtCreate());
-        return vo;
-    }
-
-    private Boolean isOnline(JudgeNodeToken token) {
-        if (token.getLastHeartbeatTime() == null || !JudgeNodeConstant.TOKEN_ACTIVE.equals(token.getStatus())) {
-            return false;
-        }
-        return token.getLastHeartbeatTime().isAfter(LocalDateTime.now().minusSeconds(HEARTBEAT_ONLINE_TIMEOUT_SECONDS));
+        return JudgeNodeTokenVo.from(token);
     }
 
     private List<String> splitSupportedJudgeModes(String supportedJudgeModes) {

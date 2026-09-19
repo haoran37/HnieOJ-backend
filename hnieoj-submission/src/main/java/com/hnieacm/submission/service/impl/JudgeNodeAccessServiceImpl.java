@@ -3,13 +3,13 @@ package com.hnieacm.submission.service.impl;
 import cn.hutool.core.util.StrUtil;
 import com.hnieacm.common.dto.JudgeNodeRequestContext;
 import com.hnieacm.common.exception.BizException;
-import com.hnieacm.common.result.Result;
 import com.hnieacm.common.result.ResultCode;
 import com.hnieacm.common.util.JudgeNodeRequestContextUtils;
-import com.hnieacm.submission.dto.ValidateJudgeNodeTokenRequest;
-import com.hnieacm.submission.feign.JudgeNodeTokenFeignClient;
+import com.hnieacm.judge.dto.ValidateJudgeNodeTokenRequest;
+import com.hnieacm.judge.service.JudgeNodeHeartbeatService;
+import com.hnieacm.judge.service.JudgeNodeSecurityService;
+import com.hnieacm.judge.vo.JudgeNodeTokenValidationVo;
 import com.hnieacm.submission.service.JudgeNodeAccessService;
-import com.hnieacm.submission.vo.JudgeNodeTokenValidationVo;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -17,14 +17,17 @@ import org.springframework.stereotype.Service;
 /**
  * @Author: HaoRan_Lyu
  * @Date: 2026/06/07
- * @Description: 判题节点访问校验服务实现
+ * @Description: 判题节点访问校验服务实现（合并判题域后改为本地调用）
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class JudgeNodeAccessServiceImpl implements JudgeNodeAccessService {
 
-    private final JudgeNodeTokenFeignClient judgeNodeTokenFeignClient;
+    private static final String DEFAULT_JUDGE_MODE = "default";
+
+    private final JudgeNodeSecurityService judgeNodeSecurityService;
+    private final JudgeNodeHeartbeatService judgeNodeHeartbeatService;
 
     /**
      * @MethodName checkAccess
@@ -42,9 +45,8 @@ public class JudgeNodeAccessServiceImpl implements JudgeNodeAccessService {
         request.setBearerToken(JudgeNodeRequestContextUtils.extractBearerToken(authorizationHeader));
         fillSignatureContext(request, requestContext);
 
-        Result<JudgeNodeTokenValidationVo> result = judgeNodeTokenFeignClient.validate(request);
-        if (result == null || result.getCode() != ResultCode.SUCCESS || result.getData() == null
-                || !Boolean.TRUE.equals(result.getData().getValid())) {
+        JudgeNodeTokenValidationVo validation = judgeNodeSecurityService.validateToken(request);
+        if (validation == null || !Boolean.TRUE.equals(validation.getValid())) {
             log.warn("Judge node token validation failed");
             throw new BizException(ResultCode.FORBIDDEN, "判题节点凭证无效");
         }
@@ -60,10 +62,9 @@ public class JudgeNodeAccessServiceImpl implements JudgeNodeAccessService {
      */
     @Override
     public boolean hasActiveNodeForMode(String judgeMode) {
-        String normalizedJudgeMode = StrUtil.blankToDefault(judgeMode, "default");
+        String normalizedJudgeMode = StrUtil.blankToDefault(judgeMode, DEFAULT_JUDGE_MODE);
         try {
-            Result<Boolean> result = judgeNodeTokenFeignClient.hasActiveNodeForMode(normalizedJudgeMode);
-            return result != null && result.getCode() == ResultCode.SUCCESS && Boolean.TRUE.equals(result.getData());
+            return judgeNodeHeartbeatService.hasActiveNodeForMode(normalizedJudgeMode);
         } catch (Exception e) {
             log.warn("Query judge node capability failed, judgeMode: {}", normalizedJudgeMode, e);
             return false;

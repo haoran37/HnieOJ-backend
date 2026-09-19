@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.PostMapping;
  * @Date: 2026/02/24
  * @Description: Auth 服务内部接口
  */
-@FeignClient(name = "hnieoj-auth")
+@FeignClient(name = "hnieoj-user", contextId = "authInternalFeignClient")
 public interface AuthInternalFeignClient {
 
     @PostMapping("/internal/auth/cache/refresh/{uid}")

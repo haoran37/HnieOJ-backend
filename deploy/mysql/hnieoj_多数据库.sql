@@ -349,7 +349,7 @@ CREATE TABLE `judge_server` (
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 临时判题节点授权码
+-- 临时判题节点授权码（同时作为节点 Bootstrap 一次性凭据事实记录）
 DROP TABLE IF EXISTS `judge_node_auth_code`;
 CREATE TABLE `judge_node_auth_code` (
   `id` bigint(20) NOT NULL AUTO_INCREMENT,
@@ -359,32 +359,40 @@ CREATE TABLE `judge_node_auth_code` (
   `remark` varchar(255) DEFAULT NULL COMMENT '备注',
   `max_exchange_count` int(11) DEFAULT '1' COMMENT '最大兑换次数',
   `used_count` int(11) DEFAULT '0' COMMENT '已兑换次数',
-  `status` varchar(20) DEFAULT 'enabled' COMMENT 'enabled, revoked, expired',
+  `status` varchar(20) DEFAULT 'enabled' COMMENT 'enabled, consumed, revoked, expired',
   `expire_time` datetime NOT NULL COMMENT '授权码过期时间',
+  `node_type` varchar(20) NOT NULL DEFAULT 'temp' COMMENT 'formal, temp',
+  `policy_json` text DEFAULT NULL COMMENT '节点策略 JSON：maxConcurrency/supportedJudgeModes/weight/authorizationUntil',
+  `authorization_until` datetime(3) DEFAULT NULL COMMENT '节点硬截止时间，formal 可空',
+  `enrollment_id` varchar(64) DEFAULT NULL COMMENT 'Bootstrap 绑定的 enrollment ID，用于响应丢失恢复',
+  `public_key_hash` varchar(64) DEFAULT NULL COMMENT '注册公钥 SHA-256 摘要',
+  `node_id` varchar(64) DEFAULT NULL COMMENT '注册成功生成的节点 ID',
+  `consumed_time` datetime DEFAULT NULL COMMENT 'Bootstrap 原子消费时间',
   `gmt_create` datetime DEFAULT CURRENT_TIMESTAMP,
   `gmt_modified` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_code_hash` (`code_hash`),
-  KEY `idx_status_expire` (`status`, `expire_time`)
+  KEY `idx_status_expire` (`status`, `expire_time`),
+  KEY `idx_enrollment_id` (`enrollment_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='临时判题节点授权码';
 
--- 判题节点短期 Token 审计记录
+-- 判题节点注册事实记录（历史表名保留；token_id 为稳定 registryID，非短期 JWT jti）
 DROP TABLE IF EXISTS `judge_node_token`;
 CREATE TABLE `judge_node_token` (
   `id` bigint(20) NOT NULL AUTO_INCREMENT,
-  `token_id` varchar(64) NOT NULL COMMENT 'JWT jti/tokenId',
+  `token_id` varchar(64) NOT NULL COMMENT '稳定 registryID（原 JWT jti 语义已退休）',
   `node_id` varchar(64) NOT NULL COMMENT '判题节点 ID',
   `node_name` varchar(100) DEFAULT NULL COMMENT '节点名称',
   `node_type` varchar(20) NOT NULL COMMENT 'formal, temp',
-  `status` varchar(20) DEFAULT 'active' COMMENT 'active, revoked, expired',
+  `status` varchar(20) DEFAULT 'active' COMMENT 'active, draining, disabled, revoked, expired',
   `auth_code_id` bigint(20) DEFAULT NULL COMMENT '来源授权码 ID',
   `instance_id` varchar(64) DEFAULT NULL COMMENT '临时节点持久化实例 ID',
-  `fingerprint_hash` varchar(64) DEFAULT NULL COMMENT '后端规范化后的指纹摘要',
-  `bound_source_ip` varchar(64) DEFAULT NULL COMMENT '兑换时后端观测到的来源 IP',
+  `fingerprint_hash` varchar(64) DEFAULT NULL COMMENT '后端规范化后的指纹摘要（仅审计）',
+  `bound_source_ip` varchar(64) DEFAULT NULL COMMENT '兑换时后端观测到的来源 IP（仅审计）',
   `proof_type` varchar(32) DEFAULT NULL COMMENT 'ed25519',
-  `public_key` text DEFAULT NULL COMMENT 'Ed25519 公钥，Base64',
+  `public_key` text DEFAULT NULL COMMENT 'Ed25519 公钥，Base64（仅审计/兼容，权威见 judge_node_key）',
   `public_key_hash` varchar(64) DEFAULT NULL COMMENT 'Ed25519 公钥摘要',
-  `expire_time` datetime NOT NULL COMMENT 'Token 过期时间',
+  `expire_time` datetime(3) NOT NULL COMMENT '节点身份记录过期时间（硬截止，不等于短期 JWT exp）',
   `last_used_time` datetime DEFAULT NULL COMMENT '最近使用时间',
   `last_heartbeat_time` datetime DEFAULT NULL COMMENT '最近心跳时间',
   `last_seen_at` datetime DEFAULT NULL COMMENT '最近通过安全校验时间',
@@ -401,14 +409,47 @@ CREATE TABLE `judge_node_token` (
   `disk_free_bytes` bigint(20) DEFAULT NULL COMMENT '缓存挂载磁盘可用字节数',
   `revoked_time` datetime DEFAULT NULL COMMENT '吊销时间',
   `revoked_by` varchar(50) DEFAULT NULL COMMENT '吊销管理员',
+  `session_epoch` bigint(20) NOT NULL DEFAULT '0' COMMENT '会话纪元，新会话接管时原子自增，旧连接业务写入被拒绝',
+  `access_version` int(11) NOT NULL DEFAULT '0' COMMENT '访问版本，轮换/吊销时自增，用于短期令牌失效',
+  `active_key_id` varchar(64) DEFAULT NULL COMMENT '当前激活密钥 ID（权威见 judge_node_key）',
+  `weight` int(11) NOT NULL DEFAULT '10' COMMENT '调度权重',
+  `draining` tinyint(1) NOT NULL DEFAULT '0' COMMENT '是否排空中',
+  `authorization_until` datetime(3) DEFAULT NULL COMMENT '节点硬授权截止时间，formal 可空',
+  `enrollment_id` varchar(64) DEFAULT NULL COMMENT '注册时使用的 enrollment ID',
   `gmt_create` datetime DEFAULT CURRENT_TIMESTAMP,
   `gmt_modified` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_token_id` (`token_id`),
+  UNIQUE KEY `uk_node_enrollment` (`enrollment_id`),
   KEY `idx_node_id` (`node_id`),
   KEY `idx_last_heartbeat_time` (`last_heartbeat_time`),
-  KEY `idx_status_expire` (`status`, `expire_time`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='判题节点短期 Token 审计记录';
+  KEY `idx_status_expire` (`status`, `expire_time`),
+  KEY `idx_active_key_id` (`active_key_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='判题节点注册事实记录';
+
+-- 判题节点公钥历史（active/pending/grace/revoked 状态机；绝不保存私钥）
+DROP TABLE IF EXISTS `judge_node_key`;
+CREATE TABLE `judge_node_key` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `key_id` varchar(64) NOT NULL COMMENT '密钥 ID',
+  `node_id` varchar(64) NOT NULL COMMENT '所属节点 ID',
+  `public_key` varchar(128) NOT NULL COMMENT 'Ed25519 裸公钥 Base64',
+  `public_key_hash` varchar(64) NOT NULL COMMENT '公钥 SHA-256 摘要',
+  `status` varchar(20) NOT NULL DEFAULT 'PENDING' COMMENT 'PENDING, ACTIVE, GRACE, REVOKED, EXPIRED',
+  `rotation_id` varchar(64) DEFAULT NULL COMMENT '轮换 ID，初始密钥为空',
+  `confirm_nonce` varchar(128) DEFAULT NULL COMMENT '轮换确认 nonce（随机，非私钥）',
+  `expires_at` datetime(3) DEFAULT NULL COMMENT 'pending 过期或 grace 截止时间',
+  `previous_key_id` varchar(64) DEFAULT NULL COMMENT '被本密钥轮换的旧密钥 ID',
+  `activated_at` datetime DEFAULT NULL COMMENT '激活时间',
+  `revoked_time` datetime DEFAULT NULL COMMENT '吊销时间',
+  `revoked_by` varchar(50) DEFAULT NULL COMMENT '吊销管理员',
+  `gmt_create` datetime DEFAULT CURRENT_TIMESTAMP,
+  `gmt_modified` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_key_id` (`key_id`),
+  UNIQUE KEY `uk_node_rotation` (`node_id`, `rotation_id`),
+  KEY `idx_node_status` (`node_id`, `status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='判题节点公钥历史与轮换状态';
 
 -- 正式判题节点长期 Token 哈希记录
 DROP TABLE IF EXISTS `judge_formal_token`;
@@ -490,11 +531,13 @@ CREATE TABLE `judge_case` (
 DROP TABLE IF EXISTS `judge_task_outbox`;
 CREATE TABLE `judge_task_outbox` (
   `id` bigint(20) NOT NULL AUTO_INCREMENT,
-  `message_id` varchar(64) NOT NULL COMMENT 'RabbitMQ 消息 ID',
+  `message_id` varchar(64) NOT NULL COMMENT '判题任务消息 ID',
   `judge_task_id` varchar(64) NOT NULL COMMENT '判题任务 ID',
   `submission_id` varchar(64) NOT NULL COMMENT '提交展示 ID',
-  `exchange_name` varchar(128) NOT NULL COMMENT 'RabbitMQ exchange',
-  `routing_key` varchar(128) NOT NULL COMMENT 'RabbitMQ routing key',
+  `exchange_name` varchar(128) NOT NULL COMMENT '【遗留 NOT NULL 列】代码写固定标记以满足约束，不参与路由',
+  `routing_key` varchar(128) NOT NULL COMMENT '【遗留 NOT NULL 列】代码写 Stream key 以满足约束，真实路由使用 stream_key',
+  `stream_key` varchar(128) DEFAULT NULL COMMENT 'Redis Streams 固定 Stream key',
+  `stream_id` varchar(64) DEFAULT NULL COMMENT 'XADD 返回的消息 ID，用于终态原子 ACK+XDEL',
   `payload` longtext NOT NULL COMMENT '判题任务消息 JSON',
   `status` varchar(20) NOT NULL DEFAULT 'pending' COMMENT 'pending, processing, sent, failed, exhausted',
   `retry_count` int(11) NOT NULL DEFAULT '0',
@@ -511,6 +554,39 @@ CREATE TABLE `judge_task_outbox` (
   KEY `idx_submission_id` (`submission_id`),
   KEY `idx_judge_task_id` (`judge_task_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='判题任务 outbox';
+
+-- 判题任务执行租约：MySQL 权威所有权、会话纪元与执行资格
+DROP TABLE IF EXISTS `judge_task_execution`;
+CREATE TABLE `judge_task_execution` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `submission_id` varchar(64) NOT NULL COMMENT '提交展示 ID',
+  `judge_id` bigint(20) NOT NULL COMMENT 'judge 表主键',
+  `judge_task_id` varchar(64) NOT NULL COMMENT '当前判题任务 ID，重判后更新',
+  `problem_id` bigint(20) NOT NULL COMMENT '题目 DB ID',
+  `problem_code` varchar(50) DEFAULT NULL COMMENT '题目展示 ID',
+  `judge_mode` varchar(20) NOT NULL DEFAULT 'default' COMMENT 'default, spj, interactive',
+  `stream_key` varchar(128) NOT NULL COMMENT 'Redis Streams key',
+  `stream_id` varchar(64) DEFAULT NULL COMMENT '最近一次 XADD 的消息 ID',
+  `node_id` varchar(64) DEFAULT NULL COMMENT '当前租约持有节点 ID',
+  `token_id` varchar(64) DEFAULT NULL COMMENT '当前租约持有 registryID（等于 node_id，保留兼容列）',
+  `session_epoch` bigint(20) DEFAULT NULL COMMENT '持有租约的物理会话纪元；重连 RESUME 迁移，旧会话写入被拒绝',
+  `attempt_id` varchar(64) DEFAULT NULL COMMENT '当前执行尝试 UUID',
+  `attempt_count` int(11) NOT NULL DEFAULT '0' COMMENT '实际领取执行次数；恢复/Redis 丢消息不增加',
+  `max_attempt_count` int(11) NOT NULL DEFAULT '3' COMMENT '最大实际执行次数，超出置 SYSTEM_ERROR',
+  `status` varchar(20) NOT NULL DEFAULT 'queued' COMMENT 'queued, leased, running, completed, failed',
+  `lease_until` bigint(20) DEFAULT NULL COMMENT '租约到期时间，Unix 毫秒',
+  `renew_after_millis` int(11) DEFAULT NULL COMMENT '建议续期间隔毫秒',
+  `execution_deadline` bigint(20) DEFAULT NULL COMMENT '硬执行截止时间，Unix 毫秒；到期不可续租',
+  `last_error` varchar(512) DEFAULT NULL COMMENT '最近一次失败/恢复原因',
+  `terminal_fingerprint` varchar(64) DEFAULT NULL COMMENT '终态业务内容 SHA-256 指纹，用于同 attempt 重报幂等校验；重判/重派时清空',
+  `gmt_create` datetime DEFAULT CURRENT_TIMESTAMP,
+  `gmt_modified` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_submission_id` (`submission_id`),
+  KEY `idx_status_lease` (`status`, `lease_until`),
+  KEY `idx_node_status` (`node_id`, `status`),
+  KEY `idx_judge_task_id` (`judge_task_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='判题任务执行租约（权威所有权状态）';
 
 -- 重判任务表
 DROP TABLE IF EXISTS `rejudge_task`;

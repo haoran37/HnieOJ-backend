@@ -2,7 +2,6 @@ package com.hnieacm.auth.controller;
 
 import cn.dev33.satoken.annotation.SaCheckRole;
 import cn.dev33.satoken.annotation.SaMode;
-import com.hnieacm.auth.dto.BatchUidsRequest;
 import com.hnieacm.auth.dto.RejectRegistrationRequest;
 import com.hnieacm.auth.service.RegistrationImportService;
 import com.hnieacm.auth.service.RegistrationApplyQueryService;
@@ -12,6 +11,7 @@ import com.hnieacm.auth.vo.RegistrationImportResultVo;
 import com.hnieacm.common.constant.RoleConstant;
 import com.hnieacm.common.dto.PageVo;
 import com.hnieacm.common.result.Result;
+import com.hnieacm.user.dto.BatchUidsRequest;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;

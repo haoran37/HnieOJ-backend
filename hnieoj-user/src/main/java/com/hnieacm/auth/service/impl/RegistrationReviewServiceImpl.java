@@ -2,12 +2,12 @@ package com.hnieacm.auth.service.impl;
 
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.hnieacm.auth.entity.UserInfo;
+import com.hnieacm.user.entity.UserInfo;
 import com.hnieacm.auth.entity.UserRegisterApply;
-import com.hnieacm.auth.entity.UserRole;
-import com.hnieacm.auth.mapper.UserInfoMapper;
+import com.hnieacm.user.entity.UserRole;
+import com.hnieacm.user.mapper.UserInfoMapper;
 import com.hnieacm.auth.mapper.UserRegisterApplyMapper;
-import com.hnieacm.auth.mapper.UserRoleMapper;
+import com.hnieacm.user.mapper.UserRoleMapper;
 import com.hnieacm.auth.service.RegistrationReviewService;
 import com.hnieacm.auth.service.UserAuthCacheService;
 import com.hnieacm.common.constant.RegisterStatus;

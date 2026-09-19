@@ -2,14 +2,14 @@ package com.hnieacm.user.service.support;
 
 import cn.dev33.satoken.stp.StpUtil;
 import cn.hutool.core.util.StrUtil;
+import com.hnieacm.auth.service.UserAuthCacheService;
 import com.hnieacm.common.constant.AuthCacheConstant;
-import com.hnieacm.common.result.Result;
-import com.hnieacm.common.result.ResultCode;
-import com.hnieacm.user.feign.AuthInternalFeignClient;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.List;
 
@@ -23,7 +23,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class UserAuthStateService {
 
-    private final AuthInternalFeignClient authInternalFeignClient;
+    private final UserAuthCacheService userAuthCacheService;
     private final StringRedisTemplate stringRedisTemplate;
 
     public void kickoutUserSafely(String uid) {
@@ -45,12 +45,34 @@ public class UserAuthStateService {
         }
     }
 
+    /**
+     * 刷新鉴权缓存：授权/改权类方法运行在事务中，此时角色与权限行尚未提交，
+     * 若在事务内直接写 Redis，一旦回滚就会把未生效权限暴露给网关鉴权。
+     * 因此事务内只登记 afterCommit 回调，仅提交成功后刷新；回滚不刷新；无事务调用立即刷新。
+     */
     public void refreshAuthCacheSafely(String uid) {
+        if (StrUtil.isBlank(uid)) {
+            return;
+        }
+        if (TransactionSynchronizationManager.isActualTransactionActive()
+                && TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    cacheUserAuthSafely(uid);
+                }
+            });
+            return;
+        }
+        cacheUserAuthSafely(uid);
+    }
+
+    /**
+     * 静默刷新鉴权缓存，避免缓存故障影响主业务。
+     */
+    private void cacheUserAuthSafely(String uid) {
         try {
-            Result<Void> result = authInternalFeignClient.refreshUserAuthCache(uid);
-            if (result == null || result.getCode() != ResultCode.SUCCESS) {
-                log.warn("Refresh auth cache failed, uid: {}, result: {}", uid, result);
-            }
+            userAuthCacheService.cacheUserAuth(uid);
         } catch (Exception e) {
             log.warn("Refresh auth cache failed, uid: {}", uid, e);
         }

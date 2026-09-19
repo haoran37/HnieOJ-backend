@@ -6,21 +6,21 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hnieacm.common.dto.JudgeTaskMessage;
 import com.hnieacm.common.exception.BizException;
-import com.hnieacm.common.properties.JudgeMqProperties;
+import com.hnieacm.common.properties.JudgeStreamProperties;
 import com.hnieacm.common.result.ResultCode;
+import com.hnieacm.submission.constant.JudgeTaskExecutionStatusConstant;
 import com.hnieacm.submission.constant.JudgeTaskOutboxStatusConstant;
 import com.hnieacm.submission.dto.ProblemBasicDto;
 import com.hnieacm.submission.entity.Judge;
+import com.hnieacm.submission.entity.JudgeTaskExecution;
 import com.hnieacm.submission.entity.JudgeTaskOutbox;
+import com.hnieacm.submission.mapper.JudgeTaskExecutionMapper;
 import com.hnieacm.submission.mapper.JudgeTaskOutboxMapper;
 import com.hnieacm.submission.properties.SubmissionProperties;
 import com.hnieacm.submission.service.JudgeTaskMessagePublisher;
-import jakarta.annotation.PostConstruct;
+import com.hnieacm.submission.service.JudgeTaskStreamService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.amqp.core.MessageDeliveryMode;
-import org.springframework.amqp.rabbit.connection.CorrelationData;
-import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -31,17 +31,18 @@ import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 /**
  * @Author: HaoRan_Lyu
- * @Date: 2026/06/06
- * @Description: RabbitMQ 判题任务消息发布服务
+ * @Date: 2026/09/18
+ * @Description: Redis Streams 判题任务发布服务：同事务 Outbox + 提交后 XADD + 失败重试
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class RabbitJudgeTaskMessagePublisher implements JudgeTaskMessagePublisher {
+public class RedisJudgeTaskMessagePublisher implements JudgeTaskMessagePublisher {
 
     private static final String DEFAULT_JUDGE_MODE = "default";
     private static final int DEFAULT_PROBLEM_TYPE = 0;
@@ -67,6 +68,9 @@ public class RabbitJudgeTaskMessagePublisher implements JudgeTaskMessagePublishe
     private static final String DEFAULT_INTERACTION_SCORE_MODE = "interactor";
     private static final String SPJ_JUDGE_MODE = "spj";
     private static final String INTERACTIVE_JUDGE_MODE = "interactive";
+    private static final Set<String> FIXED_JUDGE_MODES = Set.of(DEFAULT_JUDGE_MODE, SPJ_JUDGE_MODE,
+            INTERACTIVE_JUDGE_MODE);
+    private static final String LEGACY_TRANSPORT_MARK = "redis-streams";
     private static final int DEFAULT_RETRY_BATCH_SIZE = 20;
     private static final int DEFAULT_MAX_RETRY_COUNT = 10;
     private static final long DEFAULT_RETRY_BACKOFF_SECONDS = 30L;
@@ -76,55 +80,23 @@ public class RabbitJudgeTaskMessagePublisher implements JudgeTaskMessagePublishe
     private static final int DEFAULT_MAX_CHECKER_BYTES = 262144;
     private static final int DEFAULT_MAX_INTERACTOR_BYTES = 262144;
     private static final int DEFAULT_MAX_MESSAGE_PAYLOAD_BYTES = 1048576;
+    private static final int DEFAULT_MAX_ATTEMPT_COUNT = 3;
 
-    private final RabbitTemplate rabbitTemplate;
-    private final JudgeMqProperties properties;
+    private final JudgeTaskStreamService streamService;
+    private final JudgeStreamProperties streamProperties;
     private final JudgeTaskOutboxMapper outboxMapper;
+    private final JudgeTaskExecutionMapper executionMapper;
     private final ObjectMapper objectMapper;
     private final SubmissionProperties submissionProperties;
-
-    /**
-     * @MethodName initRabbitCallbacks
-     * @Description 初始化 RabbitMQ confirm 和 return 回调
-     * @Return
-     * @Author HaoRan_Lyu
-     * @Date 2026/06/08
-     */
-    @PostConstruct
-    public void initRabbitCallbacks() {
-        rabbitTemplate.setMandatory(true);
-        rabbitTemplate.setConfirmCallback((correlationData, ack, cause) -> {
-            PublishCorrelation correlation = parseCorrelation(correlationData == null ? null : correlationData.getId());
-            if (correlation == null) {
-                log.warn("Rabbit confirm ignored because correlation id is missing, ack: {}, cause: {}", ack, cause);
-                return;
-            }
-            if (ack) {
-                markSent(correlation);
-                return;
-            }
-            markFailed(correlation, new IllegalStateException(defaultString(cause, "RabbitMQ publisher confirm nack")));
-        });
-        rabbitTemplate.setReturnsCallback(returned -> {
-            PublishCorrelation correlation = parseCorrelation(returned.getMessage().getMessageProperties().getCorrelationId());
-            if (correlation == null) {
-                log.warn("Rabbit returned message ignored because correlation id is missing, replyCode: {}, replyText: {}",
-                        returned.getReplyCode(), returned.getReplyText());
-                return;
-            }
-            markFailed(correlation, new IllegalStateException("RabbitMQ returned message, replyCode: "
-                    + returned.getReplyCode() + ", replyText: " + returned.getReplyText()));
-        });
-    }
 
     /**
      * @MethodName publishAfterCommit
      * @Param judge
      * @Param problem
-     * @Description 创建 outbox 并在事务提交后投递判题任务
+     * @Description 同事务写入 Outbox 与执行租约，提交后 XADD 投递判题任务
      * @Return
      * @Author HaoRan_Lyu
-     * @Date 2026/06/08
+     * @Date 2026/09/18
      */
     @Override
     public void publishAfterCommit(Judge judge, ProblemBasicDto problem) {
@@ -134,7 +106,9 @@ public class RabbitJudgeTaskMessagePublisher implements JudgeTaskMessagePublishe
         JudgeTaskMessage message = buildMessage(judge, problem);
         JudgeTaskOutbox outbox = createOutbox(message);
         outboxMapper.insert(outbox);
-        if (TransactionSynchronizationManager.isActualTransactionActive()) {
+        upsertExecution(judge, message, outbox);
+        if (TransactionSynchronizationManager.isActualTransactionActive()
+                && TransactionSynchronizationManager.isSynchronizationActive()) {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override
                 public void afterCommit() {
@@ -152,7 +126,7 @@ public class RabbitJudgeTaskMessagePublisher implements JudgeTaskMessagePublishe
      * @Description 手动重试指定 outbox
      * @Return
      * @Author HaoRan_Lyu
-     * @Date 2026/06/08
+     * @Date 2026/09/18
      */
     @Override
     public void retryOutbox(Long outboxId) {
@@ -164,7 +138,7 @@ public class RabbitJudgeTaskMessagePublisher implements JudgeTaskMessagePublishe
                 .ne(JudgeTaskOutbox::getStatus, JudgeTaskOutboxStatusConstant.SENT)
                 .set(JudgeTaskOutbox::getStatus, JudgeTaskOutboxStatusConstant.FAILED)
                 .set(JudgeTaskOutbox::getRetryCount, 0)
-                .set(JudgeTaskOutbox::getNextRetryTime, LocalDateTime.now())
+                .set(JudgeTaskOutbox::getNextRetryTime, LocalDateTime.now().withNano(0).minusSeconds(1))
                 .set(JudgeTaskOutbox::getLastError, null));
         publishOutbox(outboxId);
     }
@@ -174,7 +148,7 @@ public class RabbitJudgeTaskMessagePublisher implements JudgeTaskMessagePublishe
      * @Description 定时扫描并重试可投递的 outbox
      * @Return
      * @Author HaoRan_Lyu
-     * @Date 2026/06/08
+     * @Date 2026/09/18
      */
     @Scheduled(fixedDelayString = "${hnieoj.submission.judge-outbox.retry-interval-ms:10000}")
     public void retryPendingOutbox() {
@@ -190,10 +164,10 @@ public class RabbitJudgeTaskMessagePublisher implements JudgeTaskMessagePublishe
     /**
      * @MethodName publishOutbox
      * @Param outboxId
-     * @Description 将指定 outbox 投递到 RabbitMQ
+     * @Description 将指定 outbox XADD 到 Redis Stream
      * @Return
      * @Author HaoRan_Lyu
-     * @Date 2026/06/08
+     * @Date 2026/09/18
      */
     private void publishOutbox(Long outboxId) {
         if (outboxId == null) {
@@ -209,15 +183,11 @@ public class RabbitJudgeTaskMessagePublisher implements JudgeTaskMessagePublishe
         }
         try {
             JudgeTaskMessage message = objectMapper.readValue(processingOutbox.getPayload(), JudgeTaskMessage.class);
-            String correlationId = buildCorrelationId(processingOutbox);
-            rabbitTemplate.convertAndSend(processingOutbox.getExchangeName(), processingOutbox.getRoutingKey(), message, item -> {
-                item.getMessageProperties().setMessageId(message.getMessageId());
-                item.getMessageProperties().setCorrelationId(correlationId);
-                item.getMessageProperties().setDeliveryMode(MessageDeliveryMode.PERSISTENT);
-                return item;
-            }, new CorrelationData(correlationId));
-            log.info("Judge task message sent to RabbitTemplate, submissionId: {}, judgeId: {}, messageId: {}",
-                    message.getSubmissionId(), message.getJudgeId(), message.getMessageId());
+            String streamKey = resolveStreamKey(processingOutbox, message);
+            String recordId = streamService.publish(streamKey, processingOutbox.getPayload());
+            markSent(processingOutbox, streamKey, recordId);
+            log.info("Judge task message sent to Redis Stream, submissionId: {}, judgeId: {}, messageId: {}, streamKey: {}, recordId: {}",
+                    message.getSubmissionId(), message.getJudgeId(), message.getMessageId(), streamKey, recordId);
         } catch (Exception e) {
             markFailed(processingOutbox, e);
             log.error("Publish judge task message failed, outboxId: {}, submissionId: {}, messageId: {}",
@@ -225,26 +195,52 @@ public class RabbitJudgeTaskMessagePublisher implements JudgeTaskMessagePublishe
         }
     }
 
+    private void markSent(JudgeTaskOutbox outbox, String streamKey, String recordId) {
+        outboxMapper.update(null, new LambdaUpdateWrapper<JudgeTaskOutbox>()
+                .eq(JudgeTaskOutbox::getId, outbox.getId())
+                .eq(JudgeTaskOutbox::getPublishAttempt, defaultInteger(outbox.getPublishAttempt(), 0))
+                .eq(JudgeTaskOutbox::getStatus, JudgeTaskOutboxStatusConstant.PROCESSING)
+                .set(JudgeTaskOutbox::getStatus, JudgeTaskOutboxStatusConstant.SENT)
+                .set(JudgeTaskOutbox::getStreamKey, streamKey)
+                .set(JudgeTaskOutbox::getStreamId, recordId)
+                .set(JudgeTaskOutbox::getSentTime, LocalDateTime.now())
+                .set(JudgeTaskOutbox::getLastError, null)
+                .set(JudgeTaskOutbox::getNextRetryTime, null));
+        executionMapper.update(null, new LambdaUpdateWrapper<JudgeTaskExecution>()
+                .eq(JudgeTaskExecution::getSubmissionId, outbox.getSubmissionId())
+                .eq(JudgeTaskExecution::getJudgeTaskId, outbox.getJudgeTaskId())
+                .set(JudgeTaskExecution::getStreamKey, streamKey)
+                .set(JudgeTaskExecution::getStreamId, recordId));
+    }
+
     /**
-     * @MethodName createOutbox
-     * @Param message
-     * @Description 创建判题任务 outbox 记录
-     * @Return @return {@link JudgeTaskOutbox }
+     * @MethodName alignedInitialNextRetryTime
+     * @Param now
+     * @Description 将首次重试时间对齐到数据库 DATETIME(0) 整秒并回退 1 秒：避免 .800 之类小数
+     * 被四舍五入进下一秒，导致刚写入的 outbox 立刻判定为“未到重试时间”而不可投递。
+     * @Return @return {@link LocalDateTime }
      * @Author HaoRan_Lyu
-     * @Date 2026/06/08
+     * @Date 2026/09/18
      */
+    static LocalDateTime alignedInitialNextRetryTime(LocalDateTime now) {
+        return now.withNano(0).minusSeconds(1);
+    }
+
     private JudgeTaskOutbox createOutbox(JudgeTaskMessage message) {
         JudgeTaskOutbox outbox = new JudgeTaskOutbox();
         outbox.setMessageId(message.getMessageId());
         outbox.setJudgeTaskId(message.getJudgeTaskId());
         outbox.setSubmissionId(message.getSubmissionId());
-        outbox.setExchangeName(properties.getExchange());
-        outbox.setRoutingKey(routingKey(message.getJudgeMode()));
+        String streamKey = streamService.resolveStreamKey(message.getJudgeMode());
+        // 遗留列保留写入以兼容 NOT NULL 约束，真实分发定位使用 stream_key / stream_id
+        outbox.setExchangeName(LEGACY_TRANSPORT_MARK);
+        outbox.setRoutingKey(streamKey);
+        outbox.setStreamKey(streamKey);
         outbox.setStatus(JudgeTaskOutboxStatusConstant.PENDING);
         outbox.setRetryCount(0);
         outbox.setPublishAttempt(0);
         outbox.setMaxRetryCount(maxRetryCount());
-        outbox.setNextRetryTime(LocalDateTime.now());
+        outbox.setNextRetryTime(alignedInitialNextRetryTime(LocalDateTime.now()));
         try {
             validateTaskPayload(message);
             String payload = objectMapper.writeValueAsString(message);
@@ -257,12 +253,64 @@ public class RabbitJudgeTaskMessagePublisher implements JudgeTaskMessagePublishe
     }
 
     /**
-     * @MethodName queryRetryCandidates
-     * @Description 查询本轮可以重试的 outbox
-     * @Return @return {@link List }<{@link JudgeTaskOutbox }>
+     * @MethodName upsertExecution
+     * @Param judge
+     * @Param message
+     * @Param outbox
+     * @Description 同事务维护执行租约；重判更换 judgeTaskId 时重置执行预算
+     * @Return
      * @Author HaoRan_Lyu
-     * @Date 2026/06/08
+     * @Date 2026/09/18
      */
+    private void upsertExecution(Judge judge, JudgeTaskMessage message, JudgeTaskOutbox outbox) {
+        long now = System.currentTimeMillis();
+        long deadline = now + executionDeadlineSeconds() * 1000L;
+        JudgeTaskExecution execution = executionMapper.selectBySubmissionIdForUpdate(message.getSubmissionId());
+        if (execution == null) {
+            execution = new JudgeTaskExecution();
+            execution.setSubmissionId(message.getSubmissionId());
+            execution.setJudgeId(judge.getId());
+            execution.setJudgeTaskId(message.getJudgeTaskId());
+            execution.setProblemId(judge.getProblemId());
+            execution.setProblemCode(judge.getProblemCode());
+            execution.setJudgeMode(defaultString(message.getJudgeMode(), DEFAULT_JUDGE_MODE));
+            execution.setStreamKey(outbox.getStreamKey());
+            execution.setAttemptCount(0);
+            execution.setMaxAttemptCount(maxAttemptCount());
+            execution.setStatus(JudgeTaskExecutionStatusConstant.QUEUED);
+            execution.setExecutionDeadline(deadline);
+            executionMapper.insert(execution);
+            return;
+        }
+        executionMapper.update(null, new LambdaUpdateWrapper<JudgeTaskExecution>()
+                .eq(JudgeTaskExecution::getId, execution.getId())
+                .set(JudgeTaskExecution::getJudgeId, judge.getId())
+                .set(JudgeTaskExecution::getJudgeTaskId, message.getJudgeTaskId())
+                .set(JudgeTaskExecution::getProblemId, judge.getProblemId())
+                .set(JudgeTaskExecution::getProblemCode, judge.getProblemCode())
+                .set(JudgeTaskExecution::getJudgeMode, defaultString(message.getJudgeMode(), DEFAULT_JUDGE_MODE))
+                .set(JudgeTaskExecution::getStreamKey, outbox.getStreamKey())
+                .set(JudgeTaskExecution::getStreamId, null)
+                .set(JudgeTaskExecution::getNodeId, null)
+                .set(JudgeTaskExecution::getTokenId, null)
+                .set(JudgeTaskExecution::getAttemptId, null)
+                .set(JudgeTaskExecution::getAttemptCount, 0)
+                .set(JudgeTaskExecution::getMaxAttemptCount, maxAttemptCount())
+                .set(JudgeTaskExecution::getStatus, JudgeTaskExecutionStatusConstant.QUEUED)
+                .set(JudgeTaskExecution::getLeaseUntil, null)
+                .set(JudgeTaskExecution::getExecutionDeadline, deadline)
+                .set(JudgeTaskExecution::getLastError, null)
+                .set(JudgeTaskExecution::getTerminalFingerprint, null));
+    }
+
+    private String resolveStreamKey(JudgeTaskOutbox outbox, JudgeTaskMessage message) {
+        String streamKey = outbox.getStreamKey();
+        if (streamKey != null && !streamKey.isBlank()) {
+            return streamKey;
+        }
+        return streamService.resolveStreamKey(message.getJudgeMode());
+    }
+
     private List<JudgeTaskOutbox> queryRetryCandidates() {
         LocalDateTime now = LocalDateTime.now();
         LocalDateTime staleProcessingTime = now.minusSeconds(processingTimeoutSeconds());
@@ -280,17 +328,10 @@ public class RabbitJudgeTaskMessagePublisher implements JudgeTaskMessagePublishe
                 .last("limit " + retryBatchSize()));
     }
 
-    /**
-     * @MethodName markProcessing
-     * @Param outbox
-     * @Description 抢占 outbox 并递增投递 attempt
-     * @Return @return {@link JudgeTaskOutbox }
-     * @Author HaoRan_Lyu
-     * @Date 2026/06/08
-     */
     private JudgeTaskOutbox markProcessing(JudgeTaskOutbox outbox) {
         LocalDateTime now = LocalDateTime.now();
-        LocalDateTime staleProcessingTime = now.minusSeconds(processingTimeoutSeconds());
+        // gmt_modified 同为 DATETIME(0)，用整秒下界避免小数进位造成“看似未超时”
+        LocalDateTime staleProcessingTime = now.withNano(0).minusSeconds(processingTimeoutSeconds());
         int updated = outboxMapper.update(null, new LambdaUpdateWrapper<JudgeTaskOutbox>()
                 .eq(JudgeTaskOutbox::getId, outbox.getId())
                 .lt(JudgeTaskOutbox::getRetryCount, maxRetryCount())
@@ -309,56 +350,6 @@ public class RabbitJudgeTaskMessagePublisher implements JudgeTaskMessagePublishe
         return outboxMapper.selectById(outbox.getId());
     }
 
-    /**
-     * @MethodName markSent
-     * @Param correlation
-     * @Description 按投递 attempt 标记 outbox 已发送
-     * @Return
-     * @Author HaoRan_Lyu
-     * @Date 2026/06/08
-     */
-    private void markSent(PublishCorrelation correlation) {
-        outboxMapper.update(null, new LambdaUpdateWrapper<JudgeTaskOutbox>()
-                .eq(JudgeTaskOutbox::getId, correlation.outboxId())
-                .eq(JudgeTaskOutbox::getPublishAttempt, correlation.publishAttempt())
-                .eq(JudgeTaskOutbox::getStatus, JudgeTaskOutboxStatusConstant.PROCESSING)
-                .set(JudgeTaskOutbox::getStatus, JudgeTaskOutboxStatusConstant.SENT)
-                .set(JudgeTaskOutbox::getSentTime, LocalDateTime.now())
-                .set(JudgeTaskOutbox::getLastError, null)
-                .set(JudgeTaskOutbox::getNextRetryTime, null));
-    }
-
-    /**
-     * @MethodName markFailed
-     * @Param correlation
-     * @Param e
-     * @Description 根据 RabbitMQ 回调标记 outbox 投递失败
-     * @Return
-     * @Author HaoRan_Lyu
-     * @Date 2026/06/08
-     */
-    private void markFailed(PublishCorrelation correlation, Exception e) {
-        JudgeTaskOutbox outbox = outboxMapper.selectById(correlation.outboxId());
-        if (outbox == null) {
-            return;
-        }
-        if (!Integer.valueOf(correlation.publishAttempt()).equals(defaultInteger(outbox.getPublishAttempt(), 0))) {
-            log.info("Rabbit callback ignored because publish attempt mismatch, outboxId: {}, callbackAttempt: {}, currentAttempt: {}",
-                    correlation.outboxId(), correlation.publishAttempt(), outbox.getPublishAttempt());
-            return;
-        }
-        markFailed(outbox, e);
-    }
-
-    /**
-     * @MethodName markFailed
-     * @Param outbox
-     * @Param e
-     * @Description 根据本地异常更新 outbox 失败状态和下次重试时间
-     * @Return
-     * @Author HaoRan_Lyu
-     * @Date 2026/06/08
-     */
     private void markFailed(JudgeTaskOutbox outbox, Exception e) {
         int nextRetryCount = defaultInteger(outbox.getRetryCount(), 0) + 1;
         boolean exhausted = nextRetryCount >= maxRetryCount();
@@ -374,20 +365,11 @@ public class RabbitJudgeTaskMessagePublisher implements JudgeTaskMessagePublishe
             wrapper.set(JudgeTaskOutbox::getNextRetryTime, null);
         } else {
             wrapper.set(JudgeTaskOutbox::getNextRetryTime,
-                    LocalDateTime.now().plusSeconds(retryBackoffSeconds()));
+                    LocalDateTime.now().withNano(0).plusSeconds(retryBackoffSeconds()));
         }
         outboxMapper.update(null, wrapper);
     }
 
-    /**
-     * @MethodName buildMessage
-     * @Param judge
-     * @Param problem
-     * @Description 构造发送给判题节点的任务消息
-     * @Return @return {@link JudgeTaskMessage }
-     * @Author HaoRan_Lyu
-     * @Date 2026/06/08
-     */
     private JudgeTaskMessage buildMessage(Judge judge, ProblemBasicDto problem) {
         JudgeTaskMessage message = new JudgeTaskMessage();
         String messageId = UUID.randomUUID().toString().replace("-", "");
@@ -418,15 +400,6 @@ public class RabbitJudgeTaskMessagePublisher implements JudgeTaskMessagePublishe
         return message;
     }
 
-    /**
-     * @MethodName buildChecker
-     * @Param judgeMode
-     * @Param problem
-     * @Description 构造 SPJ checker 配置
-     * @Return @return {@link JudgeTaskMessage.JudgeAsset }
-     * @Author HaoRan_Lyu
-     * @Date 2026/06/08
-     */
     private JudgeTaskMessage.JudgeAsset buildChecker(String judgeMode, ProblemBasicDto problem) {
         if (!SPJ_JUDGE_MODE.equalsIgnoreCase(defaultString(judgeMode, DEFAULT_JUDGE_MODE)) || problem == null) {
             return null;
@@ -444,15 +417,6 @@ public class RabbitJudgeTaskMessagePublisher implements JudgeTaskMessagePublishe
         return checker;
     }
 
-    /**
-     * @MethodName buildInteractor
-     * @Param judgeMode
-     * @Param problem
-     * @Description 构造交互题 interactor 配置
-     * @Return @return {@link JudgeTaskMessage.JudgeAsset }
-     * @Author HaoRan_Lyu
-     * @Date 2026/06/08
-     */
     private JudgeTaskMessage.JudgeAsset buildInteractor(String judgeMode, ProblemBasicDto problem) {
         if (!INTERACTIVE_JUDGE_MODE.equalsIgnoreCase(defaultString(judgeMode, DEFAULT_JUDGE_MODE)) || problem == null) {
             return null;
@@ -470,15 +434,6 @@ public class RabbitJudgeTaskMessagePublisher implements JudgeTaskMessagePublishe
         return interactor;
     }
 
-    /**
-     * @MethodName buildInteraction
-     * @Param judgeMode
-     * @Param problem
-     * @Description 构造交互题进程通信配置
-     * @Return @return {@link JudgeTaskMessage.InteractionConfig }
-     * @Author HaoRan_Lyu
-     * @Date 2026/06/08
-     */
     private JudgeTaskMessage.InteractionConfig buildInteraction(String judgeMode, ProblemBasicDto problem) {
         if (!INTERACTIVE_JUDGE_MODE.equalsIgnoreCase(defaultString(judgeMode, DEFAULT_JUDGE_MODE)) || problem == null) {
             return null;
@@ -490,108 +445,12 @@ public class RabbitJudgeTaskMessagePublisher implements JudgeTaskMessagePublishe
         return interaction;
     }
 
-    /**
-     * @MethodName routingKey
-     * @Param judgeMode
-     * @Description 按判题模式选择 RabbitMQ routing key
-     * @Return @return {@link String }
-     * @Author HaoRan_Lyu
-     * @Date 2026/06/08
-     */
-    private String routingKey(String judgeMode) {
-        String normalizedJudgeMode = defaultString(judgeMode, DEFAULT_JUDGE_MODE);
-        if (SPJ_JUDGE_MODE.equalsIgnoreCase(normalizedJudgeMode)) {
-            return defaultString(properties.getSpjRoutingKey(), properties.getRoutingKey());
-        }
-        if (INTERACTIVE_JUDGE_MODE.equalsIgnoreCase(normalizedJudgeMode)) {
-            return defaultString(properties.getInteractiveRoutingKey(), properties.getRoutingKey());
-        }
-        return properties.getRoutingKey();
-    }
-
-    /**
-     * @MethodName defaultInteger
-     * @Param value
-     * @Param defaultValue
-     * @Description 获取整数默认值
-     * @Return @return {@link Integer }
-     * @Author HaoRan_Lyu
-     * @Date 2026/06/08
-     */
-    private Integer defaultInteger(Integer value, Integer defaultValue) {
-        return value == null ? defaultValue : value;
-    }
-
-    /**
-     * @MethodName defaultString
-     * @Param value
-     * @Param defaultValue
-     * @Description 获取字符串默认值
-     * @Return @return {@link String }
-     * @Author HaoRan_Lyu
-     * @Date 2026/06/08
-     */
-    private String defaultString(String value, String defaultValue) {
-        return value == null || value.isBlank() ? defaultValue : value;
-    }
-
-    /**
-     * @MethodName retryBatchSize
-     * @Description 获取 outbox 重试批次大小
-     * @Return @return int
-     * @Author HaoRan_Lyu
-     * @Date 2026/06/08
-     */
-    private int retryBatchSize() {
-        Integer value = submissionProperties.getJudgeOutbox().getRetryBatchSize();
-        return value == null || value <= 0 ? DEFAULT_RETRY_BATCH_SIZE : value;
-    }
-
-    /**
-     * @MethodName maxRetryCount
-     * @Description 获取 outbox 最大重试次数
-     * @Return @return int
-     * @Author HaoRan_Lyu
-     * @Date 2026/06/08
-     */
-    private int maxRetryCount() {
-        Integer value = submissionProperties.getJudgeOutbox().getMaxRetryCount();
-        return value == null || value <= 0 ? DEFAULT_MAX_RETRY_COUNT : value;
-    }
-
-    /**
-     * @MethodName retryBackoffSeconds
-     * @Description 获取 outbox 重试退避时间
-     * @Return @return long
-     * @Author HaoRan_Lyu
-     * @Date 2026/06/08
-     */
-    private long retryBackoffSeconds() {
-        Long value = submissionProperties.getJudgeOutbox().getRetryBackoffSeconds();
-        return value == null || value <= 0 ? DEFAULT_RETRY_BACKOFF_SECONDS : value;
-    }
-
-    /**
-     * @MethodName processingTimeoutSeconds
-     * @Description 获取 processing 状态抢占超时时间
-     * @Return @return long
-     * @Author HaoRan_Lyu
-     * @Date 2026/06/08
-     */
-    private long processingTimeoutSeconds() {
-        Long value = submissionProperties.getJudgeOutbox().getProcessingTimeoutSeconds();
-        return value == null || value <= 0 ? DEFAULT_PROCESSING_TIMEOUT_SECONDS : value;
-    }
-
-    /**
-     * @MethodName validateTaskPayload
-     * @Param message
-     * @Description 校验判题任务 payload 中源码字段大小
-     * @Return
-     * @Author HaoRan_Lyu
-     * @Date 2026/06/08
-     */
     private void validateTaskPayload(JudgeTaskMessage message) {
+        String judgeMode = defaultString(message.getJudgeMode(), DEFAULT_JUDGE_MODE).toLowerCase();
+        if (!FIXED_JUDGE_MODES.contains(judgeMode)) {
+            // 只接受固定集合，禁止任意 mode 静默映射到 default Stream
+            throw new BizException(ResultCode.BAD_REQUEST, "不支持的判题模式: " + message.getJudgeMode());
+        }
         validateBytes(message.getCode(), maxCodeBytes(), "提交代码不能超过 " + maxCodeBytes() + " 字节");
         if (message.getChecker() != null) {
             validateBytes(message.getChecker().getSource(), maxCheckerBytes(),
@@ -603,16 +462,6 @@ public class RabbitJudgeTaskMessagePublisher implements JudgeTaskMessagePublishe
         }
     }
 
-    /**
-     * @MethodName validateBytes
-     * @Param value
-     * @Param maxBytes
-     * @Param message
-     * @Description 校验字符串 UTF-8 字节数上限
-     * @Return
-     * @Author HaoRan_Lyu
-     * @Date 2026/06/08
-     */
     private void validateBytes(String value, int maxBytes, String message) {
         if (value == null) {
             return;
@@ -622,104 +471,68 @@ public class RabbitJudgeTaskMessagePublisher implements JudgeTaskMessagePublishe
         }
     }
 
-    /**
-     * @MethodName maxCodeBytes
-     * @Description 获取提交源码最大字节数
-     * @Return @return int
-     * @Author HaoRan_Lyu
-     * @Date 2026/06/08
-     */
+    private Integer defaultInteger(Integer value, Integer defaultValue) {
+        return value == null ? defaultValue : value;
+    }
+
+    private String defaultString(String value, String defaultValue) {
+        return value == null || value.isBlank() ? defaultValue : value;
+    }
+
+    private int retryBatchSize() {
+        Integer value = submissionProperties.getJudgeOutbox().getRetryBatchSize();
+        return value == null || value <= 0 ? DEFAULT_RETRY_BATCH_SIZE : value;
+    }
+
+    private int maxRetryCount() {
+        Integer value = submissionProperties.getJudgeOutbox().getMaxRetryCount();
+        return value == null || value <= 0 ? DEFAULT_MAX_RETRY_COUNT : value;
+    }
+
+    private int maxAttemptCount() {
+        Integer value = streamProperties.getMaxAttemptCount();
+        return value == null || value <= 0 ? DEFAULT_MAX_ATTEMPT_COUNT : value;
+    }
+
+    private long executionDeadlineSeconds() {
+        Long value = streamProperties.getExecutionDeadlineSeconds();
+        return value == null || value <= 0 ? 7200L : value;
+    }
+
+    private long retryBackoffSeconds() {
+        Long value = submissionProperties.getJudgeOutbox().getRetryBackoffSeconds();
+        return value == null || value <= 0 ? DEFAULT_RETRY_BACKOFF_SECONDS : value;
+    }
+
+    private long processingTimeoutSeconds() {
+        Long value = submissionProperties.getJudgeOutbox().getProcessingTimeoutSeconds();
+        return value == null || value <= 0 ? DEFAULT_PROCESSING_TIMEOUT_SECONDS : value;
+    }
+
     private int maxCodeBytes() {
         Integer value = submissionProperties.getMaxCodeBytes();
         return value == null || value <= 0 ? DEFAULT_MAX_CODE_BYTES : value;
     }
 
-    /**
-     * @MethodName maxCheckerBytes
-     * @Description 获取 SPJ checker 源码最大字节数
-     * @Return @return int
-     * @Author HaoRan_Lyu
-     * @Date 2026/06/08
-     */
     private int maxCheckerBytes() {
         Integer value = submissionProperties.getMaxCheckerBytes();
         return value == null || value <= 0 ? DEFAULT_MAX_CHECKER_BYTES : value;
     }
 
-    /**
-     * @MethodName maxInteractorBytes
-     * @Description 获取交互题 interactor 源码最大字节数
-     * @Return @return int
-     * @Author HaoRan_Lyu
-     * @Date 2026/06/08
-     */
     private int maxInteractorBytes() {
         Integer value = submissionProperties.getMaxInteractorBytes();
         return value == null || value <= 0 ? DEFAULT_MAX_INTERACTOR_BYTES : value;
     }
 
-    /**
-     * @MethodName maxMessagePayloadBytes
-     * @Description 获取判题任务消息最大字节数
-     * @Return @return int
-     * @Author HaoRan_Lyu
-     * @Date 2026/06/08
-     */
     private int maxMessagePayloadBytes() {
         Integer value = submissionProperties.getMaxMessagePayloadBytes();
         return value == null || value <= 0 ? DEFAULT_MAX_MESSAGE_PAYLOAD_BYTES : value;
     }
 
-    /**
-     * @MethodName truncateError
-     * @Param message
-     * @Description 截断 outbox 错误信息
-     * @Return @return {@link String }
-     * @Author HaoRan_Lyu
-     * @Date 2026/06/08
-     */
     private String truncateError(String message) {
         if (message == null) {
             return null;
         }
         return message.length() <= MAX_ERROR_LENGTH ? message : message.substring(0, MAX_ERROR_LENGTH);
-    }
-
-    /**
-     * @MethodName buildCorrelationId
-     * @Param outbox
-     * @Description 构造携带 outboxId 和 attempt 的 RabbitMQ correlation id
-     * @Return @return {@link String }
-     * @Author HaoRan_Lyu
-     * @Date 2026/06/08
-     */
-    private String buildCorrelationId(JudgeTaskOutbox outbox) {
-        return outbox.getId() + ":" + defaultInteger(outbox.getPublishAttempt(), 0);
-    }
-
-    /**
-     * @MethodName parseCorrelation
-     * @Param value
-     * @Description 解析 RabbitMQ correlation id
-     * @Return @return {@link PublishCorrelation }
-     * @Author HaoRan_Lyu
-     * @Date 2026/06/08
-     */
-    private PublishCorrelation parseCorrelation(String value) {
-        if (value == null || value.isBlank()) {
-            return null;
-        }
-        String[] segments = value.split(":");
-        if (segments.length != 2) {
-            return null;
-        }
-        try {
-            return new PublishCorrelation(Long.parseLong(segments[0]), Integer.parseInt(segments[1]));
-        } catch (NumberFormatException e) {
-            return null;
-        }
-    }
-
-    private record PublishCorrelation(Long outboxId, Integer publishAttempt) {
     }
 }

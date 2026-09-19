@@ -1,5 +1,6 @@
 package com.hnieacm.problem.feign;
 
+import com.hnieacm.common.dto.JudgeTaskAccessRequest;
 import com.hnieacm.common.result.Result;
 import com.hnieacm.problem.dto.ValidateJudgeNodeTokenRequest;
 import com.hnieacm.problem.vo.JudgeNodeTokenValidationVo;
@@ -12,9 +13,12 @@ import org.springframework.web.bind.annotation.RequestBody;
  * @Date: 2026/05/12
  * @Description: 判题服务节点 Token 内部 API
  */
-@FeignClient(name = "hnieoj-judge")
+@FeignClient(name = "hnieoj-submission")
 public interface JudgeNodeTokenFeignClient {
 
     @PostMapping("/internal/judge/tokens/validate")
     Result<JudgeNodeTokenValidationVo> validate(@RequestBody ValidateJudgeNodeTokenRequest request);
+
+    @PostMapping("/internal/judge/task-access/validate")
+    Result<Void> validateTaskAccess(@RequestBody JudgeTaskAccessRequest request);
 }

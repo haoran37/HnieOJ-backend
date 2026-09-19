@@ -1,12 +1,15 @@
 package com.hnieacm.judge.controller;
 
+import com.hnieacm.common.dto.JudgeTaskAccessRequest;
 import com.hnieacm.common.result.Result;
 import com.hnieacm.judge.dto.ValidateJudgeNodeTokenRequest;
 import com.hnieacm.judge.service.JudgeNodeHeartbeatService;
 import com.hnieacm.judge.service.JudgeNodeSecurityService;
 import com.hnieacm.judge.vo.JudgeNodeTokenValidationVo;
+import com.hnieacm.submission.service.JudgeTaskAccessService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -30,11 +33,19 @@ public class InternalJudgeNodeController {
 
     private final JudgeNodeSecurityService judgeNodeSecurityService;
     private final JudgeNodeHeartbeatService judgeNodeHeartbeatService;
+    private final JudgeTaskAccessService judgeTaskAccessService;
 
     @Operation(summary = "校验判题节点凭证")
     @PostMapping("/tokens/validate")
     public Result<JudgeNodeTokenValidationVo> validateToken(@RequestBody ValidateJudgeNodeTokenRequest request) {
         return Result.success(judgeNodeSecurityService.validateToken(request));
+    }
+
+    @Operation(summary = "校验测试数据下载资格")
+    @PostMapping("/task-access/validate")
+    public Result<Void> validateTaskAccess(@Valid @RequestBody JudgeTaskAccessRequest request) {
+        judgeTaskAccessService.validateDownloadAccess(request);
+        return Result.success(null);
     }
 
     @Operation(summary = "查询指定判题模式是否存在可用节点")

@@ -1,11 +1,14 @@
 package com.hnieacm.judge.service.impl;
 
+import com.baomidou.mybatisplus.core.MybatisConfiguration;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.hnieacm.common.exception.BizException;
 import com.hnieacm.common.judge.NodeProtocolConstants;
 import com.hnieacm.judge.entity.JudgeNodeToken;
 import com.hnieacm.judge.mapper.JudgeNodeTokenMapper;
 import com.hnieacm.judge.vo.JudgeNodeTokenVo;
+import org.apache.ibatis.builder.MapperBuilderAssistant;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -40,6 +43,9 @@ class JudgeNodeLifecycleServiceImplTest {
     @BeforeEach
     void setUp() {
         service = new JudgeNodeLifecycleServiceImpl(tokenMapper);
+        // 纯 Mockito 单测不启动 Spring，需显式初始化实体的 MyBatis-Plus 表元数据，
+        // 否则 LambdaUpdateWrapper 解析列名时会因 lambda cache 缺失而报错。
+        initTableInfo(JudgeNodeToken.class);
     }
 
     @Test
@@ -105,6 +111,14 @@ class JudgeNodeLifecycleServiceImplTest {
                 ArgumentCaptor.forClass(LambdaUpdateWrapper.class);
         verify(tokenMapper).update(isNull(), captor.capture());
         return captor.getValue().getSqlSet();
+    }
+
+    private void initTableInfo(Class<?> entityClass) {
+        if (TableInfoHelper.getTableInfo(entityClass) != null) {
+            return;
+        }
+        MapperBuilderAssistant assistant = new MapperBuilderAssistant(new MybatisConfiguration(), "");
+        TableInfoHelper.initTableInfo(assistant, entityClass);
     }
 
     private JudgeNodeToken node(String status, int accessVersion, LocalDateTime authorizationUntil) {

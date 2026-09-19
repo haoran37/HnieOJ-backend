@@ -14,7 +14,8 @@ spring:
 
 mybatis-plus:
   mapper-locations: classpath*:/mapper/**/*.xml
-  type-aliases-package: com.hnieacm.user.entity
+  # auth 实体已并入 com.hnieacm.user.entity，仅保留仍存在的实体包
+  type-aliases-package: com.hnieacm.user.entity,com.hnieacm.achievement.entity
   configuration:
     map-underscore-to-camel-case: true
 
@@ -27,6 +28,24 @@ sa-token:
   is-print: false
 
 hnieoj:
+  # 合并认证域后的缓存与校验参数
+  auth-cache:
+    ttl:
+      roles: 24h
+      permissions: 12h
+      empty: 5m
+      jitter: 10m
+  auth:
+    validation:
+      username-min-length: 2
+      username-max-length: 20
+      password-min-length: 6
+      password-max-length: 32
+  # 合并成就域后的文件存储参数
+  achievement:
+    file:
+      upload-dir: ${ACHIEVEMENT_UPLOAD_DIR:}
+      public-url-prefix: ${ACHIEVEMENT_PUBLIC_URL_PREFIX:}
   user:
     manage:
       # 管理端创建/编辑用户时使用的账号密码基础校验，前端校验规则应与这里保持一致。

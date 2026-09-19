@@ -8,8 +8,8 @@
 
 - 检查 `git`、`mvn`、`docker`、Docker Compose v2
 - 检查 Docker daemon 权限
-- 检查题目资源目录与判题安全目录
-- 使用 OpenSSL 自动生成判题 JWT Secret、正式节点 RSA 公私钥
+- 检查题目资源目录与 go-judge 缓存目录
+- 使用 OpenSSL 自动生成判题 JWT Secret 与 NODE_ACCESS 运行时密钥（写入服务器 `.env`，不写入 Nacos）
 - 拉取指定 Git 分支，默认 `dev`
 - 使用 Maven 打包所有后端服务
 - 使用 Docker Compose 构建并启动所有后端服务
@@ -20,16 +20,24 @@
 - 代码目录：`/opt/hnieoj/backend/source`
 - 环境变量文件：`/opt/hnieoj/backend/.env`
 - 题目资源目录：`/data/oj/problems`
-- 判题安全目录：`/etc/hnieoj/judge-security`
-- go-judge 配置文件：`/etc/hnieoj/go-judge/config.yaml`
+- 判题节点状态目录：`/data/oj/judge-node`（容器内 `/var/lib/hnieoj-judge-node`，0700，保存 `identity.json`、`config.yaml`、`results/`）
+- go-judge 配置文件（宿主机）：`/etc/hnieoj/go-judge/config.yaml`（只读挂载到容器内状态目录下的 `config.yaml`）
+- 一次性 Bootstrap：目录 `/etc/hnieoj/judge-node`（0700）整目录只读挂载，目录内 `bootstrap.token`（0600）按需放置；挂载点与示例 `bootstrap.tokenFile` 一致
 - go-judge 测试数据缓存目录：`/data/oj/judge-cache`
 
 ## 首次部署前准备
 
 ```bash
-sudo mkdir -p /opt/hnieoj/backend/source /data/oj/problems /etc/hnieoj/judge-security
+sudo mkdir -p /opt/hnieoj/backend/source /data/oj/problems
 sudo mkdir -p /opt/hnieoj/go-judge/source /etc/hnieoj/go-judge /data/oj/judge-cache
-sudo chown -R vipuser:vipuser /opt/hnieoj/backend /opt/hnieoj/go-judge /data/oj/problems /data/oj/judge-cache
+sudo mkdir -p /data/oj/judge-node /etc/hnieoj/judge-node
+sudo chown -R vipuser:vipuser /opt/hnieoj/backend /opt/hnieoj/go-judge /data/oj/problems /data/oj/judge-cache /data/oj/judge-node
+sudo chmod 700 /data/oj/judge-node /etc/hnieoj/judge-node
+# 只读 config.yaml bind 的宿主目标必须是常规文件，否则 Docker 会在状态目录里创建目录导致节点启动失败。
+# 仅在缺失时创建 0600 空占位，绝不截断既有配置或触碰 identity.json/results。
+if [[ ! -f /data/oj/judge-node/config.yaml ]]; then
+  sudo touch /data/oj/judge-node/config.yaml && sudo chmod 600 /data/oj/judge-node/config.yaml
+fi
 ```
 
 部署用户需要能访问 Docker daemon，例如部署用户为 `vipuser`：
@@ -98,17 +106,9 @@ bash deploy/scripts/deploy-dev.sh
 
 - `HNIEOJ_INTERNAL_TOKEN`
 - `HNIEOJ_JUDGE_JWT_SECRET`
-- `HNIEOJ_JUDGE_FORMAL_TOKEN_PUBLIC_KEY_PATH`
-- `HNIEOJ_JUDGE_FORMAL_TOKEN_PRIVATE_KEY_PATH`
-- `HNIEOJ_JUDGE_FORMAL_TOKEN_NACOS_DATA_ID`
-- `HNIEOJ_JUDGE_FORMAL_TOKEN_NACOS_GROUP`
+- `HNIEOJ_JUDGE_NODE_ACCESS_TOKEN_SECRET`（节点 NODE_ACCESS 短期令牌密钥，运行时环境/文件注入，所有副本一致）
 
-脚本还会在 `/etc/hnieoj/judge-security` 下生成：
-
-- `judge_formal_private.pem`：只挂载给正式 go-judge 节点
-- `judge_formal_public.pem`：后端轮换正式 Token 时用于加密
-
-你只需要继续填写真实 MySQL、Redis、RabbitMQ、Nacos 等基础设施配置后，重新执行脚本即可。
+你只需要继续填写真实 MySQL、Redis、Nacos 等基础设施配置后，重新执行脚本即可。判题任务分发复用共享 Redis Streams，不再需要 RabbitMQ。节点身份使用 Bootstrap + Ed25519，私钥只保存在判题节点宿主机。
 
 如只想补齐安全材料：
 
@@ -116,92 +116,12 @@ bash deploy/scripts/deploy-dev.sh
 bash deploy/scripts/deploy-dev.sh security-init
 ```
 
-## 可选 RabbitMQ 容器
-
-如果服务器没有单独维护 RabbitMQ，可以使用项目提供的可选 Compose 文件启动 RabbitMQ：
-
-```bash
-bash deploy/scripts/deploy-dev.sh rabbitmq-up
-```
-
-该命令会使用同一个 `/opt/hnieoj/backend/.env`，默认创建：
-
-- AMQP 端口：`5672`
-- 管理后台端口：`15672`
-- 用户：`hnieoj_judge`
-- vhost：`hnieoj`
-- 镜像：`rabbitmq:4.2.7-management`
-- 数据目录：`/opt/hnieoj/rabbitmq/data`
-
-对应 `.env` 推荐配置：
-
-```env
-RABBITMQ_HOST=rabbitmq
-RABBITMQ_PORT=5672
-RABBITMQ_PUBLIC_PORT=5672
-RABBITMQ_MANAGEMENT_PUBLIC_PORT=15672
-RABBITMQ_BIND_HOST=127.0.0.1
-RABBITMQ_MANAGEMENT_BIND_HOST=127.0.0.1
-RABBITMQ_USERNAME=hnieoj_judge
-RABBITMQ_PASSWORD=请填写强密码
-RABBITMQ_VHOST=hnieoj
-RABBITMQ_IMAGE=rabbitmq:4.2.7-management
-RABBITMQ_DATA_DIR=/opt/hnieoj/rabbitmq/data
-```
-
-RabbitMQ 管理后台登录账号密码就是 `.env` 中的：
-
-```env
-RABBITMQ_USERNAME=...
-RABBITMQ_PASSWORD=...
-```
-
-后端服务连接 RabbitMQ 也使用同一组账号、密码和 vhost。
-
-如果你已经有外部 RabbitMQ，则不需要执行 `rabbitmq-up`，只需把 `.env` 改为外部地址，例如：
-
-```env
-RABBITMQ_HOST=host.docker.internal
-RABBITMQ_PORT=5672
-RABBITMQ_USERNAME=hnieoj_judge
-RABBITMQ_PASSWORD=请填写强密码
-RABBITMQ_VHOST=hnieoj
-```
-
-查看 RabbitMQ：
-
-```bash
-bash deploy/scripts/deploy-dev.sh rabbitmq-ps
-bash deploy/scripts/deploy-dev.sh rabbitmq-logs
-```
-
-查看判题任务队列与死信队列积压：
-```bash
-bash deploy/scripts/deploy-dev.sh judge-dlq-status
-```
-
-将判题死信队列中的消息重投回任务队列，默认最多重投 10 条，也可以显式指定数量：
-```bash
-bash deploy/scripts/deploy-dev.sh judge-dlq-requeue
-bash deploy/scripts/deploy-dev.sh judge-dlq-requeue 20
-```
-
-该命令使用 RabbitMQ Management HTTP API，需要 `.env` 中的 `RABBITMQ_MANAGEMENT_URL`、`RABBITMQ_MANAGEMENT_USERNAME`、`RABBITMQ_MANAGEMENT_PASSWORD` 可用。使用项目自带 RabbitMQ 容器时默认指向 `http://127.0.0.1:15672`。
-
-停止并移除 RabbitMQ 容器：
-
-```bash
-bash deploy/scripts/deploy-dev.sh rabbitmq-down
-```
-
-注意：`rabbitmq-down` 不会删除 `/opt/hnieoj/rabbitmq/data`，因此已有 vhost、用户和队列会保留。若数据目录已经初始化，修改 `.env` 中的 `RABBITMQ_DEFAULT_*` 相关值不会自动改写已有 RabbitMQ 用户，需要在管理后台或通过 `rabbitmqctl` 调整。
-
 ## 可选 go-judge 容器
 
 如果要在同一台服务器上运行二开后的 go-judge，可以使用脚本拉取 `go-judge` 仓库并启动两个容器：
 
-- `go-judge-sandbox`：原始沙箱服务，默认暴露 `5050`
-- `hnieoj-judge-node`：HnieOJ 判题节点，消费 RabbitMQ 判题任务并回调后端
+- `go-judge-sandbox`：原始沙箱服务，仅在 `hnieoj-backend` 内部网络提供 `5050`，不对宿主机或公网发布端口
+- `hnieoj-judge-node`：HnieOJ 判题节点，从 `HNIEOJ_STATE_DIR/config.yaml` 加载配置，通过 WSS `/ws/judge/node` 领取 Redis Streams 任务并回调后端
 
 首次执行：
 
@@ -209,40 +129,70 @@ bash deploy/scripts/deploy-dev.sh rabbitmq-down
 bash deploy/scripts/deploy-dev.sh gojudge-up
 ```
 
-如果 `/etc/hnieoj/go-judge/config.yaml` 不存在，脚本会从 go-judge 仓库的 `deploy/config.formal.example.yaml` 生成模板并中止。填写以下关键项后重新执行：
+脚本会准备宿主机目录与权限：
+
+- 状态目录 `${HNIEOJ_JUDGE_STATE_HOST_DIR:-/data/oj/judge-node}` 以 `0700` 创建并可写，容器内挂载到 `HNIEOJ_STATE_DIR`（默认 `/var/lib/hnieoj-judge-node`）。节点首次入网在该目录生成 `identity.json`（本地 Ed25519 私钥）并把结果队列持久化到 `results/`。
+- 脚本会在状态目录内非破坏性地预置 `${GOJUDGE_STATE_DIR}/config.yaml`（缺失时创建 0600 空占位，绝不截断既有文件或触碰 `identity.json`/`results`）；它是只读配置 bind 的宿主目标，缺少时 Docker 会把它创建成目录导致节点启动失败。
+- Bootstrap 目录 `${HNIEOJ_JUDGE_BOOTSTRAP_HOST_DIR:-/etc/hnieoj/judge-node}` 由脚本以 `0700` 创建并整目录只读挂载；一次性明文 `bootstrap.token`（0600）由管理员签发后放入目录内，挂载路径与示例 `bootstrap.tokenFile` 一致。已完成注册的节点重启无需新的 Bootstrap。
+- 配置文件 `${GOJUDGE_CONFIG_HOST_FILE:-/etc/hnieoj/go-judge/config.yaml}` 由运维准备并只读挂载到 `/var/lib/hnieoj-judge-node/config.yaml`，即 Agent 的实际读取路径；状态目录本身仍可写。
+
+> 直连 Compose（不经过部署脚本）时，必须先由运维预置上述宿主机路径，否则容器启动会失败：
+>
+> ```bash
+> sudo mkdir -p /data/oj/judge-node /etc/hnieoj/judge-node /data/oj/judge-cache
+> sudo chmod 700 /data/oj/judge-node /etc/hnieoj/judge-node
+> # 仅在缺失时创建 0600 空占位，绝不截断既有 config.yaml 或 identity.json。
+> [[ -f /data/oj/judge-node/config.yaml ]] || { sudo touch /data/oj/judge-node/config.yaml && sudo chmod 600 /data/oj/judge-node/config.yaml; }
+> # 首次入网前再由管理员把一次性明文放到 /etc/hnieoj/judge-node/bootstrap.token 并 chmod 600；
+> # 目录内没有该文件也能启动，已完成注册的节点复用 identity.json 即可。
+> ```
+>
+> 直连 Compose 时通过 `--env-file` 或 shell 环境提供 `HNIEOJ_JUDGE_STATE_HOST_DIR`、`GOJUDGE_CONFIG_HOST_FILE`、
+> `HNIEOJ_JUDGE_BOOTSTRAP_HOST_DIR`、`GOJUDGE_CACHE_DIR`；`deploy/scripts/deploy-dev.sh gojudge-up` 会按
+> “显式环境变量 > `.env` > 默认值”的优先级自动解析并准备这些路径（不会 source `.env`）。
+
+如果 `/etc/hnieoj/go-judge/config.yaml` 不存在，脚本会从 go-judge 仓库的 `deploy/config.formal.example.yaml` 生成模板并中止。该示例同时适用于正式（formal）与临时（temp）节点，官方 `deploy/config.temp.example.yaml` 使用完全相同机制，仅 `node.type: temp` 与 `authorizationUntil` 不同。填写以下关键项后重新执行：
 
 ```yaml
+node:
+  name: judge-node-01
+  type: formal                                   # 临时节点填 temp
+  maxConcurrency: 2
 hnieoj:
-  baseUrl: "http://gateway:8800"
-  formalToken:
-    privateKeyPath: "/etc/hnieoj/judge-security/judge_formal_private.pem"
-    nacos:
-      serverAddr: "http://${NACOS_SERVER_ADDR}"
-      namespace: "dev"
-      group: "HNIEOJ_SECRET_GROUP"
-      dataId: "hnieoj-judge-formal-token.yaml"
-rabbitmq:
-  host: "rabbitmq"
-  password: "填写 RabbitMQ 密码"
+  # 远程后端必须 HTTPS；任务通道由 baseUrl 推导为 wss://host/ws/judge/node，
+  # 节点不跳过证书校验，也不提供 skip-cert 开关。
+  baseUrl: "https://oj.example.com"
+  wssUrl: ""                                     # 任务通道必须 WSS
+  # 必须等于后端 hnieoj.submission.judge.node-security.audience
+  # （环境变量 HNIEOJ_JUDGE_NODE_AUDIENCE，当前默认 hnieoj-judge-node）；
+  # baseUrl / wssUrl / audience 必须与后端入口一起修改，否则 WSS 认证会失败。
+  audience: "hnieoj-judge-node"
+identity:
+  file: "/var/lib/hnieoj-judge-node/identity.json"
+  stateDir: "/var/lib/hnieoj-judge-node"
+bootstrap:
+  # 运维把管理员签发的一次性明文 bootstrap 放到该 0600 文件（所在目录整目录只读挂载）。
+  tokenFile: "/etc/hnieoj/judge-node/bootstrap.token"
+wss:
+  resultQueueDir: "/var/lib/hnieoj-judge-node/results"
+testdata:
+  cacheRoot: "/data/oj/judge-cache"
 gojudge:
+  # 沙箱仅在同网络内可达，不要改为宿主机公网地址。
   endpoint: "http://go-judge-sandbox:5050"
-reporter:
-  mode: "http"
-heartbeat:
-  enabled: true
-  endpoint: "/judge/nodes/heartbeat"
-  interval: "30s"
 ```
 
-正式节点长期 Token 不在配置文件中填写。`hnieoj-judge` 启动后如果数据库中没有 active 正式 Token，会自动生成 Token、保存哈希、使用公钥加密并发布到 Nacos。
+节点不再读取 Nacos，也不再使用共享正式 Token 或 Nacos 下发的密钥。正式与临时节点统一通过 Bootstrap + Ed25519 注册后以 WSS 认证（`/ws/judge/node`），短期 `NODE_ACCESS` 令牌由后端签发并绑定 `nodeId/keyId/accessVersion/sessionEpoch`。管理员可为旧节点生成一次性 Bootstrap 重新入网。
 
-后续需要主动轮换时，管理员调用：
+后续需要主动轮换节点密钥时，节点走签名 HTTPS：
 
 ```http
-POST /api/admin/judge/nodes/formal-token/rotate
+POST /judge/nodes/keys/rotations
+POST /judge/nodes/keys/rotations/{rotationId}/confirm
+GET  /judge/nodes/keys/rotations/{rotationId}
 ```
 
-该接口会随机生成新的正式 Token、保存 SHA-256 摘要、使用公钥加密并发布到 Nacos。go-judge 节点会从 Nacos 读取密文并用本地私钥解密。
+旧共享正式 Token 轮换端点 `/api/admin/judge/nodes/formal-token/rotate` 已退休并显式拒绝。
 
 查看 go-judge：
 
@@ -260,7 +210,7 @@ bash deploy/scripts/deploy-dev.sh gojudge-cache-clean 7
 bash deploy/scripts/deploy-dev.sh gojudge-down
 ```
 
-注意：`gojudge-down` 不会删除 `/data/oj/judge-cache`，因此测试数据缓存会保留。缓存清理策略默认由 Nacos `HNIEOJ_JUDGE_GROUP/hnieoj-judge-node.yaml` 管理；脚本中的 `gojudge-cache-clean` 用于临时手动清理。
+注意：`gojudge-down` 不会删除 `/data/oj/judge-cache` 或状态目录，因此测试数据缓存与节点身份都会保留。缓存清理、心跳间隔等非敏感运行参数由节点本地 `config.yaml` 管理（多判题机各自维护），脚本中的 `gojudge-cache-clean` 仅用于临时手动清理缓存。
 
 ## 快捷命令
 
@@ -289,16 +239,13 @@ bash deploy/scripts/deploy-dev.sh build
 
 # 停止并移除 Compose 容器
 bash deploy/scripts/deploy-dev.sh down
-
-# 启动可选 RabbitMQ 容器
-bash deploy/scripts/deploy-dev.sh rabbitmq-up
 ```
 
-服务名与 `deploy/docker/docker-compose.dev.yml` 中的服务一致，例如 `gateway`、`hnieoj-auth`、`hnieoj-user`、`hnieoj-problem`、`hnieoj-submission`、`hnieoj-judge`。
+服务名与 `deploy/docker/docker-compose.dev.yml` 中的 8 个服务一致：`gateway`、`hnieoj-user`、`hnieoj-problem`、`hnieoj-submission`、`hnieoj-contest`、`hnieoj-training`、`hnieoj-discussion`、`hnieoj-announcement`。`common` 只是公共依赖，不单独启动。
 
 go-judge 节点启用心跳后，会通过内部心跳上报节点运行状态和缓存状态。后台接口 `GET /api/admin/judge/nodes` 可查看 `online`、`runningTasks`、`maxConcurrency`、`cacheUsedBytes`、`cacheProblemCount`、`diskTotalBytes`、`diskFreeBytes` 等字段。缓存统计来自 `GOJUDGE_CACHE_DIR`，默认约 5 分钟采样一次，用于前端展示判题机负载、测试数据缓存占用和磁盘风险。
 
-多判题机部署时，建议把非敏感运行参数放入 Nacos `HNIEOJ_JUDGE_GROUP/hnieoj-judge-node.yaml` 统一管理，例如 `testdata.maxCacheBytes`、`testdata.maxUnusedDuration`、`testdata.cleanupInterval`、`heartbeat.interval`、`rabbitmq.maxRetries`。节点名称、私钥路径、RabbitMQ 密码、临时授权码等仍保留在服务器 `.env` 或 `/etc/hnieoj/go-judge/config.yaml`。
+多判题机部署时，判题节点不再读取 Nacos；每台节点的非敏感运行参数写入本机 `config.yaml` 的 `testdata.maxCacheBytes`、`testdata.maxUnusedDuration`、`testdata.cleanupInterval`、`wss.heartbeatInterval` 等字段，节点名称、`identity.file`、`bootstrap.tokenFile` 也保存在该配置文件与宿主机只读挂载中。需要跨节点统一的值请由运维同步模板后分别下发。
 
 ## 检查命令
 

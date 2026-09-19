@@ -14,20 +14,20 @@ spring:
   cloud:
     gateway:
       routes:
-        - id: hnieoj-auth
-          uri: lb://hnieoj-auth
+        - id: hnieoj-user-auth
+          uri: lb://hnieoj-user
           predicates:
-            # 认证服务路由
+            # 认证服务路由（已合并进 user 服务）
             - Path=/api/auth/**,/api/registrations/**
-        - id: hnieoj-achievement-public
-          uri: lb://hnieoj-achievement
+        - id: hnieoj-user-achievements-public
+          uri: lb://hnieoj-user
           predicates:
-            # 用户成就接口路由
+            # 用户成就接口路由（已合并进 user 服务）
             - Path=/api/users/*/achievements,/api/users/*/achievements/**
-        - id: hnieoj-achievement
-          uri: lb://hnieoj-achievement
+        - id: hnieoj-user-achievements-admin
+          uri: lb://hnieoj-user
           predicates:
-            # 成就管理路由
+            # 成就管理路由（已合并进 user 服务）
             - Path=/api/achievements/**,/api/admin/achievements/**,/api/admin/users/*/achievements,/api/admin/users/*/achievements/**
         - id: hnieoj-user
           uri: lb://hnieoj-user
@@ -49,15 +49,20 @@ spring:
           predicates:
             # 提交判题进度 WebSocket 路由
             - Path=/ws/submissions/**
+        - id: hnieoj-submission-node-ws
+          uri: lb:ws://hnieoj-submission
+          predicates:
+            # 节点协议 WebSocket 路由（应用层 Ed25519 认证，独立于用户 STOMP 通道）
+            - Path=/ws/judge/node
         - id: hnieoj-contest
           uri: lb://hnieoj-contest
           predicates:
             # 竞赛服务路由
             - Path=/api/contests/**,/api/admin/contest,/api/admin/contest/**
-        - id: hnieoj-judge
-          uri: lb://hnieoj-judge
+        - id: hnieoj-submission-judge
+          uri: lb://hnieoj-submission
           predicates:
-            # 系统配置与判题管理路由
+            # 系统配置与判题管理路由（已合并进 submission 服务）
             - Path=/api/system/**,/api/judge/**,/api/admin/config,/api/admin/config/**,/api/admin/judge/**,/judge/nodes/**
         - id: hnieoj-training
           uri: lb://hnieoj-training

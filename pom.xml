@@ -26,15 +26,12 @@
         <module>common</module>
         <module>gateway</module>
         <module>hnieoj-announcement</module>
-        <module>hnieoj-auth</module>
         <module>hnieoj-user</module>
         <module>hnieoj-problem</module>
         <module>hnieoj-submission</module>
-        <module>hnieoj-judge</module>
         <module>hnieoj-contest</module>
         <module>hnieoj-training</module>
         <module>hnieoj-discussion</module>
-        <module>hnieoj-achievement</module>
     </modules>
 
     <!-- ==================== 版本号统一管理 ==================== -->

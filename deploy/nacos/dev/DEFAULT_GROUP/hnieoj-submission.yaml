@@ -9,32 +9,86 @@ spring:
       host: ${hnieoj.redis.host}
       port: ${hnieoj.redis.port}
       password: ${hnieoj.redis.password}
-  rabbitmq:
-    host: ${hnieoj.rabbitmq.host}
-    port: ${hnieoj.rabbitmq.port}
-    username: ${hnieoj.rabbitmq.username}
-    password: ${hnieoj.rabbitmq.password}
-    virtual-host: ${hnieoj.rabbitmq.virtual-host}
-    publisher-confirm-type: correlated
-    publisher-returns: true
-    template:
-      mandatory: true
 
 sa-token:
   is-print: false
 
 hnieoj:
+  # 合并判题域后保留的判题安全参数
   judge:
-    mq:
-      # 判题任务 MQ 命名。生产环境如果多套 HNieOJ 共用同一个 RabbitMQ，请使用独立 vhost 或独立命名前缀。
-      exchange: ${HNIEOJ_JUDGE_MQ_EXCHANGE:hnieoj.judge.exchange}
-      task-queue: ${HNIEOJ_JUDGE_MQ_TASK_QUEUE:hnieoj.judge.task}
-      routing-key: ${HNIEOJ_JUDGE_MQ_ROUTING_KEY:judge.submission.created}
-      spj-routing-key: ${HNIEOJ_JUDGE_MQ_SPJ_ROUTING_KEY:judge.submission.spj}
-      interactive-routing-key: ${HNIEOJ_JUDGE_MQ_INTERACTIVE_ROUTING_KEY:judge.submission.interactive}
-      dead-letter-exchange: ${HNIEOJ_JUDGE_MQ_DLX:hnieoj.judge.dlx}
-      dead-letter-queue: ${HNIEOJ_JUDGE_MQ_DLQ:hnieoj.judge.task.dlq}
-      dead-letter-routing-key: ${HNIEOJ_JUDGE_MQ_DLX_ROUTING_KEY:judge.submission.created.dlq}
+    security:
+      temp-token-ttl-seconds: ${HNIEOJ_JUDGE_TEMP_TOKEN_TTL_SECONDS:7200}
+      auth-code-ttl-seconds: ${HNIEOJ_JUDGE_AUTH_CODE_TTL_SECONDS:1800}
+      auth-code-max-exchange: ${HNIEOJ_JUDGE_AUTH_CODE_MAX_EXCHANGE:1}
+      # 判题节点超过该时间未心跳时视为不可调度，单位秒。
+      node-active-timeout-seconds: ${HNIEOJ_JUDGE_NODE_ACTIVE_TIMEOUT_SECONDS:90}
+    # 节点身份协议 v1（Ed25519）安全参数。
+    # 旧 temp-token-allowed-clock-skew-seconds / temp-token-nonce-ttl-seconds 属于将退休的 bearer-only
+    # 临时令牌协议，不再恢复；对应能力由下列新参数承载，迁移说明见 docs/judge-ops.md。
+    node-security:
+      # 短期 NODE_ACCESS 令牌受众，必须与所有副本一致；判题节点凭该值校验令牌。
+      audience: ${HNIEOJ_JUDGE_NODE_AUDIENCE:hnieoj-judge-node}
+      # NODE_ACCESS 令牌有效期，单位秒；不得超过节点 authorizationUntil / 密钥 grace 截止。
+      access-token-ttl-seconds: ${HNIEOJ_JUDGE_NODE_ACCESS_TOKEN_TTL_SECONDS:900}
+      # NODE_ACCESS 令牌签名密钥，仅从运行时环境/文件注入，不得写入普通 Nacos 配置。
+      access-token-secret: ${HNIEOJ_JUDGE_NODE_ACCESS_TOKEN_SECRET:}
+      # WebSocket 认证挑战 nonce 有效期，单位秒。
+      challenge-ttl-seconds: ${HNIEOJ_JUDGE_NODE_CHALLENGE_TTL_SECONDS:30}
+      # 建连后必须完成认证的截止时间，单位秒。
+      auth-deadline-seconds: ${HNIEOJ_JUDGE_NODE_AUTH_DEADLINE_SECONDS:10}
+      # 入站消息时间戳允许偏差，单位秒（替代旧 allowed-clock-skew 语义）。
+      allowed-clock-skew-seconds: ${HNIEOJ_JUDGE_NODE_ALLOWED_CLOCK_SKEW_SECONDS:30}
+      # 认证挑战 / HTTP 签名 nonce 防重放保留时间，单位秒（替代旧 nonce-ttl 语义）。
+      nonce-ttl-seconds: ${HNIEOJ_JUDGE_NODE_NONCE_TTL_SECONDS:300}
+      # 密钥轮换 pending 状态有效期，单位秒。
+      rotation-pending-ttl-seconds: ${HNIEOJ_JUDGE_NODE_ROTATION_PENDING_TTL_SECONDS:900}
+      # 密钥轮换后旧密钥 grace 期，单位秒。
+      rotation-grace-seconds: ${HNIEOJ_JUDGE_NODE_ROTATION_GRACE_SECONDS:300}
+      # 控制帧最大字节数。
+      max-control-frame-bytes: ${HNIEOJ_JUDGE_NODE_MAX_CONTROL_FRAME_BYTES:65536}
+      # 任务/结果帧最大字节数。
+      max-task-frame-bytes: ${HNIEOJ_JUDGE_NODE_MAX_TASK_FRAME_BYTES:4194304}
+      # 单实例并发节点连接数上限，超过即拒绝新连接。
+      max-connections: ${HNIEOJ_JUDGE_NODE_MAX_CONNECTIONS:512}
+      # 单连接入站消息速率上限与窗口秒数。
+      message-rate-limit: ${HNIEOJ_JUDGE_NODE_MESSAGE_RATE_LIMIT:200}
+      message-rate-window-seconds: ${HNIEOJ_JUDGE_NODE_MESSAGE_RATE_WINDOW_SECONDS:10}
+      # 已认证连接空闲上限秒数。
+      idle-timeout-seconds: ${HNIEOJ_JUDGE_NODE_IDLE_TIMEOUT_SECONDS:120}
+      # 每连接出站写队列容量，写满即关闭连接。
+      writer-queue-capacity: ${HNIEOJ_JUDGE_NODE_WRITER_QUEUE_CAPACITY:64}
+    # 旧 formal-token（RSA + Nacos 密钥下发）配置已退休：正式/临时节点统一走 Bootstrap + Ed25519，
+    # 不再通过 Nacos 分发任何节点凭据或公钥。
+    # 判题任务 Redis Streams 分发参数（替代已退休的 RabbitMQ）。
+    stream:
+      # default 模式固定 Stream key，节点不得自行指定。
+      default-stream-key: ${HNIEOJ_JUDGE_STREAM_DEFAULT:hnieoj:judge:task:default}
+      # spj 模式固定 Stream key。
+      spj-stream-key: ${HNIEOJ_JUDGE_STREAM_SPJ:hnieoj:judge:task:spj}
+      # interactive 模式固定 Stream key。
+      interactive-stream-key: ${HNIEOJ_JUDGE_STREAM_INTERACTIVE:hnieoj:judge:task:interactive}
+      # 网关侧消费组名，必须所有副本一致。
+      consumer-group: ${HNIEOJ_JUDGE_STREAM_GROUP:hnieoj-judge-gateway}
+      # 单次 claim 为跳过错配消息最多重复的轮数。
+      claim-max-rounds: ${HNIEOJ_JUDGE_STREAM_CLAIM_MAX_ROUNDS:4}
+      # 单次租约时长，单位秒。
+      lease-seconds: ${HNIEOJ_JUDGE_STREAM_LEASE_SECONDS:60}
+      # 距离租约到期多久提示节点续期，单位毫秒；必须小于 lease-seconds*1000。
+      renew-after-millis: ${HNIEOJ_JUDGE_STREAM_RENEW_AFTER_MILLIS:20000}
+      # 单次执行硬截止时间，单位秒；到期后不得再续租。
+      execution-deadline-seconds: ${HNIEOJ_JUDGE_STREAM_EXECUTION_DEADLINE_SECONDS:7200}
+      # 单次任务最大实际领取执行次数，超出置 SYSTEM_ERROR。
+      max-attempt-count: ${HNIEOJ_JUDGE_STREAM_MAX_ATTEMPT_COUNT:3}
+      # PEL 孤儿回收的最小空闲时间，单位毫秒。
+      orphan-pending-min-idle-millis: ${HNIEOJ_JUDGE_STREAM_ORPHAN_MIN_IDLE_MILLIS:300000}
+      # 单轮回收/清理处理的条目上限。
+      recovery-batch-size: ${HNIEOJ_JUDGE_STREAM_RECOVERY_BATCH_SIZE:100}
+      # 单轮回收处理的最大活跃租约任务数。
+      recovery-lease-batch-size: ${HNIEOJ_JUDGE_STREAM_RECOVERY_LEASE_BATCH_SIZE:50}
+      # Redis 丢消息/清空后 queued 无租约的补偿判定阈值，单位秒。
+      stranded-queued-seconds: ${HNIEOJ_JUDGE_STREAM_STRANDED_QUEUED_SECONDS:3600}
+      # 恢复扫描间隔，单位毫秒。
+      recovery-scan-interval-ms: ${HNIEOJ_JUDGE_STREAM_RECOVERY_SCAN_INTERVAL_MS:60000}
   submission:
     # 单次提交代码最大字节数，按 UTF-8 编码计算。
     max-code-bytes: ${HNIEOJ_SUBMISSION_MAX_CODE_BYTES:65536}
@@ -68,7 +122,7 @@ hnieoj:
       pending-timeout-seconds: ${HNIEOJ_JUDGE_PENDING_TIMEOUT_SECONDS:1800}
       # Compiling/Running 状态超时时间，单位秒。
       active-timeout-seconds: ${HNIEOJ_JUDGE_ACTIVE_TIMEOUT_SECONDS:1800}
-      # 已投递到 RabbitMQ 但仍 Pending 的告警阈值，单位秒；不会直接终态化任务。
+      # 已投递到 Redis Streams 但仍 Pending 的告警阈值，单位秒；不会直接终态化任务。
       sent-pending-warn-seconds: ${HNIEOJ_JUDGE_SENT_PENDING_WARN_SECONDS:3600}
     rejudge-task:
       # 批量重判任务扫描间隔，单位毫秒。

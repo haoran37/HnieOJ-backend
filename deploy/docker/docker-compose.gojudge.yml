@@ -6,14 +6,18 @@ services:
       dockerfile: Dockerfile.hnieoj
     restart: unless-stopped
     privileged: true
+    # 上游沙箱在 Docker 默认 private cgroup namespace 下会取不到 cgroup path（cgroup path empty），
+    # 实测需使用宿主机 cgroup namespace；该参数需在支持 cgroup v2 的 Linux + Docker 上验证。
+    cgroup: host
     shm_size: ${GOJUDGE_SHM_SIZE:-512m}
     command:
       - /usr/local/bin/go-judge
       - -http-addr=:5050
       - -mount-conf=/opt/go-judge/mount.yaml
-    ports:
-      # go-judge 沙箱 HTTP 端口通常只供后端或判题节点访问；生产环境请配合防火墙限制来源。
-      - "${GOJUDGE_PUBLIC_PORT:-5050}:5050"
+    expose:
+      # 判题节点通过 hnieoj-backend 内部网络访问 http://go-judge-sandbox:5050。
+      # 沙箱 HTTP 端口不对宿主机或公网发布，判题 API 不对外暴露。
+      - "5050"
     networks:
       - hnieoj-backend
 
@@ -21,23 +25,25 @@ services:
     image: ${GOJUDGE_IMAGE:-hnieoj/go-judge:dev}
     restart: unless-stopped
     environment:
-      HNIEOJ_FORMAL_PRIVATE_KEY_PATH: ${HNIEOJ_JUDGE_FORMAL_TOKEN_PRIVATE_KEY_PATH:-/etc/hnieoj/judge-security/judge_formal_private.pem}
-      HNIEOJ_NACOS_SERVER_ADDR: ${NACOS_SERVER_ADDR:?NACOS_SERVER_ADDR is required}
-      HNIEOJ_NACOS_NAMESPACE: ${NACOS_NAMESPACE:?NACOS_NAMESPACE is required}
-      HNIEOJ_FORMAL_TOKEN_NACOS_GROUP: ${HNIEOJ_JUDGE_FORMAL_TOKEN_NACOS_GROUP:-HNIEOJ_SECRET_GROUP}
-      HNIEOJ_FORMAL_TOKEN_NACOS_DATA_ID: ${HNIEOJ_JUDGE_FORMAL_TOKEN_NACOS_DATA_ID:-hnieoj-judge-formal-token.yaml}
-      HNIEOJ_REMOTE_CONFIG_ENABLED: ${HNIEOJ_JUDGE_NODE_REMOTE_CONFIG_ENABLED:-true}
-      HNIEOJ_REMOTE_CONFIG_NACOS_SERVER_ADDR: ${NACOS_SERVER_ADDR:?NACOS_SERVER_ADDR is required}
-      HNIEOJ_REMOTE_CONFIG_NACOS_NAMESPACE: ${NACOS_NAMESPACE:?NACOS_NAMESPACE is required}
-      HNIEOJ_REMOTE_CONFIG_NACOS_GROUP: ${HNIEOJ_JUDGE_NODE_NACOS_GROUP:-HNIEOJ_JUDGE_GROUP}
-      HNIEOJ_REMOTE_CONFIG_NACOS_DATA_ID: ${HNIEOJ_JUDGE_NODE_NACOS_DATA_ID:-hnieoj-judge-node.yaml}
+      # Agent 只从 HNIEOJ_STATE_DIR/config.yaml 加载配置，不再解析 -config 参数，也不读取 Nacos。
+      HNIEOJ_STATE_DIR: ${HNIEOJ_JUDGE_STATE_DIR:-/var/lib/hnieoj-judge-node}
+      # 与示例 config.formal.example.yaml / config.temp.example.yaml 的 bootstrap.tokenFile 一致。
+      HNIEOJ_BOOTSTRAP_TOKEN_FILE: ${HNIEOJ_JUDGE_BOOTSTRAP_TOKEN_FILE:-/etc/hnieoj/judge-node/bootstrap.token}
     command:
       - /usr/local/bin/hnieoj-judge-node
-      - -config
-      - /etc/hnieoj/go-judge/config.yaml
     volumes:
-      - ${GOJUDGE_CONFIG_HOST_FILE:-/etc/hnieoj/go-judge/config.yaml}:/etc/hnieoj/go-judge/config.yaml:ro
-      - ${HNIEOJ_JUDGE_SECURITY_HOST_DIR:-/etc/hnieoj/judge-security}:/etc/hnieoj/judge-security:ro
+      # 状态目录必须可写：identity.json（本地 Ed25519 私钥）、config.yaml、results/ 均持久化于此。
+      # 该目录既不能只读，也不能挂入 go-judge-sandbox。
+      # 直连 Compose 前必须先在宿主机预置 ${HNIEOJ_JUDGE_STATE_HOST_DIR:-/data/oj/judge-node}/config.yaml
+      # 常规文件（0600），否则嵌套的 config.yaml 只读 bind 会在状态目录里被创建为目录，导致容器启动失败。
+      - ${HNIEOJ_JUDGE_STATE_HOST_DIR:-/data/oj/judge-node}:${HNIEOJ_JUDGE_STATE_DIR:-/var/lib/hnieoj-judge-node}
+      # 配置文件受控只读挂载，但必须位于 Agent 的实际读取路径 ${HNIEOJ_STATE_DIR}/config.yaml。
+      - ${GOJUDGE_CONFIG_HOST_FILE:-/etc/hnieoj/go-judge/config.yaml}:${HNIEOJ_JUDGE_STATE_DIR:-/var/lib/hnieoj-judge-node}/config.yaml:ro
+      # Bootstrap 以只读目录挂载：目录内可有可无 bootstrap.token，缺失时 Compose 不会在宿主机误建目录。
+      # 宿主机目录 0700、明文文件 bootstrap.token 0600；服务端只原子消费 DB 中的 Bootstrap 记录，
+      # 节点 Agent 会尝试删除本地明文并在只读挂载失败时告警；
+      # 注册成功后由运维在宿主机删除该文件；已注册节点重启用持久化 identity 即可，无需 Bootstrap。
+      - ${HNIEOJ_JUDGE_BOOTSTRAP_HOST_DIR:-/etc/hnieoj/judge-node}:${HNIEOJ_JUDGE_BOOTSTRAP_DIR:-/etc/hnieoj/judge-node}:ro
       - ${GOJUDGE_CACHE_DIR:-/data/oj/judge-cache}:/data/oj/judge-cache
     networks:
       - hnieoj-backend

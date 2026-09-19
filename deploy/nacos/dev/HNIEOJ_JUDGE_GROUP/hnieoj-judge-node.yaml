@@ -1,18 +1,10 @@
 # HnieOJ 判题节点运行配置
 # 只放非敏感、可多节点统一调整的配置。
-# 不要在这里放 RabbitMQ 密码、正式节点私钥路径、临时授权码、节点名称等节点私有或敏感配置。
+# 不要在这里放节点私钥、Bootstrap 明文、临时授权码、节点名称等节点私有或敏感配置。
 
 node:
   # 单个判题节点最大并发任务数；也可以用环境变量 HNIEOJ_NODE_MAX_CONCURRENCY 按节点覆盖。
   maxConcurrency: 2
-
-rabbitmq:
-  # RabbitMQ 消费预取数量，通常与 maxConcurrency 保持一致。
-  prefetch: 2
-  # 单条判题任务消费失败后的最大重试次数。
-  maxRetries: 3
-  # 判题任务重试退避时间。
-  retryBackoff: "10s"
 
 testdata:
   # 测试数据缓存最大占用字节数，0 表示不按容量清理。默认 20GB。

@@ -1,0 +1,38 @@
+# 合并上下文启动测试使用哑元基础设施配置，不连接真实 MySQL/Redis。
+spring:
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    # 显式短超时 + Druid 有界等待，避免哑元端口不可达时无限阻塞启动线程。
+    url: jdbc:mysql://127.0.0.1:13306/hnieoj_judge_db?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&connectTimeout=2000&socketTimeout=3000
+    username: root
+    password: ""
+    druid:
+      max-wait: 2000
+      connect-timeout: 2000
+      break-after-acquire-failure: true
+  data:
+    redis:
+      host: 127.0.0.1
+      port: 16379
+      password: ""
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+
+sa-token:
+  token-name: Authorization
+  token-prefix: Bearer
+
+hnieoj:
+  judge:
+    security:
+      # 合并上下文启动测试用的占位密钥，需满足 JudgeSecurityConfigValidator 的 32 位下限
+      jwt-secret: test_judge_jwt_secret_value_1234567890
+      node-active-timeout-seconds: 90
+    node-security:
+      # 上下文启动测试用的占位密钥，需满足 NodeSecurityConfigValidator 的 32 位下限
+      access-token-secret: test_node_access_token_secret_1234567890
+      audience: hnieoj-judge-node
+    formal-token:
+      public-key-path: /tmp/hnieoj-test/judge_formal_public.pem

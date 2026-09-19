@@ -1,0 +1,15 @@
+spring:
+  application:
+    name: hnieoj-submission
+  profiles:
+    active: test
+  cloud:
+    # 合并上下文测试不访问远程 Nacos，也不注册到服务发现
+    nacos:
+      enabled: false
+      discovery:
+        enabled: false
+      config:
+        enabled: false
+    discovery:
+      enabled: false

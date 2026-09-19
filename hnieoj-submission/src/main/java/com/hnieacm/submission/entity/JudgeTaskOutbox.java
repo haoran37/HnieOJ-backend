@@ -35,6 +35,14 @@ public class JudgeTaskOutbox {
     @TableField("routing_key")
     private String routingKey;
 
+    /** Redis Streams 固定 Stream key；遗留 exchange_name/routing_key 仅满足 NOT NULL 约束。 */
+    @TableField("stream_key")
+    private String streamKey;
+
+    /** XADD 返回的消息 ID，用于终态原子 ACK+XDEL。 */
+    @TableField("stream_id")
+    private String streamId;
+
     private String payload;
 
     private String status;

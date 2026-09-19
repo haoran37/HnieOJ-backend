@@ -18,6 +18,9 @@ public class JudgeResultEventRequest {
 
     private String judgeTaskId;
 
+    /** 当前执行尝试 ID，用于所有权/会话纪元 fencing；终态事件必填。 */
+    private String attemptId;
+
     private Integer status;
 
     private String statusText;

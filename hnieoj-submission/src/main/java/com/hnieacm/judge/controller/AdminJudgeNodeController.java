@@ -5,13 +5,18 @@ import cn.dev33.satoken.annotation.SaMode;
 import com.hnieacm.common.constant.RoleConstant;
 import com.hnieacm.common.result.Result;
 import com.hnieacm.judge.dto.CreateJudgeAuthCodeRequest;
+import com.hnieacm.judge.dto.CreateNodeBootstrapRequest;
+import com.hnieacm.judge.dto.UpdateNodePolicyRequest;
 import com.hnieacm.judge.service.FormalJudgeTokenService;
+import com.hnieacm.judge.service.JudgeNodeLifecycleService;
 import com.hnieacm.judge.service.JudgeNodeOpsService;
 import com.hnieacm.judge.service.JudgeNodeSecurityService;
+import com.hnieacm.judge.service.NodeIdentityService;
 import com.hnieacm.judge.vo.JudgeAuthCodeVo;
 import com.hnieacm.judge.vo.JudgeFormalTokenVo;
 import com.hnieacm.judge.vo.JudgeNodeOpsSummaryVo;
 import com.hnieacm.judge.vo.JudgeNodeTokenVo;
+import com.hnieacm.judge.vo.NodeBootstrapVo;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -43,6 +48,14 @@ public class AdminJudgeNodeController {
     private final JudgeNodeSecurityService judgeNodeSecurityService;
     private final FormalJudgeTokenService formalJudgeTokenService;
     private final JudgeNodeOpsService judgeNodeOpsService;
+    private final NodeIdentityService nodeIdentityService;
+    private final JudgeNodeLifecycleService judgeNodeLifecycleService;
+
+    @Operation(summary = "创建节点 Bootstrap 一次性凭据")
+    @PostMapping("/bootstrap-tokens")
+    public Result<NodeBootstrapVo> createBootstrapToken(@Valid @RequestBody CreateNodeBootstrapRequest request) {
+        return Result.success(nodeIdentityService.createBootstrap(request));
+    }
 
     @Operation(summary = "创建临时判题节点授权码")
     @PostMapping("/auth-codes")
@@ -73,6 +86,31 @@ public class AdminJudgeNodeController {
     public Result<Void> revokeToken(@PathVariable String tokenId) {
         judgeNodeSecurityService.revokeToken(tokenId);
         return Result.success("吊销成功", null);
+    }
+
+    @Operation(summary = "排空判题节点（停止新任务，保留在途续租/结果）")
+    @PostMapping("/tokens/{tokenId}/drain")
+    public Result<JudgeNodeTokenVo> drainNode(@PathVariable String tokenId) {
+        return Result.success(judgeNodeLifecycleService.drain(tokenId));
+    }
+
+    @Operation(summary = "禁用判题节点（提升访问版本并推送状态/取消）")
+    @PostMapping("/tokens/{tokenId}/disable")
+    public Result<JudgeNodeTokenVo> disableNode(@PathVariable String tokenId) {
+        return Result.success(judgeNodeLifecycleService.disable(tokenId));
+    }
+
+    @Operation(summary = "启用判题节点（吊销/硬到期节点不可复活）")
+    @PostMapping("/tokens/{tokenId}/enable")
+    public Result<JudgeNodeTokenVo> enableNode(@PathVariable String tokenId) {
+        return Result.success(judgeNodeLifecycleService.enable(tokenId));
+    }
+
+    @Operation(summary = "更新判题节点模式/额度/权重/授权截止")
+    @PostMapping("/tokens/{tokenId}/policy")
+    public Result<JudgeNodeTokenVo> updateNodePolicy(@PathVariable String tokenId,
+                                                   @Valid @RequestBody UpdateNodePolicyRequest request) {
+        return Result.success(judgeNodeLifecycleService.updatePolicy(tokenId, request));
     }
 
     @Operation(summary = "轮换正式判题节点长期 Token")

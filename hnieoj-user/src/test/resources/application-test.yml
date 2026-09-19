@@ -1,0 +1,26 @@
+# 合并上下文启动测试使用哑元基础设施配置，不连接真实 MySQL/Redis。
+spring:
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    # 显式短超时 + Druid 有界等待，避免哑元端口不可达时无限阻塞。
+    url: jdbc:mysql://127.0.0.1:13306/hnieoj_user_db?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai&connectTimeout=2000&socketTimeout=3000
+    username: root
+    password: ""
+    druid:
+      max-wait: 2000
+      connect-timeout: 2000
+      break-after-acquire-failure: true
+  data:
+    redis:
+      host: 127.0.0.1
+      port: 16379
+      password: ""
+
+mybatis-plus:
+  mapper-locations: classpath*:/mapper/**/*.xml
+  configuration:
+    map-underscore-to-camel-case: true
+
+sa-token:
+  token-name: Authorization
+  token-prefix: Bearer

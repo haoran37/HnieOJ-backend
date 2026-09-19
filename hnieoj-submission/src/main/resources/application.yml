@@ -6,6 +6,26 @@ sa-token:
   token-name: Authorization
   token-prefix: Bearer
 
+hnieoj:
+  judge:
+    security:
+      # 合并判题域后保留的正式节点 JWT 密钥环境变量入口
+      jwt-secret: ${HNIEOJ_JUDGE_JWT_SECRET:replace_me}
+      node-active-timeout-seconds: ${HNIEOJ_JUDGE_NODE_ACTIVE_TIMEOUT_SECONDS:90}
+    # 节点身份协议 v1（Ed25519）本地默认值；Nacos 覆盖为环境变量映射。
+    node-security:
+      audience: ${HNIEOJ_JUDGE_NODE_AUDIENCE:hnieoj-judge-node}
+      access-token-secret: ${HNIEOJ_JUDGE_NODE_ACCESS_TOKEN_SECRET:replace_me}
+      access-token-ttl-seconds: ${HNIEOJ_JUDGE_NODE_ACCESS_TOKEN_TTL_SECONDS:900}
+      challenge-ttl-seconds: ${HNIEOJ_JUDGE_NODE_CHALLENGE_TTL_SECONDS:30}
+      auth-deadline-seconds: ${HNIEOJ_JUDGE_NODE_AUTH_DEADLINE_SECONDS:10}
+      allowed-clock-skew-seconds: ${HNIEOJ_JUDGE_NODE_ALLOWED_CLOCK_SKEW_SECONDS:30}
+      nonce-ttl-seconds: ${HNIEOJ_JUDGE_NODE_NONCE_TTL_SECONDS:300}
+      rotation-pending-ttl-seconds: ${HNIEOJ_JUDGE_NODE_ROTATION_PENDING_TTL_SECONDS:900}
+      rotation-grace-seconds: ${HNIEOJ_JUDGE_NODE_ROTATION_GRACE_SECONDS:300}
+      max-control-frame-bytes: ${HNIEOJ_JUDGE_NODE_MAX_CONTROL_FRAME_BYTES:65536}
+      max-task-frame-bytes: ${HNIEOJ_JUDGE_NODE_MAX_TASK_FRAME_BYTES:4194304}
+
 management:
   endpoints:
     web:

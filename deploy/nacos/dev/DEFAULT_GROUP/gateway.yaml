@@ -32,13 +32,18 @@ spring:
         - id: hnieoj-user
           uri: lb://hnieoj-user
           predicates:
-            # 用户服务路由 + 学院班级路由
-            - Path=/api/user/**,/api/users/**,/api/colleges/**,/api/classes/**,/api/admin/permission/**,/api/admin/users/**
+            # 用户服务路由 + 学院班级路由 + 定向通知/身份资料变更审核路由
+            - Path=/api/user/**,/api/users/**,/api/colleges/**,/api/classes/**,/api/admin/permission/**,/api/admin/users/**,/api/admin/notices,/api/admin/notices/**,/api/admin/profile-change-requests,/api/admin/profile-change-requests/**
         - id: hnieoj-problem
           uri: lb://hnieoj-problem
           predicates:
-            # 题目服务路由
-            - Path=/api/problems/**,/api/admin/problem/**,/judge/problems/**
+            # 题目服务路由 + 标签目录/标签管理路由
+            - Path=/api/problems/**,/api/admin/problem/**,/api/tags,/api/admin/tags/**,/judge/problems/**
+        - id: hnieoj-problem-images
+          uri: lb://hnieoj-problem
+          predicates:
+            # 题面图片读取路由（仅默认相对 imageUrlPrefix=/oj/images 时生效）
+            - Path=/oj/images/**
         - id: hnieoj-submission
           uri: lb://hnieoj-submission
           predicates:

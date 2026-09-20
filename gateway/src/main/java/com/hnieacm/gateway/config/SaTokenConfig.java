@@ -5,7 +5,9 @@ import cn.dev33.satoken.exception.NotLoginException;
 import cn.dev33.satoken.exception.NotPermissionException;
 import cn.dev33.satoken.exception.NotRoleException;
 import cn.dev33.satoken.exception.SaTokenException;
+import cn.dev33.satoken.reactor.context.SaReactorSyncHolder;
 import cn.dev33.satoken.reactor.filter.SaReactorFilter;
+import cn.dev33.satoken.router.SaHttpMethod;
 import cn.dev33.satoken.router.SaRouter;
 import cn.dev33.satoken.stp.StpUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -16,6 +18,8 @@ import com.hnieacm.common.result.ResultCode;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.MediaType;
+import org.springframework.web.server.ServerWebExchange;
 
 /**
  * @Author: HaoRan_Lyu
@@ -25,6 +29,27 @@ import org.springframework.context.annotation.Configuration;
 @Slf4j
 @Configuration
 public class SaTokenConfig {
+
+    /**
+     * 注册页面所需的基础数据选项：仅精确放行以下 GET 路径，游客可访问。
+     * 不放开任意学院子路径或写方法，教师/助教查询（/api/classes/{id}/teachers、/tas）仍需登录。
+     */
+    private static final String[] REGISTRATION_BASE_DATA_GET_PATHS = {
+            "/api/colleges",
+            "/api/colleges/*/grades",
+            "/api/colleges/*/grades/*/classes"
+    };
+
+    /**
+     * 题面图片读取：仅精确放行 GET /oj/images/{id}/{filename}（两段路径），游客可访问。
+     * 其余写方法、更深子路径（如 testdata）仍需登录，避免暴露题目答案。
+     */
+    private static final String[] PROBLEM_IMAGE_GET_PATHS = {"/oj/images/*/*"};
+
+    private static final SaHttpMethod[] GET_METHOD = {SaHttpMethod.GET};
+    private static final SaHttpMethod[] POST_METHOD = {SaHttpMethod.POST};
+    private static final SaHttpMethod[] PUT_METHOD = {SaHttpMethod.PUT};
+    private static final SaHttpMethod[] DELETE_METHOD = {SaHttpMethod.DELETE};
 
     @Bean
     public SaReactorFilter saReactorFilter(ObjectMapper objectMapper) {
@@ -59,6 +84,12 @@ public class SaTokenConfig {
                                     "/judge/tasks/**",
                                     "/ws/submissions/**"
                             )
+                            // 注册基础数据选项：仅 GET 精确路径放行，其余方法与子路径仍需登录
+                            .notMatch(r -> SaRouter.isMatchCurrMethod(GET_METHOD)
+                                    && SaRouter.isMatchCurrURI(REGISTRATION_BASE_DATA_GET_PATHS))
+                            // 题面图片读取：仅 GET 两段路径放行，testdata 等更深子路径仍需登录
+                            .notMatch(r -> SaRouter.isMatchCurrMethod(GET_METHOD)
+                                    && SaRouter.isMatchCurrURI(PROBLEM_IMAGE_GET_PATHS))
                             .check(r -> {
                                 StpUtil.checkLogin();
                                 // 滑动过期：在每个经过身份验证的请求上续订令牌/会话TTL
@@ -71,10 +102,39 @@ public class SaTokenConfig {
                     // 角色校验
                     SaRouter.match("/api/admin/**", r -> StpUtil.checkRoleOr(RoleConstant.ADMIN, RoleConstant.ROOT));
 
+                    // 注册审核接口：hnieoj-user 未启用 SaInterceptor，网关按 Controller 已声明的 ADMIN/ROOT 补齐校验
+                    SaRouter.match("/api/registrations", "/api/registrations/**")
+                            .check(r -> StpUtil.checkRoleOr(RoleConstant.ADMIN, RoleConstant.ROOT));
+
                     // 题目管理权限校验
                     SaRouter.match("/api/problem/add", r -> StpUtil.checkPermission(PermissionConstant.PROBLEM_CREATE));
                     SaRouter.match("/api/problem/edit/**", r -> StpUtil.checkPermission(PermissionConstant.PROBLEM_UPDATE));
                     SaRouter.match("/api/problem/delete/**", r -> StpUtil.checkPermission(PermissionConstant.PROBLEM_DELETE));
+
+                    // 管理端题目详情读取：hnieoj-problem 未注册 SaInterceptor，Controller 注解不会生效。
+                    // 网关按 Controller 声明的 PROBLEM_UPDATE 补齐校验，仅覆盖 GET /api/admin/problem/{id}
+                    // （排除已有的 /api/admin/problem/list），不改动其它管理题目路由。
+                    SaRouter.match("/api/admin/problem/*", r -> {
+                        if (SaRouter.isMatchCurrMethod(GET_METHOD)
+                                && !SaRouter.isMatchCurrURI("/api/admin/problem/list")) {
+                            StpUtil.checkPermission(PermissionConstant.PROBLEM_UPDATE);
+                        }
+                    });
+
+                    // 标签管理写入：hnieoj-problem 未注册 SaInterceptor，Controller 注解不会生效。
+                    // 网关按 Controller 声明的 PROBLEM_CREATE/UPDATE/DELETE 补齐校验，角色仍由 /api/admin/** 规则保证。
+                    SaRouter.match("/api/admin/tags", r -> {
+                        if (SaRouter.isMatchCurrMethod(POST_METHOD)) {
+                            StpUtil.checkPermission(PermissionConstant.PROBLEM_CREATE);
+                        }
+                    });
+                    SaRouter.match("/api/admin/tags/*", r -> {
+                        if (SaRouter.isMatchCurrMethod(PUT_METHOD)) {
+                            StpUtil.checkPermission(PermissionConstant.PROBLEM_UPDATE);
+                        } else if (SaRouter.isMatchCurrMethod(DELETE_METHOD)) {
+                            StpUtil.checkPermission(PermissionConstant.PROBLEM_DELETE);
+                        }
+                    });
 
                     // 用户管理权限校验；成就接口已合并进 user 服务，保留原有例外规则
                     SaRouter.match("/api/users/**")
@@ -108,6 +168,16 @@ public class SaTokenConfig {
                         result = Result.error(ResultCode.INTERNAL_ERROR, "权限数据加载失败，请稍后重试");
                     } else {
                         result = Result.error(ResultCode.UNAUTHORIZED, "认证失败");
+                    }
+
+                    // SaReactorFilter 随后通过 SaReactorOperateUtil.writeResult 写出字符串，
+                    // 其仅在响应尚未设置 Content-Type 时补默认 text/plain;charset=utf-8。
+                    // 这里先显式设置为 application/json，确保前端 download helper 能把 401/403
+                    // 业务错误按 JSON 解析，而不是当作可下载文件保存。该回调在 filter()
+                    // 清除上下文之前执行，可安全取回当前 exchange。
+                    ServerWebExchange exchange = SaReactorSyncHolder.getExchange();
+                    if (exchange != null) {
+                        exchange.getResponse().getHeaders().setContentType(MediaType.APPLICATION_JSON);
                     }
 
                     try {

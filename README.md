@@ -213,6 +213,21 @@ bash deploy/scripts/deploy-dev.sh gojudge-up
 - [ ] 支持多判题机负载均衡（节点管理、健康检查、故障摘除）
 - [ ] 补齐判题链路集成测试与回归测试
 
+## 附录：文件链路新增 API（本次变更）
+
+以下为本次文件链路补齐新增的对外接口；原 117 项接口保持不变。
+
+| 方法 | 路径 | 鉴权 | 说明 |
+| --- | --- | --- | --- |
+| GET | `/oj/images/{id}/{filename}` | 匿名（仅 GET 两段路径） | 读取题面图片，返回图片 MIME 与 `X-Content-Type-Options: nosniff`；拒绝路径分隔符、`..`、非图片后缀，不暴露 `testdata` |
+| GET | `/api/admin/achievements/{id}/file` | 管理员 / root | 按申请 ID 读取本地成就附件，返回 `application/octet-stream` 与安全的 `attachment` 文件名；外部 HTTP(S) 附件由前端直接打开，服务端不代理 |
+
+同时包含的边界变更：
+
+- 网关新增路由 `hnieoj-problem-images`（`/oj/images/**` -> `lb://hnieoj-problem`），仅默认相对 `imageUrlPrefix=/oj/images` 时生效；自定义外部 HTTP(S) 前缀仍由外部托管。
+- 网关为 `/api/registrations` 与 `/api/registrations/**` 补齐 ADMIN/ROOT 角色校验（原 Controller 注解在 user 服务未生效）。
+- `AchievementApplyAdminVo` 增加 `description`、`fileUrl`：本地存储的 `fileUrl` 输出受保护下载接口，外部 HTTP(S) 地址原样返回，不改变数据库持久值。
+
 ## 贡献说明
 
 欢迎提交 Issue / PR。  

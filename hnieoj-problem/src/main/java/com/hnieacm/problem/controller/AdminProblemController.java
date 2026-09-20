@@ -1,6 +1,7 @@
 package com.hnieacm.problem.controller;
 
 import cn.dev33.satoken.annotation.SaCheckPermission;
+import cn.dev33.satoken.stp.StpUtil;
 import com.hnieacm.common.constant.PermissionConstant;
 import com.hnieacm.common.dto.PageVo;
 import com.hnieacm.common.result.Result;
@@ -10,6 +11,7 @@ import com.hnieacm.problem.dto.UpdateProblemAuthRequest;
 import com.hnieacm.problem.dto.UpdateProblemRequest;
 import com.hnieacm.problem.service.AdminProblemService;
 import com.hnieacm.problem.service.ProblemResourceService;
+import com.hnieacm.problem.vo.AdminProblemDetailVo;
 import com.hnieacm.problem.vo.AdminProblemListVo;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -44,6 +46,16 @@ public class AdminProblemController {
                                                    @RequestParam(required = false) String keyword,
                                                    @RequestParam(required = false) Integer auth) {
         return Result.success(adminProblemService.listProblems(page, pageSize, keyword, auth));
+    }
+
+    @Operation(summary = "获取题目编辑详情")
+    @SaCheckPermission(PermissionConstant.PROBLEM_UPDATE)
+    @GetMapping("/{id}")
+    public Result<AdminProblemDetailVo> detail(@PathVariable @Min(value = 1, message = "id 必须大于 0") Long id) {
+        // hnieoj-problem 未注册 SaInterceptor，注解不会生效；此处显式执行权限校验，
+        // 确保与网关精准规则一致地拒绝缺少 problem:update 的低权限管理员。
+        StpUtil.checkPermission(PermissionConstant.PROBLEM_UPDATE);
+        return Result.success(adminProblemService.getProblemDetail(id));
     }
 
     @Operation(summary = "添加题目")

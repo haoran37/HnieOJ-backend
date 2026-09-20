@@ -4,12 +4,14 @@ import cn.dev33.satoken.stp.StpUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hnieacm.common.dto.PageVo;
 import com.hnieacm.common.exception.BizException;
 import com.hnieacm.common.result.ResultCode;
 import com.hnieacm.problem.constant.ProblemAuthConstant;
 import com.hnieacm.problem.dto.AddProblemRequest;
+import com.hnieacm.problem.dto.ProblemExampleRequest;
 import com.hnieacm.problem.dto.ProblemRequest;
 import com.hnieacm.problem.dto.UpdateProblemAuthRequest;
 import com.hnieacm.problem.dto.UpdateProblemRequest;
@@ -20,6 +22,7 @@ import com.hnieacm.problem.mapper.TagMapper;
 import com.hnieacm.problem.properties.ProblemJudgeAssetProperties;
 import com.hnieacm.problem.service.AdminProblemService;
 import com.hnieacm.problem.service.ProblemFileStorageService;
+import com.hnieacm.problem.vo.AdminProblemDetailVo;
 import com.hnieacm.problem.vo.AdminProblemListVo;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -114,6 +117,87 @@ public class AdminProblemServiceImpl implements AdminProblemService {
         }).toList();
 
         return new PageVo<>(list, pageResult.total());
+    }
+
+    /**
+     * @MethodName getProblemDetail
+     * @Param id
+     * @Description 管理端题目完整编辑详情：返回全部可编辑字段（含 SPJ/交互题配置）与标签
+     * @Return @return {@link AdminProblemDetailVo }
+     * @Author HaoRan_Lyu
+     * @Date 2026/09/20
+     */
+    @Override
+    public AdminProblemDetailVo getProblemDetail(Long id) {
+        if (id == null) {
+            throw new BizException(ResultCode.BAD_REQUEST, "id不能为空");
+        }
+
+        Problem problem = problemMapper.selectById(id);
+        if (problem == null) {
+            throw new BizException(ResultCode.PROBLEM_NOT_FOUND, "题目不存在");
+        }
+
+        AdminProblemDetailVo vo = new AdminProblemDetailVo();
+        vo.setProblem(toProblemRequest(problem));
+        Map<Long, List<String>> tagsMap = ProblemServiceSupport.queryTagsMap(
+                problemTagMapper, tagMapper, List.of(id)
+        );
+        vo.setTags(tagsMap.getOrDefault(id, Collections.emptyList()));
+        return vo;
+    }
+
+    private ProblemRequest toProblemRequest(Problem problem) {
+        ProblemRequest pr = new ProblemRequest();
+        pr.setId(problem.getId());
+        pr.setProblemCode(problem.getProblemCode());
+        pr.setTitle(problem.getTitle());
+        pr.setAuthor(problem.getAuthor());
+        pr.setType(problem.getType());
+        pr.setJudgeMode(problem.getJudgeMode());
+        pr.setTimeLimit(problem.getTimeLimit());
+        pr.setMemoryLimit(problem.getMemoryLimit());
+        pr.setStackLimit(problem.getStackLimit());
+        pr.setDescription(problem.getDescription());
+        pr.setInput(problem.getInput());
+        pr.setOutput(problem.getOutput());
+        pr.setExamples(parseExamples(problem.getExamples()));
+        pr.setHint(problem.getHint());
+        pr.setDifficulty(problem.getDifficulty());
+        pr.setAuth(problem.getAuth());
+        pr.setIoScore(problem.getIoScore());
+        pr.setIsRemote(problem.getIsRemote());
+        pr.setSource(problem.getSource());
+        pr.setSpjCode(problem.getSpjCode());
+        pr.setSpjLanguage(problem.getSpjLanguage());
+        pr.setSpjTimeLimit(problem.getSpjTimeLimit());
+        pr.setSpjMemoryLimit(problem.getSpjMemoryLimit());
+        pr.setSpjStackLimit(problem.getSpjStackLimit());
+        pr.setSpjOutputLimit(problem.getSpjOutputLimit());
+        pr.setSpjProtocol(problem.getSpjProtocol());
+        pr.setInteractorCode(problem.getInteractorCode());
+        pr.setInteractorLanguage(problem.getInteractorLanguage());
+        pr.setInteractorTimeLimit(problem.getInteractorTimeLimit());
+        pr.setInteractorMemoryLimit(problem.getInteractorMemoryLimit());
+        pr.setInteractorStackLimit(problem.getInteractorStackLimit());
+        pr.setInteractorOutputLimit(problem.getInteractorOutputLimit());
+        pr.setInteractorProtocol(problem.getInteractorProtocol());
+        pr.setIsRemoveEndBlank(problem.getIsRemoveEndBlank());
+        pr.setOpenCaseResult(problem.getOpenCaseResult());
+        return pr;
+    }
+
+    private List<ProblemExampleRequest> parseExamples(String json) {
+        if (StrUtil.isBlank(json)) {
+            return Collections.emptyList();
+        }
+        try {
+            List<ProblemExampleRequest> examples = objectMapper.readValue(json, new TypeReference<>() {
+            });
+            return examples == null ? Collections.emptyList() : examples;
+        } catch (Exception e) {
+            throw new BizException(ResultCode.INTERNAL_ERROR, "examples数据格式不正确");
+        }
     }
 
     /**

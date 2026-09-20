@@ -3,6 +3,7 @@ package com.hnieacm.problem.controller;
 import cn.dev33.satoken.annotation.SaCheckLogin;
 import cn.dev33.satoken.annotation.SaCheckRole;
 import cn.dev33.satoken.annotation.SaMode;
+import cn.dev33.satoken.stp.StpUtil;
 import com.hnieacm.common.constant.RoleConstant;
 import com.hnieacm.common.dto.PageVo;
 import com.hnieacm.common.exception.BizException;
@@ -16,6 +17,7 @@ import com.hnieacm.problem.vo.ProblemListVo;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
@@ -63,6 +65,20 @@ public class ProblemController {
     @GetMapping("/{problemCode}")
     public Result<ProblemDetailVo> detail(@PathVariable String problemCode) {
         return Result.success(problemQueryService.getProblemDetail(problemCode));
+    }
+
+    @Operation(summary = "获取推荐题目")
+    @SaCheckLogin
+    @GetMapping("/{problemCode}/recommendations")
+    public Result<List<ProblemListVo>> recommendations(
+            @PathVariable String problemCode,
+            @RequestParam(defaultValue = "5")
+            @Min(value = 1, message = "limit 必须大于等于 1")
+            @Max(value = 10, message = "limit 不能超过 10") int limit) {
+        // hnieoj-problem 未注册 SaInterceptor，@SaCheckLogin 注解不会生效；
+        // 推荐接口显式校验登录，避免匿名绕过网关后直连服务读取公开题推荐。
+        StpUtil.checkLogin();
+        return Result.success(problemQueryService.getRecommendations(problemCode, limit));
     }
 
     @Operation(summary = "下载全部测试数据")

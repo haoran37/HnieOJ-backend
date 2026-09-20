@@ -1,11 +1,9 @@
 package com.hnieacm.problem.service.impl;
 
-import cn.dev33.satoken.stp.StpUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.hnieacm.common.constant.PermissionConstant;
 import com.hnieacm.common.dto.PageVo;
 import com.hnieacm.common.exception.BizException;
 import com.hnieacm.common.result.ResultCode;
@@ -40,6 +38,8 @@ import java.util.Objects;
 @Service
 @RequiredArgsConstructor
 public class ProblemQueryServiceImpl implements ProblemQueryService {
+
+    private static final int MAX_RECOMMEND_LIMIT = 10;
 
     private final ProblemMapper problemMapper;
     private final ProblemTagMapper problemTagMapper;
@@ -115,20 +115,62 @@ public class ProblemQueryServiceImpl implements ProblemQueryService {
         List<Problem> records = pageResult.records();
         Map<Long, List<String>> tagsMap = pageResult.tagsMap();
 
-        List<ProblemListVo> list = records.stream().map(problem -> {
-            ProblemListVo vo = new ProblemListVo();
-            vo.setId(problem.getId());
-            vo.setProblemCode(problem.getProblemCode());
-            vo.setTitle(problem.getTitle());
-            vo.setDifficulty(problem.getDifficulty());
-            vo.setTags(tagsMap.getOrDefault(problem.getId(), Collections.emptyList()));
-            vo.setSubmissionCount(problem.getSubmissionCount());
-            vo.setAcceptedCount(problem.getAcceptedCount());
-            vo.setScorePercentage(problem.getScorePercentage());
-            return vo;
-        }).toList();
+        List<ProblemListVo> list = records.stream()
+                .map(problem -> toListVo(problem, tagsMap))
+                .toList();
 
         return new PageVo<>(list, pageResult.total());
+    }
+
+    /**
+     * @MethodName getRecommendations
+     * @Param problemCode
+     * @Param limit
+     * @Description 推荐题目：源题先按既有详情可见性校验，候选仅公开、排除源题，
+     * 由 SQL 完成标签重合/难度距离排序与 limit 截断，Java 仅组装展示对象。
+     * @Return @return {@link List }<{@link ProblemListVo }>
+     * @Author HaoRan_Lyu
+     * @Date 2026/09/20
+     */
+    @Override
+    public List<ProblemListVo> getRecommendations(String problemCode, int limit) {
+        if (limit <= 0 || limit > MAX_RECOMMEND_LIMIT) {
+            throw new BizException(ResultCode.BAD_REQUEST, "limit 必须为 1 到 " + MAX_RECOMMEND_LIMIT);
+        }
+
+        Problem source = ProblemServiceSupport.queryProblemByCode(problemMapper, problemCode);
+        ProblemServiceSupport.requireAccessible(source);
+
+        List<Problem> candidates = problemMapper.selectRecommendations(
+                source.getId(), ProblemAuthConstant.PUBLIC, source.getDifficulty(), limit
+        );
+        if (candidates == null || candidates.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        List<Long> candidateIds = candidates.stream()
+                .map(Problem::getId)
+                .filter(Objects::nonNull)
+                .toList();
+        Map<Long, List<String>> tagsMap = ProblemServiceSupport.queryTagsMap(
+                problemTagMapper, tagMapper, candidateIds
+        );
+        return candidates.stream()
+                .map(problem -> toListVo(problem, tagsMap))
+                .toList();
+    }
+
+    private ProblemListVo toListVo(Problem problem, Map<Long, List<String>> tagsMap) {
+        ProblemListVo vo = new ProblemListVo();
+        vo.setId(problem.getId());
+        vo.setProblemCode(problem.getProblemCode());
+        vo.setTitle(problem.getTitle());
+        vo.setDifficulty(problem.getDifficulty());
+        vo.setTags(tagsMap.getOrDefault(problem.getId(), Collections.emptyList()));
+        vo.setSubmissionCount(problem.getSubmissionCount());
+        vo.setAcceptedCount(problem.getAcceptedCount());
+        vo.setScorePercentage(problem.getScorePercentage());
+        return vo;
     }
 
     /**
@@ -142,12 +184,7 @@ public class ProblemQueryServiceImpl implements ProblemQueryService {
     @Override
     public ProblemDetailVo getProblemDetail(String problemCode) {
         Problem problem = ProblemServiceSupport.queryProblemByCode(problemMapper, problemCode);
-
-        if (problem.getAuth() == null || problem.getAuth() != ProblemAuthConstant.PUBLIC) {
-            if (!StpUtil.hasPermission(PermissionConstant.PROBLEM_UPDATE)) {
-                throw new BizException(ResultCode.FORBIDDEN, "该题目当前不可访问");
-            }
-        }
+        ProblemServiceSupport.requireAccessible(problem);
 
         ProblemDetailVo vo = new ProblemDetailVo();
         vo.setId(problem.getId());

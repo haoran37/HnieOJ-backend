@@ -4,6 +4,7 @@ import com.hnieacm.common.dto.PageVo;
 import com.hnieacm.problem.dto.AddProblemRequest;
 import com.hnieacm.problem.dto.UpdateProblemAuthRequest;
 import com.hnieacm.problem.dto.UpdateProblemRequest;
+import com.hnieacm.problem.vo.AdminProblemDetailVo;
 import com.hnieacm.problem.vo.AdminProblemListVo;
 
 /**
@@ -14,6 +15,8 @@ import com.hnieacm.problem.vo.AdminProblemListVo;
 public interface AdminProblemService {
 
     PageVo<AdminProblemListVo> listProblems(int page, int pageSize, String keyword, Integer auth);
+
+    AdminProblemDetailVo getProblemDetail(Long id);
 
     void addProblem(AddProblemRequest request);
 

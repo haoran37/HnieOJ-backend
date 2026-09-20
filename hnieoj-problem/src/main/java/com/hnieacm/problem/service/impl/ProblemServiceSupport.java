@@ -1,10 +1,13 @@
 package com.hnieacm.problem.service.impl;
 
+import cn.dev33.satoken.stp.StpUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.hnieacm.common.constant.PermissionConstant;
 import com.hnieacm.common.exception.BizException;
 import com.hnieacm.common.result.ResultCode;
+import com.hnieacm.problem.constant.ProblemAuthConstant;
 import com.hnieacm.problem.entity.Problem;
 import com.hnieacm.problem.entity.ProblemTag;
 import com.hnieacm.problem.entity.Tag;
@@ -68,6 +71,25 @@ public final class ProblemServiceSupport {
             throw new BizException(ResultCode.PROBLEM_NOT_FOUND, "题目不存在");
         }
         return problem;
+    }
+
+    /**
+     * @MethodName requireAccessible
+     * @Param problem
+     * @Description 按既有详情可见性规则校验题目：非公开题目仅拥有 problem:update 权限者可见
+     * @Return
+     * @Author HaoRan_Lyu
+     * @Date 2026/09/20
+     */
+    public static void requireAccessible(Problem problem) {
+        if (problem == null) {
+            throw new BizException(ResultCode.PROBLEM_NOT_FOUND, "题目不存在");
+        }
+        if (problem.getAuth() == null || problem.getAuth() != ProblemAuthConstant.PUBLIC) {
+            if (!StpUtil.hasPermission(PermissionConstant.PROBLEM_UPDATE)) {
+                throw new BizException(ResultCode.FORBIDDEN, "该题目当前不可访问");
+            }
+        }
     }
 
     /**
@@ -244,7 +266,11 @@ public final class ProblemServiceSupport {
      * @Date 2026/02/21
      */
     private static Map<String, Long> ensureTags(TagMapper tagMapper, List<String> names) {
-        List<Tag> existed = tagMapper.selectList(new LambdaQueryWrapper<Tag>().in(Tag::getName, names));
+        // 事务内对已存在的 tag 行加锁（FOR UPDATE），与 TagServiceImpl.deleteTag 使用同一把行锁，
+        // 保证“删除标签”和“题目维护标签关联”不会交错产生悬挂的 problem_tag 引用。
+        List<Tag> existed = tagMapper.selectList(
+                new LambdaQueryWrapper<Tag>().in(Tag::getName, names).last("FOR UPDATE")
+        );
         Map<String, Long> nameToId = existed == null ? new HashMap<>() : existed.stream()
                 .filter(t -> StrUtil.isNotBlank(t.getName()) && t.getId() != null)
                 .collect(Collectors.toMap(Tag::getName, Tag::getId, (a, b) -> a, HashMap::new));

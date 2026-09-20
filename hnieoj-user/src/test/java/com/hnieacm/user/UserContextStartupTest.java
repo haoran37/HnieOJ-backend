@@ -73,6 +73,10 @@ class UserContextStartupTest {
                 "com.hnieacm.achievement.controller.UserAchievementController",
                 "com.hnieacm.user.controller.UserManageController",
                 "com.hnieacm.user.controller.UserProfileController",
+                "com.hnieacm.user.controller.UserMessageController",
+                "com.hnieacm.user.controller.ProfileChangeController",
+                "com.hnieacm.user.controller.AdminNoticeController",
+                "com.hnieacm.user.controller.AdminProfileChangeController",
                 "com.hnieacm.user.controller.UserLookupController",
                 "com.hnieacm.user.controller.InternalUserLookupController",
                 "com.hnieacm.user.controller.AdminPermissionController",
@@ -98,6 +102,13 @@ class UserContextStartupTest {
                 "/api/users/{uid}/achievements",
                 "/api/admin/users/{uid}/achievements",
                 "/api/user/profile",
+                "/api/user/password",
+                "/api/user/messages",
+                "/api/user/messages/unread-count",
+                "/api/user/profile-change-requests",
+                "/api/admin/notices",
+                "/api/admin/notices/{id}/publish",
+                "/api/admin/profile-change-requests",
                 "/api/users",
                 "/api/admin/permission/users",
                 "/internal/users/basic-info"
@@ -117,7 +128,10 @@ class UserContextStartupTest {
                 RolePermissionMapper.class,
                 UserRegisterApplyMapper.class,
                 AchievementApplyMapper.class,
-                UserAchievementMapper.class
+                UserAchievementMapper.class,
+                com.hnieacm.user.mapper.UserNoticeMapper.class,
+                com.hnieacm.user.mapper.UserMessageMapper.class,
+                com.hnieacm.user.mapper.UserProfileChangeMapper.class
         );
         for (Class<?> mapper : mappers) {
             assertThat(applicationContext.getBeansOfType(mapper))

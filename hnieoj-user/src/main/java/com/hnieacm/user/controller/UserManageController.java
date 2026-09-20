@@ -13,7 +13,13 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.core.io.Resource;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -33,7 +39,25 @@ import org.springframework.web.bind.annotation.RestController;
 @SaCheckPermission(PermissionConstant.USER_MANAGE)
 public class UserManageController {
 
+    private static final String IMPORT_TEMPLATE_PATH = "templates/user-import-template.xlsx";
+
+    private static final String IMPORT_TEMPLATE_FILENAME = "user-import-template.xlsx";
+
+    private static final MediaType IMPORT_TEMPLATE_MEDIA_TYPE =
+            MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+
     private final UserManageService userManageService;
+
+    @Operation(summary = "下载用户导入模板")
+    @GetMapping("/import/template")
+    public ResponseEntity<Resource> downloadImportTemplate() {
+        Resource template = new ClassPathResource(IMPORT_TEMPLATE_PATH);
+        return ResponseEntity.ok()
+                .contentType(IMPORT_TEMPLATE_MEDIA_TYPE)
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=\"" + IMPORT_TEMPLATE_FILENAME + "\"")
+                .body(template);
+    }
 
     @Operation(summary = "创建用户")
     @PostMapping

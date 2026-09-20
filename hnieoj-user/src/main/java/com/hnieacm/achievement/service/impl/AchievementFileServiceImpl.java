@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Locale;
@@ -29,6 +30,10 @@ public class AchievementFileServiceImpl implements AchievementFileService {
 
     //TODO: 使用 nacos 管理配置
     private static final long MAX_FILE_SIZE_BYTES = 10L * 1024 * 1024;
+
+    private static final String HTTP_PREFIX = "http://";
+
+    private static final String HTTPS_PREFIX = "https://";
 
     private final AchievementFileProperties achievementFileProperties;
 
@@ -81,6 +86,42 @@ public class AchievementFileServiceImpl implements AchievementFileService {
             return prefix + key;
         }
         return prefix + "/" + key;
+    }
+
+    /**
+     * @MethodName loadLocal
+     * @Param storedValue
+     * @Description 读取本地附件：仅接受相对 key，拒绝外部 URL 与任何路径穿越，规范化后必须位于 upload-dir 内
+     * @Return @return {@link LocalFile }
+     * @Author HaoRan_Lyu
+     * @Date 2026/09/20
+     */
+    @Override
+    public LocalFile loadLocal(String storedValue) {
+        String key = StrUtil.trimToNull(storedValue);
+        if (key == null) {
+            throw new BizException(ResultCode.NOT_FOUND, "附件不存在");
+        }
+        String lowerKey = key.toLowerCase(Locale.ROOT);
+        if (lowerKey.startsWith(HTTP_PREFIX) || lowerKey.startsWith(HTTPS_PREFIX)) {
+            // 外部 URL 由前端直接打开，服务端不做任意地址代理下载
+            throw new BizException(ResultCode.BAD_REQUEST, "外部附件地址无需服务端下载");
+        }
+        if (key.contains("/") || key.contains("\\") || key.contains("..")) {
+            throw new BizException(ResultCode.BAD_REQUEST, "附件路径不合法");
+        }
+
+        Path uploadRoot = Path.of(resolveUploadDir()).toAbsolutePath().normalize();
+        Path target = uploadRoot.resolve(key).normalize();
+        if (!target.startsWith(uploadRoot) || !Files.isRegularFile(target)) {
+            throw new BizException(ResultCode.NOT_FOUND, "附件不存在");
+        }
+        try {
+            return new LocalFile(Files.readAllBytes(target), target.getFileName().toString());
+        } catch (IOException e) {
+            log.error("Load achievement file failed, key: {}", key, e);
+            throw new BizException(ResultCode.INTERNAL_ERROR, "读取附件失败");
+        }
     }
 
     /**

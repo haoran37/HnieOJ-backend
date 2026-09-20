@@ -29,7 +29,6 @@ import java.util.List;
 @RestController
 @RequestMapping("/api")
 @RequiredArgsConstructor
-@SaCheckLogin
 public class BaseDataController {
 
     private final BaseDataService baseDataService;
@@ -54,12 +53,14 @@ public class BaseDataController {
     }
 
     @Operation(summary = "获取班级老师列表")
+    @SaCheckLogin
     @GetMapping("/classes/{id}/teachers")
     public Result<List<ClassTeacherVo>> listTeachers(@PathVariable("id") @Min(value = 1, message = "id 必须>=1") Long classId) {
         return Result.success(baseDataService.listTeachers(classId));
     }
 
     @Operation(summary = "获取班级助教列表")
+    @SaCheckLogin
     @GetMapping("/classes/{id}/tas")
     public Result<List<ClassTaVo>> listTas(@PathVariable("id") @Min(value = 1, message = "id 必须>=1") Long classId) {
         return Result.success(baseDataService.listTas(classId));

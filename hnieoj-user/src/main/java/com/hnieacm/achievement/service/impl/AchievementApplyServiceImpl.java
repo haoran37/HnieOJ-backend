@@ -25,6 +25,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
 import java.util.Collections;
+import java.util.Locale;
 
 /**
  * @Author: HaoRan_Lyu
@@ -35,6 +36,16 @@ import java.util.Collections;
 @Service
 @RequiredArgsConstructor
 public class AchievementApplyServiceImpl implements AchievementApplyService {
+
+    private static final String ADMIN_FILE_DOWNLOAD_PATH = "/api/admin/achievements/";
+
+    private static final String ADMIN_FILE_DOWNLOAD_SUFFIX = "/file";
+
+    private static final String HTTP_PREFIX = "http://";
+
+    private static final String HTTPS_PREFIX = "https://";
+
+    private static final String OCTET_STREAM = "application/octet-stream";
 
     private final AchievementApplyMapper achievementApplyMapper;
     private final UserAchievementMapper userAchievementMapper;
@@ -103,7 +114,30 @@ public class AchievementApplyServiceImpl implements AchievementApplyService {
         if (result.getRecords().isEmpty()) {
             return new PageVo<>(Collections.emptyList(), result.getTotal());
         }
+        result.getRecords().forEach(this::applyAdminFileUrl);
         return new PageVo<>(result.getRecords(), result.getTotal());
+    }
+
+    /**
+     * @MethodName applyAdminFileUrl
+     * @Param vo
+     * @Description 内存转换附件地址：外部 HTTP(S) 原样返回，本地 key 改为受保护的下载接口
+     * @Return
+     * @Author HaoRan_Lyu
+     * @Date 2026/09/20
+     */
+    private void applyAdminFileUrl(AchievementApplyAdminVo vo) {
+        String rawFileUrl = StrUtil.trimToNull(vo.getFileUrl());
+        if (rawFileUrl == null) {
+            vo.setFileUrl(null);
+            return;
+        }
+        String lowerFileUrl = rawFileUrl.toLowerCase(Locale.ROOT);
+        if (lowerFileUrl.startsWith(HTTP_PREFIX) || lowerFileUrl.startsWith(HTTPS_PREFIX)) {
+            vo.setFileUrl(rawFileUrl);
+            return;
+        }
+        vo.setFileUrl(ADMIN_FILE_DOWNLOAD_PATH + vo.getId() + ADMIN_FILE_DOWNLOAD_SUFFIX);
     }
 
     /**
@@ -189,6 +223,27 @@ public class AchievementApplyServiceImpl implements AchievementApplyService {
         achievementApplyMapper.updateById(apply);
 
         log.info("Achievement apply rejected, id: {}, uid: {}", id, apply.getUid());
+    }
+
+    /**
+     * @MethodName downloadFile
+     * @Param id
+     * @Description 按申请 ID 读取本地附件，避免使用客户端 filename 直接访问文件系统
+     * @Return @return {@link AchievementFileDownload }
+     * @Author HaoRan_Lyu
+     * @Date 2026/09/20
+     */
+    @Override
+    public AchievementFileDownload downloadFile(Long id) {
+        if (id == null || id <= 0) {
+            throw new BizException(ResultCode.BAD_REQUEST, "id 不合法");
+        }
+        AchievementApply apply = achievementApplyMapper.selectById(id);
+        if (apply == null) {
+            throw new BizException(ResultCode.NOT_FOUND, "申请不存在");
+        }
+        AchievementFileService.LocalFile localFile = achievementFileService.loadLocal(apply.getFileUrl());
+        return new AchievementFileDownload(localFile.content(), localFile.filename(), OCTET_STREAM);
     }
 
     /**

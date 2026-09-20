@@ -11,6 +11,8 @@
         COALESCE(NULLIF(TRIM(ui.realname), ''), NULLIF(TRIM(ui.username), ''), aa.uid) AS username,
         aa.title AS title,
         aa.status AS status,
+        aa.description AS description,
+        aa.file_url AS fileUrl,
         (UNIX_TIMESTAMP(aa.gmt_create) * 1000) AS submitTime
         FROM achievement_apply aa
         LEFT JOIN user_info ui ON ui.uid = aa.uid

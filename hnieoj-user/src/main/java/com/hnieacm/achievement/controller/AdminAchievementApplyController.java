@@ -13,6 +13,9 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -59,5 +62,23 @@ public class AdminAchievementApplyController {
     public Result<Void> reject(@PathVariable Long id, @Valid @RequestBody RejectAchievementApplyRequest request) {
         achievementApplyService.reject(id, request.getReason());
         return Result.success("操作成功", null);
+    }
+
+    @Operation(summary = "下载成就认证申请附件")
+    @GetMapping("/{id}/file")
+    public ResponseEntity<byte[]> downloadFile(@PathVariable Long id) {
+        AchievementApplyService.AchievementFileDownload file = achievementApplyService.downloadFile(id);
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .header(HttpHeaders.CONTENT_DISPOSITION, buildAttachmentHeader(file.filename()))
+                .header("X-Content-Type-Options", "nosniff")
+                .body(file.content());
+    }
+
+    private String buildAttachmentHeader(String filename) {
+        String safeFilename = (filename == null || filename.isBlank())
+                ? "attachment"
+                : filename.replaceAll("[\\r\\n\"\\\\]", "_");
+        return "attachment; filename=\"" + safeFilename + "\"";
     }
 }

@@ -25,6 +25,16 @@ public class AchievementApplyAdminVo {
     private String status;
 
     /**
+     * 申请说明（原始 description）
+     */
+    private String description;
+
+    /**
+     * 附件地址：本地存储时输出受保护的下载接口，外部存储时输出原 HTTP(S) 地址
+     */
+    private String fileUrl;
+
+    /**
      * 提交时间（毫秒级时间戳）
      */
     private Long submitTime;

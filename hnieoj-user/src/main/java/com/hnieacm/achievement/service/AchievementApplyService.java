@@ -30,4 +30,15 @@ public interface AchievementApplyService {
      * 驳回成就认证申请
      */
     void reject(Long id, String reason);
+
+    /**
+     * 按申请 ID 读取本地附件（仅管理员/root 经网关访问）
+     */
+    AchievementFileDownload downloadFile(Long id);
+
+    /**
+     * 附件下载内容与安全文件名
+     */
+    record AchievementFileDownload(byte[] content, String filename, String contentType) {
+    }
 }

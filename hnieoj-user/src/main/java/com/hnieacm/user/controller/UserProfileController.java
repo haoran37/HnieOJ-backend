@@ -1,8 +1,11 @@
 package com.hnieacm.user.controller;
 
 import cn.dev33.satoken.annotation.SaCheckLogin;
+import cn.dev33.satoken.stp.StpUtil;
 import com.hnieacm.common.dto.PageVo;
 import com.hnieacm.common.result.Result;
+import com.hnieacm.user.dto.UpdatePasswordRequest;
+import com.hnieacm.user.dto.UpdateUserProfileRequest;
 import com.hnieacm.user.service.UserManageService;
 import com.hnieacm.user.service.UserProfileService;
 import com.hnieacm.user.vo.UserDetailVo;
@@ -10,11 +13,14 @@ import com.hnieacm.user.vo.UserListVo;
 import com.hnieacm.user.vo.UserProfileVo;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -38,7 +44,27 @@ public class UserProfileController {
     @SaCheckLogin
     @GetMapping("/profile")
     public Result<UserProfileVo> getProfile() {
-        return Result.success(userProfileService.getCurrentUserProfile());
+        // hnieoj-user 未注册 SaInterceptor，@SaCheckLogin 不会生效；显式取服务端登录态 uid。
+        String uid = StpUtil.getLoginIdAsString();
+        return Result.success(userProfileService.getCurrentUserProfile(uid));
+    }
+
+    @Operation(summary = "本人自助修改资料")
+    @SaCheckLogin
+    @PutMapping("/profile")
+    public Result<Void> updateProfile(@Valid @RequestBody UpdateUserProfileRequest request) {
+        String uid = StpUtil.getLoginIdAsString();
+        userProfileService.updateCurrentUserProfile(uid, request);
+        return Result.success("修改成功", null);
+    }
+
+    @Operation(summary = "本人自助修改密码")
+    @SaCheckLogin
+    @PutMapping("/password")
+    public Result<Void> updatePassword(@Valid @RequestBody UpdatePasswordRequest request) {
+        String uid = StpUtil.getLoginIdAsString();
+        userProfileService.updatePassword(uid, request);
+        return Result.success("密码修改成功", null);
     }
 
     @Operation(summary = "获取用户列表（分页）")

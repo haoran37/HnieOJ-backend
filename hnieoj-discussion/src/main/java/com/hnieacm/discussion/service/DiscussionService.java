@@ -5,6 +5,7 @@ import com.hnieacm.discussion.dto.AdminUpdateDiscussionRequest;
 import com.hnieacm.discussion.dto.CreateDiscussionAnswerRequest;
 import com.hnieacm.discussion.dto.CreateDiscussionCommentRequest;
 import com.hnieacm.discussion.dto.CreateDiscussionRequest;
+import com.hnieacm.discussion.vo.AdminDiscussionDetailVo;
 import com.hnieacm.discussion.vo.AdminDiscussionListVo;
 import com.hnieacm.discussion.vo.DiscussionCreateVo;
 import com.hnieacm.discussion.vo.DiscussionDetailVo;
@@ -35,6 +36,8 @@ public interface DiscussionService {
     List<DiscussionRelatedVo> listRelatedDiscussions(String problemCode, Integer limit);
 
     PageVo<AdminDiscussionListVo> listAdminDiscussions(int page, int pageSize, String keyword, String category, Integer status);
+
+    AdminDiscussionDetailVo getAdminDiscussionDetail(Long discussionId);
 
     void updateDiscussionByAdmin(Long discussionId, AdminUpdateDiscussionRequest request);
 

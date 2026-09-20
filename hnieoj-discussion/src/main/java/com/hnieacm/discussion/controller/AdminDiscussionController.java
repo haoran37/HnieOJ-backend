@@ -1,10 +1,13 @@
 package com.hnieacm.discussion.controller;
 
 import cn.dev33.satoken.annotation.SaCheckLogin;
+import cn.dev33.satoken.stp.StpUtil;
+import com.hnieacm.common.constant.RoleConstant;
 import com.hnieacm.common.dto.PageVo;
 import com.hnieacm.common.result.Result;
 import com.hnieacm.discussion.dto.AdminUpdateDiscussionRequest;
 import com.hnieacm.discussion.service.DiscussionService;
+import com.hnieacm.discussion.vo.AdminDiscussionDetailVo;
 import com.hnieacm.discussion.vo.AdminDiscussionListVo;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -45,6 +48,16 @@ public class AdminDiscussionController {
             @RequestParam(required = false) String category,
             @RequestParam(required = false) Integer status) {
         return Result.success(discussionService.listAdminDiscussions(page, pageSize, keyword, category, status));
+    }
+
+    @Operation(summary = "获取讨论详情（管理端）")
+    @GetMapping("/{id}")
+    public Result<AdminDiscussionDetailVo> detail(
+            @PathVariable("id") @Min(value = 1, message = "id 必须大于等于 1") Long discussionId) {
+        // hnieoj-discussion 未注册 SaInterceptor，注解不会生效；此处显式执行角色校验，
+        // 确保与网关 /api/admin/** 的 ADMIN/ROOT 规则一致。
+        StpUtil.checkRoleOr(RoleConstant.ADMIN, RoleConstant.ROOT);
+        return Result.success(discussionService.getAdminDiscussionDetail(discussionId));
     }
 
     @Operation(summary = "编辑讨论")

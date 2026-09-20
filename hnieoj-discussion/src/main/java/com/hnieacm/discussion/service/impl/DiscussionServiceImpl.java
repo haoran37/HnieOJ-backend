@@ -28,6 +28,7 @@ import com.hnieacm.discussion.mapper.DiscussionCommentMapper;
 import com.hnieacm.discussion.mapper.DiscussionLikeMapper;
 import com.hnieacm.discussion.mapper.DiscussionMapper;
 import com.hnieacm.discussion.service.DiscussionService;
+import com.hnieacm.discussion.vo.AdminDiscussionDetailVo;
 import com.hnieacm.discussion.vo.AdminDiscussionListVo;
 import com.hnieacm.discussion.vo.DiscussionAnswerVo;
 import com.hnieacm.discussion.vo.DiscussionCommentVo;
@@ -444,6 +445,28 @@ public class DiscussionServiceImpl implements DiscussionService {
                 .map(post -> toAdminDiscussionListVo(post, answerCountMap.getOrDefault(post.getId(), 0L)))
                 .toList();
         return new PageVo<>(list, pageResult.getTotal());
+    }
+
+    /**
+     * @MethodName getAdminDiscussionDetail
+     * @Param discussionId
+     * @Description 管理端获取讨论完整详情（关闭/正常状态均返回真实正文与状态，不增加浏览量）
+     * @Return @return {@link AdminDiscussionDetailVo }
+     * @Author HaoRan_Lyu
+     * @Date 2026/09/20
+     */
+    @Override
+    public AdminDiscussionDetailVo getAdminDiscussionDetail(Long discussionId) {
+        Discussion post = queryDiscussionById(discussionId);
+        AdminDiscussionDetailVo vo = new AdminDiscussionDetailVo();
+        vo.setId(post.getId());
+        vo.setTitle(post.getTitle());
+        vo.setCategory(post.getCategory());
+        vo.setProblemCode(post.getProblemCode());
+        vo.setContent(post.getContent());
+        vo.setStatus(post.getStatus());
+        vo.setIsTop(post.getTopPriority() != null && post.getTopPriority() > 0);
+        return vo;
     }
 
     /**

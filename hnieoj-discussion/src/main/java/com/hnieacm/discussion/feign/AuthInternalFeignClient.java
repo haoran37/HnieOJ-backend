@@ -1,0 +1,18 @@
+package com.hnieacm.discussion.feign;
+
+import com.hnieacm.common.result.Result;
+import org.springframework.cloud.openfeign.FeignClient;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+
+/**
+ * @Author: HaoRan_Lyu
+ * @Date: 2026/09/20
+ * @Description: Auth 服务内部接口
+ */
+@FeignClient(name = "hnieoj-user", contextId = "authInternalFeignClient")
+public interface AuthInternalFeignClient {
+
+    @PostMapping("/internal/auth/cache/refresh/{uid}")
+    Result<Void> refreshUserAuthCache(@PathVariable String uid);
+}

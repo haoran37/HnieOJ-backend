@@ -17,6 +17,11 @@ public interface ProblemFileStorageService {
 
     String saveImage(Long problemId, MultipartFile file);
 
+    /**
+     * 读取题面图片（root/{problemId}/images/{filename} 单文件）
+     */
+    ProblemImageContent readImage(Long problemId, String filename);
+
     void deleteImage(Long problemId, String filename);
 
     void validateTestdata(MultipartFile file);
@@ -30,4 +35,10 @@ public interface ProblemFileStorageService {
     boolean hasAvailableTestdata(Long problemId);
 
     int countAvailableTestdataCases(Long problemId);
+
+    /**
+     * 题面图片内容与响应 MIME
+     */
+    record ProblemImageContent(byte[] content, String contentType) {
+    }
 }

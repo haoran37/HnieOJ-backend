@@ -29,6 +29,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
@@ -54,6 +55,21 @@ public class ProblemFileStorageServiceImpl implements ProblemFileStorageService 
     private static final String TESTDATA_OUT_SUFFIX = ".out";
     private static final int BUFFER_SIZE = 8192;
     private static final int IMAGE_FILENAME_GENERATE_MAX_RETRY = 10;
+
+    /**
+     * 允许读取的图片后缀与响应 MIME，仅按扩展名白名单，避免读取 testdata 等非图片文件。
+     * 不包含 svg，避免用户上传内容以可执行 HTML/脚本形式在浏览器内联执行。
+     */
+    private static final Map<String, String> IMAGE_CONTENT_TYPES = Map.of(
+            "png", "image/png",
+            "jpg", "image/jpeg",
+            "jpeg", "image/jpeg",
+            "gif", "image/gif",
+            "webp", "image/webp",
+            "bmp", "image/bmp",
+            "avif", "image/avif",
+            "ico", "image/x-icon"
+    );
 
     private final ProblemStorageProperties storageProperties;
 
@@ -160,6 +176,42 @@ public class ProblemFileStorageServiceImpl implements ProblemFileStorageService 
         String extension = StringUtils.getFilenameExtension(originalFilename);
         String suffix = StrUtil.isBlank(extension) ? "" : "." + extension.toLowerCase();
         return UUID.randomUUID().toString().replace("-", "").toUpperCase() + suffix;
+    }
+
+    /**
+     * @MethodName readImage
+     * @Param problemId
+     * @Param filename
+     * @Description 读取题面图片：只允许 root/{id}/images 下的单文件，拒绝路径分隔符、.. 与非图片后缀
+     * @Return @return {@link ProblemImageContent }
+     * @Author HaoRan_Lyu
+     * @Date 2026/09/20
+     */
+    @Override
+    public ProblemImageContent readImage(Long problemId, String filename) {
+        if (filename == null || filename.contains("/") || filename.contains("\\") || filename.contains("..")) {
+            throw new BizException(ResultCode.BAD_REQUEST, "文件名不合法");
+        }
+        String normalizedFilename = normalizeFilename(filename);
+        if (!normalizedFilename.equals(filename)) {
+            throw new BizException(ResultCode.BAD_REQUEST, "文件名不合法");
+        }
+        String extension = StringUtils.getFilenameExtension(normalizedFilename);
+        String contentType = extension == null ? null : IMAGE_CONTENT_TYPES.get(extension.toLowerCase(Locale.ROOT));
+        if (contentType == null) {
+            throw new BizException(ResultCode.BAD_REQUEST, "不是可读取的图片文件");
+        }
+        Path imageDir = resolveProblemPath(problemId, IMAGES_DIR);
+        Path targetPath = ensureChildPath(imageDir, normalizedFilename);
+        if (!Files.isRegularFile(targetPath)) {
+            throw new BizException(ResultCode.NOT_FOUND, "图片不存在");
+        }
+        try {
+            return new ProblemImageContent(Files.readAllBytes(targetPath), contentType);
+        } catch (IOException e) {
+            log.error("Read problem image failed, problemId: {}, filename: {}", problemId, normalizedFilename, e);
+            throw new BizException(ResultCode.INTERNAL_ERROR, "读取图片失败");
+        }
     }
 
     /**

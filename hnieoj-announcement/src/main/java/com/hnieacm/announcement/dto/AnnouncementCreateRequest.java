@@ -24,4 +24,10 @@ public class AnnouncementCreateRequest {
     @Min(value = 0, message = "status 只能为 0 或 1")
     @Max(value = 1, message = "status 只能为 0 或 1")
     private Integer status;
+
+    /**
+     * ANNOUNCEMENT / NEWS；缺省为 ANNOUNCEMENT
+     */
+    @Size(max = 20, message = "category 长度不能超过 20")
+    private String category;
 }

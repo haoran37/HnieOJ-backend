@@ -22,6 +22,8 @@ public class AnnouncementDetailVo {
 
     private Integer status;
 
+    private String category;
+
     private LocalDateTime gmtCreate;
 
     private LocalDateTime gmtModified;

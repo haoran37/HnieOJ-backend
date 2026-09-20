@@ -20,6 +20,8 @@ public class AnnouncementListVo {
 
     private Integer status;
 
+    private String category;
+
     private LocalDateTime gmtCreate;
 
     private LocalDateTime gmtModified;

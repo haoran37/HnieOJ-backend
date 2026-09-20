@@ -2,10 +2,12 @@ package com.hnieacm.announcement.controller;
 
 import cn.dev33.satoken.annotation.SaCheckRole;
 import cn.dev33.satoken.annotation.SaMode;
+import cn.dev33.satoken.stp.StpUtil;
 import com.hnieacm.announcement.dto.AnnouncementCreateRequest;
 import com.hnieacm.announcement.dto.AnnouncementUpdateRequest;
 import com.hnieacm.announcement.dto.AnnouncementUpdateStatusRequest;
 import com.hnieacm.announcement.service.AnnouncementService;
+import com.hnieacm.announcement.vo.AnnouncementDetailVo;
 import com.hnieacm.announcement.vo.AnnouncementListVo;
 import com.hnieacm.common.constant.RoleConstant;
 import com.hnieacm.common.dto.PageVo;
@@ -49,8 +51,19 @@ public class AdminAnnouncementController {
             @RequestParam(defaultValue = "10") @Min(value = 1, message = "pageSize 必须大于等于 1")
             @Max(value = 100, message = "pageSize 不能超过 100") int pageSize,
             @RequestParam(required = false) String keyword,
-            @RequestParam(required = false) Integer status) {
-        return Result.success(announcementService.listAdminAnnouncements(page, pageSize, keyword, status));
+            @RequestParam(required = false) Integer status,
+            @RequestParam(required = false) String category) {
+        return Result.success(announcementService.listAdminAnnouncements(page, pageSize, keyword, status, category));
+    }
+
+    @Operation(summary = "获取公告详情（管理端）")
+    @GetMapping("/{id}")
+    public Result<AnnouncementDetailVo> detail(
+            @PathVariable @Min(value = 1, message = "id 必须大于等于 1") Long id) {
+        // hnieoj-announcement 未注册 SaInterceptor，类上的 @SaCheckRole 注解不会生效；
+        // 此处显式执行角色校验，确保与网关 /api/admin/** 的 ADMIN/ROOT 规则一致。
+        StpUtil.checkRoleOr(RoleConstant.ADMIN, RoleConstant.ROOT);
+        return Result.success(announcementService.getAdminAnnouncementDetail(id));
     }
 
     @Operation(summary = "创建公告")

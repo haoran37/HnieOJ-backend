@@ -39,8 +39,9 @@ public class AnnouncementController {
             @RequestParam(defaultValue = "1") @Min(value = 1, message = "page 必须大于等于 1") int page,
             @RequestParam(defaultValue = "10") @Min(value = 1, message = "pageSize 必须大于等于 1")
             @Max(value = 100, message = "pageSize 不能超过 100") int pageSize,
-            @RequestParam(required = false) String keyword) {
-        return Result.success(announcementService.listPublicAnnouncements(page, pageSize, keyword));
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String category) {
+        return Result.success(announcementService.listPublicAnnouncements(page, pageSize, keyword, category));
     }
 
     @Operation(summary = "获取公告详情")

@@ -27,6 +27,11 @@ public class Announcement {
 
     private Integer status;
 
+    /**
+     * ANNOUNCEMENT / NEWS
+     */
+    private String category;
+
     private LocalDateTime gmtCreate;
 
     private LocalDateTime gmtModified;

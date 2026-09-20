@@ -4,6 +4,7 @@ import cn.dev33.satoken.stp.StpUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.hnieacm.announcement.constant.AnnouncementCategoryConstant;
 import com.hnieacm.announcement.constant.AnnouncementStatusConstant;
 import com.hnieacm.announcement.dto.AnnouncementCreateRequest;
 import com.hnieacm.announcement.dto.AnnouncementUpdateRequest;
@@ -47,8 +48,11 @@ public class AnnouncementServiceImpl implements AnnouncementService {
      * @Date 2026/03/01
      */
     @Override
-    public PageVo<AnnouncementListVo> listPublicAnnouncements(int page, int pageSize, String keyword) {
-        LambdaQueryWrapper<Announcement> wrapper = buildListQueryWrapper(keyword, AnnouncementStatusConstant.ONLINE);
+    public PageVo<AnnouncementListVo> listPublicAnnouncements(int page, int pageSize, String keyword, String category) {
+        String normalizedCategory = normalizeCategoryFilter(category);
+        LambdaQueryWrapper<Announcement> wrapper = buildListQueryWrapper(
+                keyword, AnnouncementStatusConstant.ONLINE, normalizedCategory
+        );
         return queryAnnouncementPage(page, pageSize, wrapper);
     }
 
@@ -71,6 +75,20 @@ public class AnnouncementServiceImpl implements AnnouncementService {
     }
 
     /**
+     * @MethodName getAdminAnnouncementDetail
+     * @Param id
+     * @Description 后台获取公告详情：下线/上线公告均返回真实正文与状态，不改变公开接口的过滤逻辑
+     * @Return @return {@link AnnouncementDetailVo }
+     * @Author HaoRan_Lyu
+     * @Date 2026/09/20
+     */
+    @Override
+    public AnnouncementDetailVo getAdminAnnouncementDetail(Long id) {
+        Announcement announcement = requireAnnouncement(id);
+        return toDetailVo(announcement);
+    }
+
+    /**
      * @MethodName listAdminAnnouncements
      * @Param page
      * @Param pageSize
@@ -82,9 +100,11 @@ public class AnnouncementServiceImpl implements AnnouncementService {
      * @Date 2026/03/01
      */
     @Override
-    public PageVo<AnnouncementListVo> listAdminAnnouncements(int page, int pageSize, String keyword, Integer status) {
+    public PageVo<AnnouncementListVo> listAdminAnnouncements(int page, int pageSize, String keyword, Integer status,
+                                                             String category) {
         validateStatus(status, true);
-        LambdaQueryWrapper<Announcement> wrapper = buildListQueryWrapper(keyword, status);
+        String normalizedCategory = normalizeCategoryFilter(category);
+        LambdaQueryWrapper<Announcement> wrapper = buildListQueryWrapper(keyword, status, normalizedCategory);
         return queryAnnouncementPage(page, pageSize, wrapper);
     }
 
@@ -104,6 +124,7 @@ public class AnnouncementServiceImpl implements AnnouncementService {
         announcement.setContent(request.getContent());
         announcement.setUid(StpUtil.getLoginIdAsString());
         announcement.setStatus(resolveStatus(request.getStatus()));
+        announcement.setCategory(resolveCategoryForCreate(request.getCategory()));
         announcementMapper.insert(announcement);
         log.info("Announcement created, id: {}, operator: {}", announcement.getId(), announcement.getUid());
     }
@@ -126,6 +147,10 @@ public class AnnouncementServiceImpl implements AnnouncementService {
         if (request.getStatus() != null) {
             validateStatus(request.getStatus(), false);
             announcement.setStatus(request.getStatus());
+        }
+        String category = resolveCategoryForUpdate(request.getCategory());
+        if (category != null) {
+            announcement.setCategory(category);
         }
         announcementMapper.updateById(announcement);
         log.info("Announcement updated, id: {}, operator: {}", id, StpUtil.getLoginIdAsString());
@@ -205,13 +230,14 @@ public class AnnouncementServiceImpl implements AnnouncementService {
      * @Author HaoRan_Lyu
      * @Date 2026/03/01
      */
-    private LambdaQueryWrapper<Announcement> buildListQueryWrapper(String keyword, Integer status) {
+    private LambdaQueryWrapper<Announcement> buildListQueryWrapper(String keyword, Integer status, String category) {
         LambdaQueryWrapper<Announcement> wrapper = new LambdaQueryWrapper<>();
         wrapper.select(
                 Announcement::getId,
                 Announcement::getTitle,
                 Announcement::getUid,
                 Announcement::getStatus,
+                Announcement::getCategory,
                 Announcement::getGmtCreate,
                 Announcement::getGmtModified
         );
@@ -220,12 +246,63 @@ public class AnnouncementServiceImpl implements AnnouncementService {
             wrapper.eq(Announcement::getStatus, status);
         }
 
+        if (category != null) {
+            wrapper.eq(Announcement::getCategory, category);
+        }
+
         if (StringUtils.hasText(keyword)) {
             wrapper.like(Announcement::getTitle, keyword.trim());
         }
 
         wrapper.orderByDesc(Announcement::getGmtCreate, Announcement::getId);
         return wrapper;
+    }
+
+    /**
+     * @MethodName resolveCategoryForCreate
+     * @Param rawCategory
+     * @Description 新增缺省 ANNOUNCEMENT；非空非法值拒绝
+     * @Return @return {@link String }
+     * @Author HaoRan_Lyu
+     * @Date 2026/09/20
+     */
+    private String resolveCategoryForCreate(String rawCategory) {
+        String category = normalizeCategoryFilter(rawCategory);
+        return category == null ? AnnouncementCategoryConstant.ANNOUNCEMENT : category;
+    }
+
+    /**
+     * @MethodName resolveCategoryForUpdate
+     * @Param rawCategory
+     * @Description 修改缺省或空白保留原分类；非空非法值拒绝
+     * @Return @return {@link String }
+     * @Author HaoRan_Lyu
+     * @Date 2026/09/20
+     */
+    private String resolveCategoryForUpdate(String rawCategory) {
+        return normalizeCategoryFilter(rawCategory);
+    }
+
+    /**
+     * @MethodName normalizeCategoryFilter
+     * @Param rawCategory
+     * @Description 规范化分类过滤值：空值返回 null（不过滤），非法值拒绝
+     * @Return @return {@link String }
+     * @Author HaoRan_Lyu
+     * @Date 2026/09/20
+     */
+    private String normalizeCategoryFilter(String rawCategory) {
+        if (rawCategory == null) {
+            return null;
+        }
+        String category = rawCategory.trim();
+        if (category.isEmpty()) {
+            return null;
+        }
+        if (!AnnouncementCategoryConstant.isValid(category)) {
+            throw new BizException(ResultCode.BAD_REQUEST, "category 只能为 ANNOUNCEMENT 或 NEWS");
+        }
+        return category;
     }
 
     /**
@@ -296,6 +373,7 @@ public class AnnouncementServiceImpl implements AnnouncementService {
         vo.setTitle(announcement.getTitle());
         vo.setUid(announcement.getUid());
         vo.setStatus(announcement.getStatus());
+        vo.setCategory(announcement.getCategory());
         vo.setGmtCreate(announcement.getGmtCreate());
         vo.setGmtModified(announcement.getGmtModified());
         return vo;
@@ -316,6 +394,7 @@ public class AnnouncementServiceImpl implements AnnouncementService {
         vo.setContent(announcement.getContent());
         vo.setUid(announcement.getUid());
         vo.setStatus(announcement.getStatus());
+        vo.setCategory(announcement.getCategory());
         vo.setGmtCreate(announcement.getGmtCreate());
         vo.setGmtModified(announcement.getGmtModified());
         return vo;

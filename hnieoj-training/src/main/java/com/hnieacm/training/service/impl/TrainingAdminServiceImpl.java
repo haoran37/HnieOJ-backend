@@ -19,6 +19,7 @@ import com.hnieacm.training.mapper.TrainingMapper;
 import com.hnieacm.training.mapper.TrainingProblemMapper;
 import com.hnieacm.training.service.TrainingAdminService;
 import com.hnieacm.training.service.manager.TrainingProblemManager;
+import com.hnieacm.training.vo.AdminTrainingDetailVo;
 import com.hnieacm.training.vo.AdminTrainingListVo;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -107,6 +108,40 @@ public class TrainingAdminServiceImpl implements TrainingAdminService {
                         return vo;
                     }).toList();
                 });
+    }
+
+    /**
+     * @MethodName getTrainingDetail
+     * @Param trainingId
+     * @Description 管理端完整题单详情：不受启用状态过滤，返回全部可编辑字段与有序题目
+     * @Return @return {@link AdminTrainingDetailVo }
+     * @Author HaoRan_Lyu
+     * @Date 2026/09/20
+     */
+    @Override
+    public AdminTrainingDetailVo getTrainingDetail(Long trainingId) {
+        Training training = getTrainingById(trainingId);
+        List<TrainingProblem> problems = trainingProblemMapper.selectList(new LambdaQueryWrapper<TrainingProblem>()
+                .eq(TrainingProblem::getTid, training.getId())
+                .orderByAsc(TrainingProblem::getDisplayId)
+                .orderByAsc(TrainingProblem::getId));
+
+        AdminTrainingDetailVo vo = new AdminTrainingDetailVo();
+        vo.setId(training.getId());
+        vo.setTitle(training.getTitle());
+        vo.setType(training.getType());
+        vo.setAuth(training.getAuth());
+        vo.setPrivatePwd(training.getPrivatePwd());
+        vo.setDescription(training.getDescription());
+        vo.setStatus(TrainingStatusConstant.isEnabled(training.getStatus()));
+        vo.setRank(training.getRank());
+        vo.setProblems(problems.stream().map(problem -> {
+            AdminTrainingDetailVo.Problem item = new AdminTrainingDetailVo.Problem();
+            item.setProblemId(problem.getProblemId());
+            item.setDisplayId(problem.getDisplayId());
+            return item;
+        }).toList());
+        return vo;
     }
 
     /**

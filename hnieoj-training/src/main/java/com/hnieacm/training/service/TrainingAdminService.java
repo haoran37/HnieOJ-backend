@@ -3,6 +3,7 @@ package com.hnieacm.training.service;
 import com.hnieacm.common.dto.PageVo;
 import com.hnieacm.training.dto.AdminTrainingSaveRequest;
 import com.hnieacm.training.dto.AdminTrainingStatusRequest;
+import com.hnieacm.training.vo.AdminTrainingDetailVo;
 import com.hnieacm.training.vo.AdminTrainingListVo;
 
 /**
@@ -13,6 +14,8 @@ import com.hnieacm.training.vo.AdminTrainingListVo;
 public interface TrainingAdminService {
 
     PageVo<AdminTrainingListVo> listTrainings(int page, int pageSize, String keyword, String type, String auth, Boolean status);
+
+    AdminTrainingDetailVo getTrainingDetail(Long trainingId);
 
     void createTraining(AdminTrainingSaveRequest request);
 

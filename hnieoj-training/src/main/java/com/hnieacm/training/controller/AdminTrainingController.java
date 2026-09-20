@@ -2,12 +2,14 @@ package com.hnieacm.training.controller;
 
 import cn.dev33.satoken.annotation.SaCheckRole;
 import cn.dev33.satoken.annotation.SaMode;
+import cn.dev33.satoken.stp.StpUtil;
 import com.hnieacm.common.constant.RoleConstant;
 import com.hnieacm.common.dto.PageVo;
 import com.hnieacm.common.result.Result;
 import com.hnieacm.training.dto.AdminTrainingSaveRequest;
 import com.hnieacm.training.dto.AdminTrainingStatusRequest;
 import com.hnieacm.training.service.TrainingAdminService;
+import com.hnieacm.training.vo.AdminTrainingDetailVo;
 import com.hnieacm.training.vo.AdminTrainingListVo;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -49,6 +51,13 @@ public class AdminTrainingController {
                                                      @RequestParam(required = false) String auth,
                                                      @RequestParam(required = false) Boolean status) {
         return Result.success(trainingAdminService.listTrainings(page, pageSize, keyword, type, auth, status));
+    }
+
+    @Operation(summary = "获取题单详情(Admin)")
+    @GetMapping("/{id}")
+    public Result<AdminTrainingDetailVo> detail(@PathVariable("id") @Min(value = 1, message = "id 必须大于等于 1") Long trainingId) {
+        StpUtil.checkRoleOr(RoleConstant.ADMIN, RoleConstant.ROOT);
+        return Result.success(trainingAdminService.getTrainingDetail(trainingId));
     }
 
     @Operation(summary = "添加题单")

@@ -23,5 +23,14 @@ public interface ProblemQueryService {
 
     ProblemDetailVo getProblemDetail(String problemCode);
 
+    /**
+     * Read a problem as part of a contest after participant access is checked.
+     *
+     * @param problemCode public problem code
+     * @param contestId contest ID, or null for normal access
+     * @return problem detail
+     */
+    ProblemDetailVo getProblemDetail(String problemCode, Long contestId);
+
     ProblemCheckVo checkProblemExists(Long problemId);
 }

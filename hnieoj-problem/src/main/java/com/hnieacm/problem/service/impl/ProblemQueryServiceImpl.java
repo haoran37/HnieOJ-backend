@@ -5,7 +5,9 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hnieacm.common.dto.PageVo;
+import com.hnieacm.problem.feign.ContestAccessFeignClient;
 import com.hnieacm.common.exception.BizException;
+import com.hnieacm.common.result.Result;
 import com.hnieacm.common.result.ResultCode;
 import com.hnieacm.common.util.PageParamUtils;
 import com.hnieacm.problem.constant.ProblemAuthConstant;
@@ -46,6 +48,7 @@ public class ProblemQueryServiceImpl implements ProblemQueryService {
     private final ProblemTagMapper problemTagMapper;
     private final TagMapper tagMapper;
     private final ObjectMapper objectMapper;
+    private final ContestAccessFeignClient contestAccessFeignClient;
 
     /**
      * @MethodName listPublicProblems
@@ -182,8 +185,28 @@ public class ProblemQueryServiceImpl implements ProblemQueryService {
      */
     @Override
     public ProblemDetailVo getProblemDetail(String problemCode) {
+        return getProblemDetail(problemCode, null);
+    }
+
+    @Override
+    public ProblemDetailVo getProblemDetail(String problemCode, Long contestId) {
         Problem problem = ProblemServiceSupport.queryProblemByCode(problemMapper, problemCode);
-        ProblemServiceSupport.requireAccessible(problem);
+        if (problem != null && problem.getAuth() != null
+                && problem.getAuth() == ProblemAuthConstant.CONTEST_ONLY && contestId != null) {
+            Result<Boolean> access;
+            try {
+                access = contestAccessFeignClient.checkProblemAccess(
+                        contestId, problem.getId(), cn.dev33.satoken.stp.StpUtil.getLoginIdAsString());
+            } catch (RuntimeException ex) {
+                log.warn("Contest problem access check failed, contestId: {}, problemId: {}", contestId, problem.getId(), ex);
+                throw new BizException(ResultCode.FORBIDDEN, "无权访问该比赛题目");
+            }
+            if (access == null || access.getCode() != ResultCode.SUCCESS || !Boolean.TRUE.equals(access.getData())) {
+                throw new BizException(ResultCode.FORBIDDEN, "无权访问该比赛题目");
+            }
+        } else {
+            ProblemServiceSupport.requireAccessible(problem);
+        }
 
         ProblemDetailVo vo = new ProblemDetailVo();
         vo.setId(problem.getId());

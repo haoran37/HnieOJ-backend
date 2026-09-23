@@ -51,8 +51,9 @@ public class DiscussionController {
             @RequestParam @Min(value = 1, message = "pageSize 必须大于等于 1") int pageSize,
             @RequestParam(required = false) String category,
             @RequestParam(required = false) String keyword,
-            @RequestParam(required = false) String sort) {
-        return Result.success(discussionService.listDiscussions(page, pageSize, category, keyword, sort));
+            @RequestParam(required = false) String sort,
+            @RequestParam(required = false) String uid) {
+        return Result.success(discussionService.listDiscussions(page, pageSize, category, keyword, sort, uid));
     }
 
     @Operation(summary = "获取讨论详情")

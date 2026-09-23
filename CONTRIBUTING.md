@@ -36,7 +36,7 @@
 ```bash
 mvn clean install -DskipTests
 mvn test
-mvn -pl gateway spring-boot:run
+mvn -pl hnieoj-gateway spring-boot:run
 ```
 
 如本地 Maven 源有特殊要求，可使用：
@@ -55,7 +55,7 @@ mvn -s deploy/maven/settings.xml clean install -DskipTests
 
 Commit Message 使用 Conventional Commits，例如：
 
-- `feat(gateway): add admin discussion route`
+- `feat(hnieoj-gateway): add admin discussion route`
 - `fix(auth): handle empty role cache`
 - `docs: update judge deployment guide`
 

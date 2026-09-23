@@ -17,7 +17,7 @@ deploy/nacos/
 ## 导入说明（dev namespace）
 
 1. 登录 Nacos（namespace: `dev`）。
-2. 先导入 `DEFAULT_GROUP` 下所有 `*.yaml`（Data ID 与文件名一致）。合并后只保留 8 个可执行服务：`gateway`、`hnieoj-user`、`hnieoj-problem`、`hnieoj-submission`、`hnieoj-contest`、`hnieoj-training`、`hnieoj-discussion`、`hnieoj-announcement`，以及 `hnieoj-secrets.yaml`。
+2. 先导入 `DEFAULT_GROUP` 下所有 `*.yaml`（Data ID 与文件名一致）。合并后只保留 8 个可执行服务：`hnieoj-gateway`、`hnieoj-user`、`hnieoj-problem`、`hnieoj-submission`、`hnieoj-contest`、`hnieoj-training`、`hnieoj-discussion`、`hnieoj-announcement`，以及 `hnieoj-secrets.yaml`。
 3. 原 `hnieoj-auth.yaml`、`hnieoj-achievement.yaml` 的字段已合并进 `hnieoj-user.yaml`，`hnieoj-judge.yaml` 的字段已合并进 `hnieoj-submission.yaml`；发布后请手动下线这三个旧 Data ID。
 4. 不要导入 `HNIEOJ_JUDGE_GROUP/hnieoj-judge-node.yaml`：判题节点 Agent 只读取本机 `HNIEOJ_STATE_DIR/config.yaml` 与环境变量，不再连接 Nacos；该文件仅为历史快照，保留在仓库中不参与运行，如目标 namespace 已有同名配置请手动下线。
 5. 在 `HNIEOJ_SECRET_GROUP` 新建 `hnieoj-secrets.yaml`，内容参考 `hnieoj-secrets.example.yaml`。该文件只允许保留环境变量占位，不要填写真实密码或 Token。
@@ -27,7 +27,7 @@ deploy/nacos/
 ## 手动发布与受控上线
 
 - 本目录只是快照，仓库脚本不会连接远程 Nacos；所有远程发布由运维人工执行并复核。
-- 受控上线建议顺序：先发 `hnieoj-user`，再发 `hnieoj-submission`，最后发 gateway 路由；回滚顺序相反。
+- 受控上线建议顺序：先发 `hnieoj-user`，再发 `hnieoj-submission`，最后发 hnieoj-gateway 路由；回滚顺序相反。
 - 上线后确认服务发现中不再有 `hnieoj-auth`、`hnieoj-achievement`、`hnieoj-judge` 实例。
 - 本仓库未在生产环境执行或验证上述流程。
 

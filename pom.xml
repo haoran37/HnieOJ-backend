@@ -24,7 +24,7 @@
     <!-- ==================== 子模块 ==================== -->
     <modules>
         <module>common</module>
-        <module>gateway</module>
+        <module>hnieoj-gateway</module>
         <module>hnieoj-announcement</module>
         <module>hnieoj-user</module>
         <module>hnieoj-problem</module>

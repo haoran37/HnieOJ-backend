@@ -327,7 +327,7 @@ UPDATE `sys_config` SET
 `logo_url` = '/logo.png',
 `icp_code` = '湘ICP备2026xxxx号',
 `allow_register` = 1,
-`register_mode` = 'EMAIL_SUFFIX',
+`register_mode` = 'OPEN',
 `allowed_email_suffixes` = '["@hnie.edu.cn", "@stu.hnie.edu.cn"]',
 `smtp_host` = 'smtp.qq.com',
 `smtp_port` = 465,

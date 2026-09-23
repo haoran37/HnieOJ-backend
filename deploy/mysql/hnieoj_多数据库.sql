@@ -81,6 +81,33 @@ CREATE TABLE `user_info` (
   UNIQUE KEY `uk_email` (`email`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户信息表';
 
+-- 一次性注册邀请码
+DROP TABLE IF EXISTS `invite_code`;
+CREATE TABLE `invite_code` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `code_hash` char(64) NOT NULL,
+  `status` tinyint(1) NOT NULL DEFAULT '1',
+  `created_by` varchar(50) NOT NULL,
+  `used_uid` varchar(50) DEFAULT NULL,
+  `used_at` datetime DEFAULT NULL,
+  `expires_at` datetime NOT NULL,
+  `gmt_create` datetime DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_invite_code_hash` (`code_hash`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='一次性注册邀请码，仅保存 SHA-256 摘要';
+
+-- 用户收藏
+DROP TABLE IF EXISTS `user_favorite`;
+CREATE TABLE `user_favorite` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `uid` varchar(50) NOT NULL,
+  `target_type` varchar(20) NOT NULL,
+  `target_id` varchar(64) NOT NULL,
+  `gmt_create` datetime DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_favorite` (`uid`, `target_type`, `target_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户收藏的题目、题单、比赛和讨论';
+
 -- 用户注册申请表 (审核用)
 DROP TABLE IF EXISTS `user_register_apply`;
 CREATE TABLE `user_register_apply` (
@@ -537,6 +564,7 @@ CREATE TABLE `judge` (
   KEY `idx_judge_task_id` (`judge_task_id`),
   KEY `idx_uid_problem_id` (`uid`, `problem_id`),
   KEY `idx_cid` (`cid`),
+  KEY `idx_hid_status_create` (`hid`, `status`, `gmt_create`),
   KEY `idx_status` (`status`),
   KEY `idx_gmt_create` (`gmt_create`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='代码提交记录';
@@ -962,7 +990,7 @@ CREATE TABLE `sys_config` (
   `logo_url` varchar(500) DEFAULT NULL,
   `icp_code` varchar(100) DEFAULT NULL,
   `allow_register` tinyint(1) DEFAULT '1',
-  `register_mode` varchar(50) DEFAULT 'EMAIL_SUFFIX',
+  `register_mode` varchar(50) DEFAULT 'OPEN',
   `allowed_email_suffixes` json DEFAULT NULL,
   `smtp_host` varchar(100) DEFAULT NULL,
   `smtp_port` int(11) DEFAULT '465',

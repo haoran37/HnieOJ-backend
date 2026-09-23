@@ -98,7 +98,7 @@ usage() {
 
 常用示例：
   bash deploy/scripts/deploy-dev.sh
-  bash deploy/scripts/deploy-dev.sh logs gateway
+  bash deploy/scripts/deploy-dev.sh logs hnieoj-gateway
   bash deploy/scripts/deploy-dev.sh restart hnieoj-user
   bash deploy/scripts/deploy-dev.sh gojudge-up
 EOF

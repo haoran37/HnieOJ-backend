@@ -18,8 +18,18 @@ public interface ContestQueryService {
      * window=recent 时按「距当前由近到远」排序（不改变可见性过滤）。
      */
     PageVo<ContestListVo> listContests(ContestListQuery query);
+    PageVo<ContestListVo> listContests(ContestListQuery query, String participantUid);
 
     ContestDetailVo getContestDetail(Long contestId);
 
     ContestCheckVo checkContestExists(Long contestId);
+
+    /**
+     * Verify that a participant may access a problem in an active contest.
+     *
+     * @param contestId contest ID
+     * @param problemId internal problem ID
+     * @param uid participant UID
+     */
+    void checkProblemAccess(Long contestId, Long problemId, String uid);
 }

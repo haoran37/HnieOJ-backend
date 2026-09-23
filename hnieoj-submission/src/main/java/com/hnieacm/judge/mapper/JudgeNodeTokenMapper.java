@@ -7,6 +7,8 @@ import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
 
+import java.time.LocalDateTime;
+
 /**
  * 判题节点注册事实 Mapper。
  *
@@ -52,10 +54,12 @@ public interface JudgeNodeTokenMapper extends BaseMapper<JudgeNodeToken> {
      *
      * @param nodeId       节点 registryID
      * @param sessionEpoch 连接持有的会话纪元
+     * @param now          与在线判定一致的应用时间
      * @return 受影响行数，0 表示旧会话已被接管
      */
-    @Update("UPDATE judge_node_token SET last_heartbeat_time = NOW(), last_seen_at = NOW() "
+    @Update("UPDATE judge_node_token SET last_heartbeat_time = #{now}, last_seen_at = #{now} "
             + "WHERE token_id = #{nodeId} AND session_epoch = #{sessionEpoch} "
             + "AND status IN ('active', 'draining')")
-    int touchSessionHeartbeat(@Param("nodeId") String nodeId, @Param("sessionEpoch") long sessionEpoch);
+    int touchSessionHeartbeat(@Param("nodeId") String nodeId, @Param("sessionEpoch") long sessionEpoch,
+                              @Param("now") LocalDateTime now);
 }

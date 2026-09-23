@@ -22,6 +22,7 @@ import java.util.List;
 public interface DiscussionService {
 
     PageVo<DiscussionListVo> listDiscussions(int page, int pageSize, String category, String keyword, String sort);
+    PageVo<DiscussionListVo> listDiscussions(int page, int pageSize, String category, String keyword, String sort, String uid);
 
     DiscussionDetailVo getDiscussionDetail(Long discussionId);
 

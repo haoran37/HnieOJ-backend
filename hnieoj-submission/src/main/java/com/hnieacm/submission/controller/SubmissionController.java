@@ -66,12 +66,14 @@ public class SubmissionController {
                                            @RequestParam String language,
                                            @RequestParam(required = false) String code,
                                            @RequestPart(required = false) MultipartFile file,
-                                           @RequestParam(required = false) String contestId) {
+                                           @RequestParam(required = false) String contestId,
+                                           @RequestParam(required = false) String homeworkId) {
         SubmitCodeRequest request = new SubmitCodeRequest();
         request.setProblemCode(problemCode);
         request.setLanguage(language);
         request.setCode(code);
         request.setContestId(contestId);
+        request.setHomeworkId(homeworkId);
         return Result.success("提交成功", submissionService.submit(request, file));
     }
 }

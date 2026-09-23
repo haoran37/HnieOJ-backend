@@ -89,6 +89,11 @@ public class DiscussionServiceImpl implements DiscussionService {
      */
     @Override
     public PageVo<DiscussionListVo> listDiscussions(int page, int pageSize, String category, String keyword, String sort) {
+        return listDiscussions(page, pageSize, category, keyword, sort, null);
+    }
+
+    @Override
+    public PageVo<DiscussionListVo> listDiscussions(int page, int pageSize, String category, String keyword, String sort, String uid) {
         PageParamUtils.validate(page, pageSize);
 
         String normalizedCategory = DiscussionCategoryConstant.normalizeWithAll(category);
@@ -98,6 +103,9 @@ public class DiscussionServiceImpl implements DiscussionService {
         LambdaQueryWrapper<Discussion> wrapper = new LambdaQueryWrapper<Discussion>()
                 .eq(Discussion::getStatus, DiscussionStatusConstant.NORMAL)
                 .orderByDesc(Discussion::getTopPriority);
+        if (uid != null && !uid.isBlank()) {
+            wrapper.eq(Discussion::getUid, uid.trim());
+        }
         if (!DiscussionCategoryConstant.ALL.equals(normalizedCategory)) {
             wrapper.eq(Discussion::getCategory, normalizedCategory);
         }

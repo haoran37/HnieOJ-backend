@@ -198,7 +198,7 @@
 
 ## 6. 网关路由与鉴权
 
-`deploy/nacos/dev/DEFAULT_GROUP/gateway.yaml`：
+`deploy/nacos/dev/DEFAULT_GROUP/hnieoj-gateway.yaml`：
 
 - `hnieoj-problem` 路由新增 `/api/tags`、`/api/admin/tags/**`。
 - 既有 `/api/admin/**` 规则继续要求 ADMIN/ROOT。
@@ -584,7 +584,7 @@
 
 ## B2-6 网关路由
 
-`deploy/nacos/dev/DEFAULT_GROUP/gateway.yaml` 中 `hnieoj-user` 路由新增：
+`deploy/nacos/dev/DEFAULT_GROUP/hnieoj-gateway.yaml` 中 `hnieoj-user` 路由新增：
 
 - `/api/admin/notices`、`/api/admin/notices/**`
 - `/api/admin/profile-change-requests`、`/api/admin/profile-change-requests/**`

@@ -11,5 +11,6 @@ public class ProblemAuthConstant {
     }
 
     public static final int PUBLIC = 1;
-}
 
+    public static final int CONTEST_ONLY = 3;
+}

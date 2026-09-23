@@ -1,5 +1,6 @@
 package com.hnieacm.contest.service.impl;
 
+import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hnieacm.common.dto.PageVo;
@@ -11,8 +12,10 @@ import com.hnieacm.contest.constant.ContestTypeConstant;
 import com.hnieacm.contest.dto.ContestListQuery;
 import com.hnieacm.contest.entity.Contest;
 import com.hnieacm.contest.entity.ContestProblem;
+import com.hnieacm.contest.entity.ContestRegister;
 import com.hnieacm.contest.mapper.ContestMapper;
 import com.hnieacm.contest.mapper.ContestProblemMapper;
+import com.hnieacm.contest.mapper.ContestRegisterMapper;
 import com.hnieacm.contest.service.ContestQueryService;
 import com.hnieacm.contest.vo.ContestCheckVo;
 import com.hnieacm.contest.vo.ContestDetailVo;
@@ -39,7 +42,33 @@ public class ContestQueryServiceImpl implements ContestQueryService {
 
     private final ContestMapper contestMapper;
     private final ContestProblemMapper contestProblemMapper;
+    private final ContestRegisterMapper contestRegisterMapper;
     private final ObjectMapper objectMapper;
+
+    @Override
+    public void checkProblemAccess(Long contestId, Long problemId, String uid) {
+        if (contestId == null || contestId <= 0 || problemId == null || problemId <= 0 || StrUtil.isBlank(uid)) {
+            throw new BizException(ResultCode.BAD_REQUEST, "比赛题目访问参数不合法");
+        }
+        Contest contest = contestMapper.selectById(contestId);
+        LocalDateTime now = LocalDateTime.now();
+        if (contest == null || contest.getIsVisible() == null || contest.getIsVisible() != VISIBLE
+                || contest.getStartTime() == null || contest.getEndTime() == null
+                || now.isBefore(contest.getStartTime()) || !now.isBefore(contest.getEndTime())) {
+            throw new BizException(ResultCode.FORBIDDEN, "比赛未开放或已结束");
+        }
+        if (contestProblemMapper.selectCount(new LambdaQueryWrapper<ContestProblem>()
+                .eq(ContestProblem::getCid, contestId)
+                .eq(ContestProblem::getProblemId, problemId)) == 0) {
+            throw new BizException(ResultCode.FORBIDDEN, "题目不属于该比赛");
+        }
+        if (contestRegisterMapper.selectCount(new LambdaQueryWrapper<ContestRegister>()
+                .eq(ContestRegister::getCid, contestId)
+                .eq(ContestRegister::getUid, uid)
+                .eq(ContestRegister::getStatus, 1)) == 0) {
+            throw new BizException(ResultCode.FORBIDDEN, "未获得该比赛的参赛资格");
+        }
+    }
 
     /**
      * @MethodName listContests
@@ -51,6 +80,11 @@ public class ContestQueryServiceImpl implements ContestQueryService {
      */
     @Override
     public PageVo<ContestListVo> listContests(ContestListQuery query) {
+        return listContests(query, null);
+    }
+
+    @Override
+    public PageVo<ContestListVo> listContests(ContestListQuery query, String participantUid) {
         int page = query.page();
         int pageSize = query.pageSize();
         ContestServiceSupport.validatePageParams(page, pageSize);
@@ -66,6 +100,17 @@ public class ContestQueryServiceImpl implements ContestQueryService {
 
         LambdaQueryWrapper<Contest> wrapper = new LambdaQueryWrapper<Contest>()
                 .eq(Contest::getIsVisible, VISIBLE);
+
+        if (participantUid != null && !participantUid.isBlank()) {
+            List<Long> registeredIds = contestRegisterMapper.selectList(new LambdaQueryWrapper<ContestRegister>()
+                    .eq(ContestRegister::getUid, participantUid.trim())
+                    .eq(ContestRegister::getStatus, 1)).stream()
+                    .map(ContestRegister::getCid).distinct().toList();
+            if (registeredIds.isEmpty()) {
+                return new PageVo<>(List.of(), 0L);
+            }
+            wrapper.in(Contest::getId, registeredIds);
+        }
 
         if (ContestListWindowConstant.RECENT.equals(window)) {
             // 「距当前由近到远」：不能用 orderByDesc(startTime)，否则永远拿到开始时间最晚的那场

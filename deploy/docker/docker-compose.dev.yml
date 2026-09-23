@@ -36,15 +36,15 @@ x-service-base: &service-base
     start_period: 60s
 
 services:
-  gateway:
+  hnieoj-gateway:
     <<: *service-base
-    image: hnieoj/gateway:dev
+    image: hnieoj/hnieoj-gateway:dev
     build:
       context: ../..
       dockerfile: deploy/docker/Dockerfile
       args:
         JAVA_BASE_IMAGE: ${JAVA_BASE_IMAGE:-eclipse-temurin:17-jre-jammy}
-        SERVICE_NAME: gateway
+        SERVICE_NAME: hnieoj-gateway
     environment:
       <<: *common-environment
       SERVER_PORT: ${GATEWAY_SERVER_PORT:-8800}

@@ -168,6 +168,29 @@ class JudgeGatewayIntegrationTest {
     }
 
     @Test
+    void homeworkBestScoresAreAggregatedWithinWindowInSql() {
+        LocalDateTime start = LocalDateTime.of(2026, 9, 23, 10, 0);
+        String sql = "INSERT INTO judge (submit_id, problem_id, problem_code, uid, username, language, code, "
+                + "hid, status, score, gmt_create) VALUES (?, ?, 'P1', ?, ?, 'java', 'code', 9, ?, ?, ?)";
+        jdbcTemplate.update(sql, "homework-a1", 1L, "alice", "Alice", 3, 50, start.plusMinutes(5));
+        jdbcTemplate.update(sql, "homework-a2", 1L, "alice", "Alice", 3, 80, start.plusMinutes(10));
+        jdbcTemplate.update(sql, "homework-a3", 1L, "alice", "Alice", 0, 100, start.plusHours(3));
+        jdbcTemplate.update(sql, "homework-a4", 1L, "alice", "Alice", -10, 100, start.plusMinutes(15));
+        jdbcTemplate.update(sql, "homework-b1", 2L, "bob", "Bob", 0, 0, start.plusMinutes(20));
+
+        var scores = judgeMapper.listHomeworkBestScores(9L, start, start.plusHours(2), List.of(1L, 2L));
+        assertThat(scores).hasSize(2);
+        assertThat(scores).anySatisfy(row -> {
+            assertThat(row.getUid()).isEqualTo("alice");
+            assertThat(row.getBestScore()).isEqualTo(80);
+        });
+        assertThat(scores).anySatisfy(row -> {
+            assertThat(row.getUid()).isEqualTo("bob");
+            assertThat(row.getBestScore()).isEqualTo(100);
+        });
+    }
+
+    @Test
     void normalChainClaimRenewProgressFinishAndIdempotentDuplicate() {
         insertAndPublish("it-sub-1", "it-task-1", 101L);
         SignedCaller nodeA = newNodeSession(2);

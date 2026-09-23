@@ -29,7 +29,7 @@ HNieOJ-backend 是一个基于 **Spring Cloud Alibaba** 的在线判题系统后
 ```text
 HnieOJ-backend/
 ├── common                  # 公共模块（工具、常量、异常、通用配置）
-├── gateway                 # API 网关
+├── hnieoj-gateway                 # API 网关
 ├── hnieoj-user             # 用户服务（已合并原 hnieoj-auth 认证域与 hnieoj-achievement 成就域）
 ├── hnieoj-problem          # 题目服务
 ├── hnieoj-submission       # 提交服务（已合并原 hnieoj-judge 判题域）
@@ -45,7 +45,7 @@ HnieOJ-backend/
 
 | 服务 | 默认端口 | 说明 |
 | --- | --- | --- |
-| gateway | 8800 | API 网关，统一路由与 Sa-Token 鉴权 |
+| hnieoj-gateway | 8800 | API 网关，统一路由与 Sa-Token 鉴权 |
 | hnieoj-user | 8101 | 用户服务，合并原认证（auth）与成就（achievement）域，共用 user DB |
 | hnieoj-problem | 8102 | 题目服务 |
 | hnieoj-submission | 8103 | 提交服务，合并原判题（judge）域，共用 judge DB |
@@ -89,6 +89,8 @@ HnieOJ-backend/
 - 二开 go-judge（可通过部署脚本启动）
 - 本地文件系统目录 `/data/oj/problems`（题面、图片、测试数据）
 
+MySQL 会话时区应与后端默认时区 `Asia/Shanghai` 一致（例如 `+08:00`）。若 MySQL 使用 UTC，数据库 `NOW()`/`CURRENT_TIMESTAMP` 写入的时间与 Java 的 `LocalDateTime.now()` 相差 8 小时，提交时间显示和基于时间的判断会异常；联调前可用 `SELECT @@session.time_zone, NOW();` 核对。
+
 ### 配置Nacos
 
 详细步骤见 [Nacos Configs](deploy/nacos/README.md)
@@ -110,7 +112,7 @@ mvn clean install -DskipTests
 ### 启动单个服务
 
 ```bash
-mvn -pl gateway spring-boot:run
+mvn -pl hnieoj-gateway spring-boot:run
 mvn -pl hnieoj-user spring-boot:run
 mvn -pl hnieoj-submission spring-boot:run
 ```
@@ -153,7 +155,7 @@ mvn -s deploy/maven/settings.xml clean install -DskipTests
 
 ```bash
 bash deploy/scripts/deploy-dev.sh ps
-bash deploy/scripts/deploy-dev.sh logs gateway
+bash deploy/scripts/deploy-dev.sh logs hnieoj-gateway
 bash deploy/scripts/deploy-dev.sh restart hnieoj-user
 bash deploy/scripts/deploy-dev.sh gojudge-up
 ```
@@ -178,16 +180,16 @@ bash deploy/scripts/deploy-dev.sh gojudge-up
 
 手动发布步骤：
 
-1. 在目标 namespace（如 `dev`）中，先导入 `deploy/nacos/dev/DEFAULT_GROUP/` 下的全部 `*.yaml`（Data ID 与文件名一致）。合并后只保留 8 个可执行服务对应的配置：`gateway`、`hnieoj-user`、`hnieoj-problem`、`hnieoj-submission`、`hnieoj-contest`、`hnieoj-training`、`hnieoj-discussion`、`hnieoj-announcement`，以及 `hnieoj-secrets.yaml`。
+1. 在目标 namespace（如 `dev`）中，先导入 `deploy/nacos/dev/DEFAULT_GROUP/` 下的全部 `*.yaml`（Data ID 与文件名一致）。合并后只保留 8 个可执行服务对应的配置：`hnieoj-gateway`、`hnieoj-user`、`hnieoj-problem`、`hnieoj-submission`、`hnieoj-contest`、`hnieoj-training`、`hnieoj-discussion`、`hnieoj-announcement`，以及 `hnieoj-secrets.yaml`。
 2. 原 `hnieoj-auth.yaml`、`hnieoj-achievement.yaml`、`hnieoj-judge.yaml` 不再发布；它们的字段已分别合并进 `hnieoj-user.yaml` 与 `hnieoj-submission.yaml`。发布完成后在目标 namespace 手动下线这三个旧 Data ID，避免残留旧配置。
 3. 不要导入 `HNIEOJ_JUDGE_GROUP/hnieoj-judge-node.yaml`：判题节点 Agent 不再读取 Nacos，节点运行参数只来自本机 `config.yaml`。并按 `HNIEOJ_SECRET_GROUP` 下的示例模板人工创建 `hnieoj-secrets.yaml`（只保留环境变量占位，不写真实密码/Token；节点短期令牌密钥只允许运行时环境/文件注入）。
 4. 人工逐项核对配置差异（数据库、Redis 地址与凭据保持环境变量占位），确认无误后再由运维手动发布到 Nacos。
 5. 受控滚动发布，顺序建议：
    - 先发布 `hnieoj-user` 配置并重启该服务，确认 `/actuator/health`、`/api/auth/**`、`/api/users/*/achievements` 正常；
    - 再发布 `hnieoj-submission` 配置并重启该服务，确认 `/actuator/health`、判题回调、`/judge/nodes/**`、`/ws/submissions/**` 正常；
-   - 最后发布 gateway 路由变更并重启 gateway，确认各业务路由与 WebSocket 路由转发正常；
+   - 最后发布 gateway 路由变更并重启 hnieoj-gateway，确认各业务路由与 WebSocket 路由转发正常；
    - 其余 problem/contest/training/discussion/announcement 服务按需滚动重启。
-6. 如需回滚，按发布相反顺序执行：先回滚 gateway，再回滚 `hnieoj-submission` / `hnieoj-user` 及其配置。
+6. 如需回滚，按发布相反顺序执行：先回滚 hnieoj-gateway，再回滚 `hnieoj-submission` / `hnieoj-user` 及其配置。
 7. 上线后确认服务发现中不再存在 `hnieoj-auth`、`hnieoj-achievement`、`hnieoj-judge` 实例，所有发现目标均指向合并后的服务。
 
 > 以上为人工发布与受控上线流程说明；本仓库未在生产环境执行或验证该流程。
@@ -229,6 +231,5 @@ bash deploy/scripts/deploy-dev.sh gojudge-up
 ## 许可证
 
 本项目使用 [MIT License](./LICENSE) 开源。
-
 
 

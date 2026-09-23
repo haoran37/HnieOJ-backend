@@ -22,6 +22,7 @@ import com.hnieacm.auth.properties.AuthValidationProperties;
 import com.hnieacm.auth.service.AuthPermissionService;
 import com.hnieacm.auth.service.UserAuthCacheService;
 import com.hnieacm.auth.service.AuthService;
+import com.hnieacm.auth.service.InviteCodeService;
 import com.hnieacm.common.constant.RegisterStatus;
 import com.hnieacm.common.constant.RoleConstant;
 import com.hnieacm.common.constant.UserStatusConstant;
@@ -53,8 +54,19 @@ public class AuthServiceImpl implements AuthService {
     private final UserAuthCacheService userAuthCacheService;
     private final AuthValidationProperties authValidationProperties;
     private final ObjectMapper objectMapper;
+    private final InviteCodeService inviteCodeService;
     private static final TypeReference<List<String>> STRING_LIST_TYPE = new TypeReference<>() {
     };
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void registerWithInvite(RegisterRequest request) {
+        if (request == null) {
+            throw new BizException(ResultCode.BAD_REQUEST, "请求参数不能为空");
+        }
+        inviteCodeService.consume(request.getInviteCode(), request.getUid());
+        register(request);
+    }
 
     /**
      * @MethodName login

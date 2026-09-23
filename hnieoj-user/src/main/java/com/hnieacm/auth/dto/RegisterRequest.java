@@ -39,4 +39,6 @@ public class RegisterRequest {
     @NotBlank(message = "QQ不能为空")
     @Pattern(regexp = "\\d{5,11}", message = "QQ号格式不正确")
     private String qq;
+
+    private String inviteCode;
 }

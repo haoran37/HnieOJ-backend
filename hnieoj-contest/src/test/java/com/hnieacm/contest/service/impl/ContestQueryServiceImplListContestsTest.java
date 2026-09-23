@@ -36,7 +36,7 @@ import static org.mockito.Mockito.when;
  * @Date: 2026/09/21
  * @Description: 比赛列表时间筛选与 window=recent 排序回归。
  * <p>枚举非法参数、时间窗过滤与「距当前由近到远」排序片段都在这里锁定；
- * 真实库上的端点行为另见 review-verification/acceptance-20260921 下的验收脚本。</p>
+ * 真实库上的端点行为由集成验收覆盖。</p>
  */
 class ContestQueryServiceImplListContestsTest {
 
@@ -56,6 +56,7 @@ class ContestQueryServiceImplListContestsTest {
         service = new ContestQueryServiceImpl(
                 contestMapper,
                 mock(ContestProblemMapper.class),
+                mock(com.hnieacm.contest.mapper.ContestRegisterMapper.class),
                 new ObjectMapper());
     }
 

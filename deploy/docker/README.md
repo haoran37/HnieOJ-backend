@@ -222,7 +222,7 @@ bash deploy/scripts/deploy-dev.sh ps
 bash deploy/scripts/deploy-dev.sh logs
 
 # 查看单个服务日志
-bash deploy/scripts/deploy-dev.sh logs gateway
+bash deploy/scripts/deploy-dev.sh logs hnieoj-gateway
 bash deploy/scripts/deploy-dev.sh logs hnieoj-user
 
 # 重启全部服务
@@ -241,7 +241,7 @@ bash deploy/scripts/deploy-dev.sh build
 bash deploy/scripts/deploy-dev.sh down
 ```
 
-服务名与 `deploy/docker/docker-compose.dev.yml` 中的 8 个服务一致：`gateway`、`hnieoj-user`、`hnieoj-problem`、`hnieoj-submission`、`hnieoj-contest`、`hnieoj-training`、`hnieoj-discussion`、`hnieoj-announcement`。`common` 只是公共依赖，不单独启动。
+服务名与 `deploy/docker/docker-compose.dev.yml` 中的 8 个服务一致：`hnieoj-gateway`、`hnieoj-user`、`hnieoj-problem`、`hnieoj-submission`、`hnieoj-contest`、`hnieoj-training`、`hnieoj-discussion`、`hnieoj-announcement`。`common` 只是公共依赖，不单独启动。
 
 go-judge 节点启用心跳后，会通过内部心跳上报节点运行状态和缓存状态。后台接口 `GET /api/admin/judge/nodes` 可查看 `online`、`runningTasks`、`maxConcurrency`、`cacheUsedBytes`、`cacheProblemCount`、`diskTotalBytes`、`diskFreeBytes` 等字段。缓存统计来自 `GOJUDGE_CACHE_DIR`，默认约 5 分钟采样一次，用于前端展示判题机负载、测试数据缓存占用和磁盘风险。
 

@@ -34,6 +34,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
 /**
@@ -46,6 +47,20 @@ import static org.mockito.Mockito.when;
  */
 @ExtendWith(MockitoExtension.class)
 class NodeIdentityServiceImplTest {
+
+    @Test
+    void heartbeatUsesApplicationTimeAndRejectsStaleSession() {
+        LocalDateTime before = LocalDateTime.now();
+        when(tokenMapper.touchSessionHeartbeat(eq(NODE_ID), eq(7L), any(LocalDateTime.class)))
+                .thenAnswer(invocation -> {
+                    LocalDateTime now = invocation.getArgument(2);
+                    assertThat(now).isBetween(before, LocalDateTime.now());
+                    return 1;
+                });
+        service.touchHeartbeat(NODE_ID, 7L);
+        assertThatThrownBy(() -> service.touchHeartbeat(NODE_ID, 6L))
+                .isInstanceOf(BizException.class).hasMessageContaining("会话已被接管");
+    }
 
     private static final String NODE_ID = "node-1";
     private static final String KEY_ID = "key-1";

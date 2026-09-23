@@ -1,0 +1,15 @@
+server:
+  port: ${SERVER_PORT:8800}
+
+sa-token:
+  token-name: Authorization
+  token-prefix: Bearer
+
+hnieoj:
+  auth-cache:
+    ttl:
+      roles: 24h
+      permissions: 12h
+      empty: 5m
+      jitter: 10m
+      local-fallback: 2m

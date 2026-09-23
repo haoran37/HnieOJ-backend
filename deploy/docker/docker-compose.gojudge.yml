@@ -4,6 +4,10 @@ services:
     build:
       context: ${GOJUDGE_SOURCE_DIR:?GOJUDGE_SOURCE_DIR is required}
       dockerfile: Dockerfile.hnieoj
+      args:
+        GO_BUILDER_IMAGE: ${GO_BUILDER_IMAGE:-golang:1.26-bookworm}
+        DEBIAN_RUNTIME_IMAGE: ${DEBIAN_RUNTIME_IMAGE:-debian:bookworm-slim}
+        DEBIAN_MIRROR: ${DEBIAN_MIRROR:-deb.debian.org}
     restart: unless-stopped
     privileged: true
     # 上游沙箱在 Docker 默认 private cgroup namespace 下会取不到 cgroup path（cgroup path empty），

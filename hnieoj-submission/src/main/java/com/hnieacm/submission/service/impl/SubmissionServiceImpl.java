@@ -8,6 +8,8 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.hnieacm.common.constant.PermissionConstant;
 import com.hnieacm.common.constant.RoleConstant;
 import com.hnieacm.common.dto.PageVo;
+import com.hnieacm.submission.feign.ContestAccessFeignClient;
+import com.hnieacm.submission.feign.HomeworkAccessFeignClient;
 import com.hnieacm.common.exception.BizException;
 import com.hnieacm.common.result.Result;
 import com.hnieacm.common.result.ResultCode;
@@ -64,6 +66,8 @@ public class SubmissionServiceImpl implements SubmissionService {
     private final JudgeMapper judgeMapper;
     private final JudgeCaseMapper judgeCaseMapper;
     private final ProblemInternalFeignClient problemInternalFeignClient;
+    private final ContestAccessFeignClient contestAccessFeignClient;
+    private final HomeworkAccessFeignClient homeworkAccessFeignClient;
     private final UserProfileFeignClient userProfileFeignClient;
     private final JudgeNodeAccessService judgeNodeAccessService;
     private final JudgeTaskMessagePublisher judgeTaskMessagePublisher;
@@ -95,36 +99,32 @@ public class SubmissionServiceImpl implements SubmissionService {
             throw new BizException(ResultCode.BAD_REQUEST, "language不能为空");
         }
 
-        String code = StrUtil.trimToNull(request.getCode());
-        if (code != null) {
-            validateCodeSize(code);
-        }
-        if (StrUtil.isBlank(code) && (file == null || file.isEmpty())) {
-            throw new BizException(ResultCode.BAD_REQUEST, "code和file不能同时为空");
-        }
-
-        if (StrUtil.isBlank(code) && file != null && !file.isEmpty()) {
-            validateCodeFileSize(file);
-            try {
-                code = new String(file.getBytes(), StandardCharsets.UTF_8);
-            } catch (Exception e) {
-                throw new BizException(ResultCode.BAD_REQUEST, "读取代码文件失败");
-            }
-            code = StrUtil.trimToNull(code);
-            if (StrUtil.isBlank(code)) {
-                throw new BizException(ResultCode.BAD_REQUEST, "代码文件内容不能为空");
-            }
-            validateCodeSize(code);
-        }
+        String code = readSubmittedCode(request, file);
 
         String uid = StpUtil.getLoginIdAsString();
 
         ProblemBasicDto problem = queryProblemBasic(problemCode);
-        ensureProblemSubmitAllowed(problem);
+        long cid = parseContestId(request.getContestId());
+        long hid = parseHomeworkId(request.getHomeworkId());
+        if (cid > 0 && hid > 0) {
+            throw new BizException(ResultCode.BAD_REQUEST, "比赛和作业不能同时提交");
+        }
+        ensureProblemSubmitAllowed(problem, cid, uid);
+        if (hid > 0) {
+            Result<Boolean> access;
+            try {
+                access = homeworkAccessFeignClient.checkAccess(hid, problem.getId(), uid);
+            } catch (RuntimeException ex) {
+                log.warn("Homework access check failed, homeworkId: {}, problemId: {}", hid, problem.getId(), ex);
+                throw new BizException(ResultCode.FORBIDDEN, "无作业提交资格");
+            }
+            if (access == null || access.getCode() != ResultCode.SUCCESS || !Boolean.TRUE.equals(access.getData())) {
+                throw new BizException(ResultCode.FORBIDDEN, "无作业提交资格");
+            }
+        }
 
         String username = queryUsername(uid);
 
-        long cid = parseContestId(request.getContestId());
         String submitId = generateUuid32();
 
         Judge judge = new Judge();
@@ -143,7 +143,7 @@ public class SubmissionServiceImpl implements SubmissionService {
         judge.setCurrentCase(0);
         judge.setCpid(SubmissionConstant.DEFAULT_CPID);
         judge.setTid(SubmissionConstant.DEFAULT_TID);
-        judge.setHid(SubmissionConstant.DEFAULT_HID);
+        judge.setHid(hid);
         judge.setIsManual(false);
         judge.setIp(resolveClientIp());
 
@@ -153,6 +153,30 @@ public class SubmissionServiceImpl implements SubmissionService {
         log.info("Submission created, submitId={}, problemCode={}, uid={}, language={}", submitId, problemCode, uid, language);
 
         return new SubmitCodeVo(submitId);
+    }
+
+    private String readSubmittedCode(SubmitCodeRequest request, MultipartFile file) {
+        String code = StrUtil.trimToNull(request.getCode());
+        if (code != null) {
+            validateCodeSize(code);
+        }
+        if (StrUtil.isBlank(code) && (file == null || file.isEmpty())) {
+            throw new BizException(ResultCode.BAD_REQUEST, "code和file不能同时为空");
+        }
+        if (StrUtil.isBlank(code) && file != null && !file.isEmpty()) {
+            validateCodeFileSize(file);
+            try {
+                code = new String(file.getBytes(), StandardCharsets.UTF_8);
+            } catch (Exception e) {
+                throw new BizException(ResultCode.BAD_REQUEST, "读取代码文件失败");
+            }
+            code = StrUtil.trimToNull(code);
+            if (StrUtil.isBlank(code)) {
+                throw new BizException(ResultCode.BAD_REQUEST, "代码文件内容不能为空");
+            }
+            validateCodeSize(code);
+        }
+        return code;
     }
 
     /**
@@ -468,19 +492,37 @@ public class SubmissionServiceImpl implements SubmissionService {
     /**
      * @MethodName ensureProblemSubmitAllowed
      * @Param problem
+     * @Param contestId
+     * @Param uid
      * @Description 确保允许提交题目
      * @Return
      * @Author HaoRan_Lyu
      * @Date 2026/02/21
      */
-    private void ensureProblemSubmitAllowed(ProblemBasicDto problem) {
+    private void ensureProblemSubmitAllowed(ProblemBasicDto problem, long contestId, String uid) {
         if (problem.getAuth() == null) {
             throw new BizException(ResultCode.PROBLEM_NOT_FOUND, "题目不存在");
         }
 
-        // 当前版本下，私有/比赛题目仅允许题目管理员提交。
-        if (problem.getAuth() != ProblemAuthConstant.PUBLIC && !StpUtil.hasPermission(PermissionConstant.PROBLEM_UPDATE)) {
+        if (problem.getAuth() != ProblemAuthConstant.PUBLIC
+                && problem.getAuth() != ProblemAuthConstant.CONTEST_ONLY
+                && !StpUtil.hasPermission(PermissionConstant.PROBLEM_UPDATE)) {
             throw new BizException(ResultCode.FORBIDDEN, "该题目当前不可提交");
+        }
+        if (contestId > 0) {
+            Result<Boolean> access;
+            try {
+                access = contestAccessFeignClient.checkProblemAccess(contestId, problem.getId(), uid);
+            } catch (RuntimeException ex) {
+                log.warn("Contest access check failed, contestId: {}, problemId: {}", contestId, problem.getId(), ex);
+                throw new BizException(ResultCode.FORBIDDEN, "无权向该比赛提交题目");
+            }
+            if (access == null || access.getCode() != ResultCode.SUCCESS || !Boolean.TRUE.equals(access.getData())) {
+                throw new BizException(ResultCode.FORBIDDEN, "无权向该比赛提交题目");
+            }
+        } else if (problem.getAuth() == ProblemAuthConstant.CONTEST_ONLY
+                && !StpUtil.hasPermission(PermissionConstant.PROBLEM_UPDATE)) {
+            throw new BizException(ResultCode.FORBIDDEN, "该题目仅允许在比赛中提交");
         }
         if (!Boolean.TRUE.equals(problem.getHasTestdata()) || defaultZero(problem.getTestdataCaseCount()) <= 0) {
             throw new BizException(ResultCode.BAD_REQUEST, "题目测试数据未配置，暂不能提交");
@@ -756,6 +798,22 @@ public class SubmissionServiceImpl implements SubmissionService {
         } catch (NumberFormatException e) {
             throw new BizException(ResultCode.BAD_REQUEST, "contestId格式不正确");
         }
+    }
+
+    private long parseHomeworkId(String homeworkId) {
+        String normalized = StrUtil.trimToNull(homeworkId);
+        if (normalized == null) {
+            return SubmissionConstant.DEFAULT_HID;
+        }
+        try {
+            long id = Long.parseLong(normalized);
+            if (id > 0) {
+                return id;
+            }
+        } catch (NumberFormatException ignored) {
+            // invalid ID below
+        }
+        throw new BizException(ResultCode.BAD_REQUEST, "homeworkId 格式不正确");
     }
 
     /**

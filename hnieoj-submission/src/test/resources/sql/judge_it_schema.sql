@@ -42,6 +42,7 @@ CREATE TABLE `judge` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_submit_id` (`submit_id`),
   KEY `idx_judge_task_id` (`judge_task_id`),
+  KEY `idx_hid_status_create` (`hid`, `status`, `gmt_create`),
   KEY `idx_status` (`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 

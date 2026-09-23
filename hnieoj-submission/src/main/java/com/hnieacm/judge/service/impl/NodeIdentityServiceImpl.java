@@ -388,7 +388,8 @@ public class NodeIdentityServiceImpl implements NodeIdentityService {
 
     @Override
     public void touchHeartbeat(String nodeId, long sessionEpoch, NodeRuntimeMetrics metrics) {
-        if (tokenMapper.touchSessionHeartbeat(nodeId, sessionEpoch) == 0) {
+        // 与在线判定使用同一应用时区，避免数据库 NOW() 的会话时区造成心跳误过期。
+        if (tokenMapper.touchSessionHeartbeat(nodeId, sessionEpoch, LocalDateTime.now()) == 0) {
             throw new BizException(ResultCode.FORBIDDEN, "会话已被接管");
         }
         if (metrics == null || !metrics.hasAny()) {

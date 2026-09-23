@@ -5,6 +5,11 @@ import com.hnieacm.auth.dto.LoginVo;
 import com.hnieacm.auth.dto.RegisterRequest;
 import com.hnieacm.auth.service.AuthService;
 import com.hnieacm.common.result.Result;
+import com.hnieacm.common.result.ResultCode;
+import com.hnieacm.common.constant.RegisterModeConstant;
+import com.hnieacm.common.exception.BizException;
+import com.hnieacm.user.feign.SubmissionInternalFeignClient;
+import com.hnieacm.user.vo.RegisterEmailCheckVo;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
@@ -29,6 +34,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class AuthController {
 
     private final AuthService authService;
+    private final SubmissionInternalFeignClient submissionInternalFeignClient;
 
     /**
      * @MethodName login
@@ -70,6 +76,20 @@ public class AuthController {
     @PostMapping("/register")
     public Result<Void> register(@Valid @RequestBody RegisterRequest request) {
         log.info("User register apply submit, uid: {}", request.getUid());
+        Result<RegisterEmailCheckVo> policy = submissionInternalFeignClient.checkRegisterEmail(request.getEmail());
+        if (policy == null || policy.getCode() != ResultCode.SUCCESS || policy.getData() == null) {
+            throw new BizException(ResultCode.INTERNAL_ERROR, "注册策略暂不可用");
+        }
+        if (!Boolean.TRUE.equals(policy.getData().getAllowRegister())) {
+            throw new BizException(ResultCode.FORBIDDEN, policy.getData().getReason());
+        }
+        if (RegisterModeConstant.INVITE_CODE.equals(policy.getData().getRegisterMode())) {
+            authService.registerWithInvite(request);
+            return Result.success("注册申请提交成功，请等待审核", null);
+        }
+        if (!Boolean.TRUE.equals(policy.getData().getMatched())) {
+            throw new BizException(ResultCode.BAD_REQUEST, policy.getData().getReason());
+        }
         authService.register(request);
         return Result.success("注册申请提交成功，请等待审核", null);
     }

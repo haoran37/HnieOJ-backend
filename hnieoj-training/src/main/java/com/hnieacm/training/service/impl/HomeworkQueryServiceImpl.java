@@ -2,8 +2,11 @@ package com.hnieacm.training.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.hnieacm.common.dto.PageVo;
+import com.hnieacm.common.exception.BizException;
+import com.hnieacm.common.result.ResultCode;
 import com.hnieacm.training.constant.HomeworkStatusConstant;
 import com.hnieacm.training.entity.Homework;
+import com.hnieacm.training.entity.HomeworkClass;
 import com.hnieacm.training.mapper.HomeworkClassMapper;
 import com.hnieacm.training.mapper.HomeworkMapper;
 import com.hnieacm.training.mapper.HomeworkProblemMapper;
@@ -42,12 +45,38 @@ public class HomeworkQueryServiceImpl implements HomeworkQueryService {
      */
     @Override
     public PageVo<HomeworkListVo> listHomeworks(int page, int pageSize, String keyword) {
+        return listHomeworks(page, pageSize, keyword, null);
+    }
+
+    @Override
+    public PageVo<HomeworkListVo> listHomeworks(int page, int pageSize, String keyword, Long classId) {
+        return listHomeworks(page, pageSize, keyword, classId, null);
+    }
+
+    @Override
+    public PageVo<HomeworkListVo> listHomeworks(int page, int pageSize, String keyword, Long classId, List<Long> classIds) {
         String normalizedKeyword = HomeworkServiceSupport.trimToNull(keyword);
 
         LambdaQueryWrapper<Homework> wrapper = new LambdaQueryWrapper<Homework>()
                 .eq(Homework::getStatus, HomeworkStatusConstant.ENABLED)
                 .orderByDesc(Homework::getStartTime)
                 .orderByDesc(Homework::getId);
+        if (classId != null || classIds != null) {
+            List<Long> selected = classId != null ? List.of(classId) : classIds;
+            if (selected.isEmpty() || selected.size() > 1000) {
+                throw new BizException(ResultCode.BAD_REQUEST, "classIds 不合法");
+            }
+            if (selected.stream().anyMatch(id -> id == null || id <= 0)) {
+                throw new BizException(ResultCode.BAD_REQUEST, "classIds 不合法");
+            }
+            List<Long> ids = homeworkClassMapper.selectList(new LambdaQueryWrapper<HomeworkClass>()
+                    .in(HomeworkClass::getClassId, selected)).stream()
+                    .map(HomeworkClass::getHid).distinct().toList();
+            if (ids.isEmpty()) {
+                return new PageVo<>(List.of(), 0L);
+            }
+            wrapper.in(Homework::getId, ids);
+        }
         if (normalizedKeyword != null) {
             wrapper.and(w -> w.like(Homework::getTitle, normalizedKeyword)
                     .or()

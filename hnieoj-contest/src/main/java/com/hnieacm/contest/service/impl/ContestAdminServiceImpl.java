@@ -165,7 +165,9 @@ public class ContestAdminServiceImpl implements ContestAdminService {
         contestMapper.updateById(contest);
 
         replaceContestProblems(contestId, request.getProblems());
-        replaceContestAccounts(contestId, resolveAccountList(contest.getAuth(), request.getAccountList()));
+        if (Integer.valueOf(ContestAuthConstant.PRIVATE).equals(contest.getAuth())) {
+            replaceContestAccounts(contestId, resolveAccountList(contest.getAuth(), request.getAccountList()));
+        }
     }
 
     /**

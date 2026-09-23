@@ -14,5 +14,7 @@ public class EmailCheckVo {
 
     private Boolean matched;
 
+    private String registerMode;
+
     private String reason;
 }

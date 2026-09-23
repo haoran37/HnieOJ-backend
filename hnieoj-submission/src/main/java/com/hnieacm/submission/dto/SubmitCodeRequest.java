@@ -26,4 +26,7 @@ public class SubmitCodeRequest {
      * 比赛ID（可选）
      */
     private String contestId;
+
+    /** 作业ID（可选） */
+    private String homeworkId;
 }

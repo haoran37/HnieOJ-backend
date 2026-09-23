@@ -90,22 +90,25 @@ public class SystemConfigServiceImpl implements SystemConfigService {
 
     @Override
     public EmailCheckVo checkRegisterEmail(String email) {
+        SysConfig config = getOrInitConfig();
+        String registerMode = trimToNull(config.getRegisterMode());
         String normalizedEmail = trimToNull(email);
         if (normalizedEmail == null || !normalizedEmail.contains("@")) {
-            return buildEmailCheck(false, false, "邮箱格式不正确");
+            return buildEmailCheck(false, false, "邮箱格式不正确", registerMode);
         }
 
-        SysConfig config = getOrInitConfig();
         if (!Boolean.TRUE.equals(config.getAllowRegister())) {
-            return buildEmailCheck(false, false, "系统暂未开放注册");
+            return buildEmailCheck(false, false, "系统暂未开放注册", registerMode);
         }
 
-        String registerMode = trimToNull(config.getRegisterMode());
         if (SystemConfigConstant.REGISTER_MODE_OPEN.equals(registerMode)) {
-            return buildEmailCheck(true, true, "系统允许开放注册");
+            return buildEmailCheck(true, true, "系统允许开放注册", registerMode);
+        }
+        if (SystemConfigConstant.REGISTER_MODE_INVITE_CODE.equals(registerMode)) {
+            return buildEmailCheck(true, false, "当前为邀请码注册模式", registerMode);
         }
         if (!SystemConfigConstant.REGISTER_MODE_EMAIL_SUFFIX.equals(registerMode)) {
-            return buildEmailCheck(false, false, "当前注册模式不支持邮箱后缀注册");
+            return buildEmailCheck(false, false, "注册模式配置不合法", registerMode);
         }
 
         String lowerEmail = normalizedEmail.toLowerCase();
@@ -114,9 +117,9 @@ public class SystemConfigServiceImpl implements SystemConfigService {
                 .map(String::toLowerCase)
                 .anyMatch(lowerEmail::endsWith);
         if (!matched) {
-            return buildEmailCheck(false, false, "邮箱后缀不符合系统注册策略");
+            return buildEmailCheck(false, false, "邮箱后缀不符合系统注册策略", registerMode);
         }
-        return buildEmailCheck(true, true, "邮箱后缀符合系统注册策略");
+        return buildEmailCheck(true, true, "邮箱后缀符合系统注册策略", registerMode);
     }
 
     @Override
@@ -249,11 +252,12 @@ public class SystemConfigServiceImpl implements SystemConfigService {
         }
     }
 
-    private EmailCheckVo buildEmailCheck(boolean allowRegister, boolean matched, String reason) {
+    private EmailCheckVo buildEmailCheck(boolean allowRegister, boolean matched, String reason, String registerMode) {
         EmailCheckVo vo = new EmailCheckVo();
         vo.setAllowRegister(allowRegister);
         vo.setMatched(matched);
         vo.setReason(reason);
+        vo.setRegisterMode(registerMode);
         return vo;
     }
 

@@ -63,8 +63,9 @@ public class ProblemController {
     @Operation(summary = "获取题目详情")
     @SaCheckLogin
     @GetMapping("/{problemCode}")
-    public Result<ProblemDetailVo> detail(@PathVariable String problemCode) {
-        return Result.success(problemQueryService.getProblemDetail(problemCode));
+    public Result<ProblemDetailVo> detail(@PathVariable String problemCode,
+                                         @RequestParam(required = false) Long cid) {
+        return Result.success(problemQueryService.getProblemDetail(problemCode, cid));
     }
 
     @Operation(summary = "获取推荐题目")

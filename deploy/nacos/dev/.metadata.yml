@@ -1,6 +1,6 @@
 metadata:
 - appName: ''
-  dataId: gateway.yaml
+  dataId: hnieoj-gateway.yaml
   group: DEFAULT_GROUP
   type: yaml
 - appName: ''

@@ -52,7 +52,8 @@ class ProblemQueryServiceImplRecommendationTest {
         problemMapper = mock(ProblemMapper.class);
         problemTagMapper = mock(ProblemTagMapper.class);
         tagMapper = mock(TagMapper.class);
-        service = new ProblemQueryServiceImpl(problemMapper, problemTagMapper, tagMapper, new ObjectMapper());
+        service = new ProblemQueryServiceImpl(problemMapper, problemTagMapper, tagMapper, new ObjectMapper(),
+                mock(com.hnieacm.problem.feign.ContestAccessFeignClient.class));
         // 默认无任何权限，避免跨测试污染 Sa-Token 全局 StpInterface
         SaManager.setStpInterface(stpInterface(List.of()));
     }

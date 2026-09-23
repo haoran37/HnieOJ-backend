@@ -30,4 +30,11 @@ public interface AuthService {
      * @Date 2026/02/13
      */
     void register(RegisterRequest request);
+
+    /**
+     * Register a user with a one-time invitation in the same transaction.
+     *
+     * @param request registration request containing an invitation code
+     */
+    void registerWithInvite(RegisterRequest request);
 }
